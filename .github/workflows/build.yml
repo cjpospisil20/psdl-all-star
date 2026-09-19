@@ -1,0 +1,148 @@
+name: Build and deploy
+
+# Three ways in:
+#   schedule          - the weekly refresh, after Tuesday-night matches
+#   workflow_dispatch - a volunteer can force a rebuild from the Actions tab
+#   push              - republish straight away when code or archived data changes
+on:
+  schedule:
+    # ---------------------------------------------------------------------------
+    # GitHub cron is ALWAYS UTC. It does not follow US daylight saving, so any
+    # fixed UTC time slides an hour against New York twice a year (mid-March and
+    # early November). So pick a slot with hours of slack on both sides, where a
+    # one-hour drift cannot possibly matter.
+    #
+    # The league plays Tuesday nights in Brooklyn and the last boards finish late
+    # evening America/New_York. 07:00 UTC on Wednesday is:
+    #     03:00 EDT  (UTC-4, mid-March to early November)
+    #     02:00 EST  (UTC-5, the rest of the year)
+    # Either way: the small hours of Wednesday morning in Brooklyn. Hours after
+    # the last dart, and finished long before anyone opens the site over coffee.
+    - cron: "0 7 * * 3"
+    # Catch-up pass, Thursday at the same hour. GitHub delays and sometimes
+    # silently drops scheduled runs when its queues are busy, and fetch.py skips
+    # every match it has already archived - so this second pass normally does
+    # nothing, costs nothing, and turns a missed Wednesday into a one-day delay
+    # rather than a week-long gap in the archive.
+    - cron: "0 7 * * 4"
+  workflow_dispatch:
+  push:
+    # Both names listed so this works whatever the repo's default branch is.
+    # Note: commits pushed by this workflow's own GITHUB_TOKEN do NOT re-trigger
+    # workflows, so the data commit below cannot start an infinite loop.
+    branches: [main, master]
+
+# Read-only by default; each job widens only what it actually needs.
+permissions:
+  contents: read
+
+# One run at a time. Never cancel a run in progress: it may be mid-push of newly
+# archived data, or mid-deploy to Pages.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # to commit newly archived recaps back to the repo
+      pages: write      # configure-pages reads/writes the Pages config
+      id-token: write
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          # No requirements.txt, no pip install, no cache: the scraper and the
+          # site generator are pure Python standard library, on purpose. A league
+          # volunteer should be able to run this on any machine with python3.
+
+      # ---------------------------------------------------------------------
+      # 1. Fetch. Archives any match recap not already on disk, and refreshes
+      #    the schedule and standings. Rate-limited to ~1.5s per request.
+      - name: Fetch new matches from DartConnect
+        run: python3 scraper/fetch.py
+
+      # ---------------------------------------------------------------------
+      # 2. Commit the archive - BEFORE verification, deliberately.
+      #
+      #    The archive is the whole point: DartConnect owes us nothing and could
+      #    change its format or withdraw access at any time. Once a payload is
+      #    fetched it must be kept, even if verification then fails, otherwise a
+      #    bad build throws away data we may never be able to fetch again.
+      #    Committing is not publishing - the deploy below is still gated on
+      #    verify.py passing.
+      #
+      #    always() so a partial archive survives a mid-run fetch failure.
+      - name: Commit newly archived data
+        if: always()
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          # Guard against an empty commit: most weeks nothing new has appeared.
+          if git diff --cached --quiet; then
+            echo "No new or changed files under data/ - nothing to commit."
+          else
+            git diff --cached --name-only
+            git commit -m "data: archive DartConnect recaps ($(date -u '+%Y-%m-%d'))"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
+
+      # ---------------------------------------------------------------------
+      # 3. Verify. This is the gate. verify.py exits non-zero if any assertion
+      #    fails, which fails this step, which fails the job, which means the
+      #    deploy job below never runs. Wrong numbers must never publish.
+      - name: Verify the numbers
+        run: python3 scraper/verify.py
+
+      # ---------------------------------------------------------------------
+      # 4. Build. Reads only the archive on disk, so it is offline and
+      #    reproducible. Also exits non-zero if a placeholder reached a page.
+      - name: Build the site
+        run: python3 site/build.py
+
+      # ---------------------------------------------------------------------
+      # 5. Check the built output. verify.py gates the NUMBERS; this gates the
+      #    PAGES - links, contrast, palette, fonts, heading structure, tap
+      #    targets, name integrity. Also exits non-zero, so it gates the deploy
+      #    the same way.
+      - name: Check the built pages
+        run: python3 site/check.py
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload public/ as the Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Summarise the run
+        if: always()
+        run: |
+          {
+            echo "### PSDL All Star build"
+            echo ""
+            echo "- Archived recaps: $(ls data/recaps/*.json 2>/dev/null | wc -l | tr -d ' ')"
+            echo "- Generated pages: $(find public -name '*.html' 2>/dev/null | wc -l | tr -d ' ')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    # Only reached when build succeeded, which means verify.py passed.
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to prove the artifact came from this workflow
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

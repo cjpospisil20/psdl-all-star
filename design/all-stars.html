@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PSDL All Star — All-Star leaderboard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Archivo:wght@400;500;600;700&amp;display=swap">
+<style>
+body { margin: 0; background: #141112; font-family: 'Archivo', 'Helvetica Neue', sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: #C59940; text-decoration: none; }
+a:hover { color: #FFFFFF; }
+input::placeholder { color: #8E8889; }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+<style>
+body { display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
+</style>
+</head>
+<body>
+<div style="width: 390px; height: 1460px; box-sizing: border-box; background: #141112; display: flex; flex-direction: column; overflow: hidden;">
+
+  <header style="display: flex; align-items: center; gap: 12px; padding: 16px; background: #201B1C; border-bottom: 1px solid #3A3234;">
+    <span style="width: 42px; height: 42px; border-radius: 50%; background: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+      <img src="assets/psdl-mark.png" alt="Park Slope Dart League" style="width: 36px; height: 36px; object-fit: contain; display: block;">
+    </span>
+    <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+      <span style="font-size: 9px; font-weight: 700; letter-spacing: 0.16em; color: #C59940;">PARK SLOPE DART LEAGUE</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 23px; line-height: 1; letter-spacing: 0.02em; color: #FFFFFF;">ALL STAR POINTS</span>
+    </span>
+  </header>
+
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 16px; background: #1A1617; border-bottom: 1px solid #2B2526;">
+    <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #FFFFFF;">WEEK 1 · TUE 15 SEP</span>
+    <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.08em; color: #C59940;">SYNCED FROM DARTCONNECT</span>
+  </div>
+
+  <nav aria-label="Division" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; padding: 14px 16px 10px;">
+    <a href="#div1" aria-current="page" style="height: 52px; border-radius: 8px; background: #C59940; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;">
+      <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.14em; color: #4A3A16;">DIV</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 21px; line-height: 1; color: #211C1D;">1</span>
+    </a>
+    <a href="#div2" style="height: 52px; border-radius: 8px; background: #201B1C; border: 1px solid #332C2E; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;">
+      <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.14em; color: #8E8889;">DIV</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 21px; line-height: 1; color: #E4E0E1;">2</span>
+    </a>
+    <a href="#div3" style="height: 52px; border-radius: 8px; background: #201B1C; border: 1px solid #332C2E; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;">
+      <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.14em; color: #8E8889;">DIV</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 21px; line-height: 1; color: #E4E0E1;">3</span>
+    </a>
+    <a href="#div4" style="height: 52px; border-radius: 8px; background: #201B1C; border: 1px solid #332C2E; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;">
+      <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.14em; color: #8E8889;">DIV</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 21px; line-height: 1; color: #E4E0E1;">4</span>
+    </a>
+    <a href="#div5" style="height: 52px; border-radius: 8px; background: #201B1C; border: 1px solid #332C2E; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;">
+      <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.14em; color: #8E8889;">DIV</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 21px; line-height: 1; color: #E4E0E1;">5</span>
+    </a>
+  </nav>
+
+  <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 6px 16px 12px;">
+    <span style="display: flex; flex-direction: column; gap: 3px;">
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 30px; line-height: 1; color: #FFFFFF;">DIVISION 1</span>
+      <span style="font-size: 12px; font-weight: 500; color: #A6A2A3;">22 players on the board this week</span>
+    </span>
+    <span style="flex-shrink: 0; text-align: right; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: #C59940; line-height: 1.4;">RANKED WITHIN<br>DIVISION ONLY</span>
+  </div>
+
+  <label for="find-player" class="vh">Find a player</label>
+  <div style="display: flex; align-items: center; gap: 9px; margin: 0 16px 14px; padding: 0 12px; height: 46px; background: #201B1C; border: 1px solid #332C2E; border-radius: 9px;">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7"></circle>
+      <path d="M16.5 16.5 L21 21"></path>
+    </svg>
+    <input id="find-player" type="search" placeholder="Find a player" style="flex-grow: 1; min-width: 0; background: transparent; border: 0; outline: none; color: #FFFFFF; font-family: 'Archivo', 'Helvetica Neue', sans-serif; font-size: 15px;">
+  </div>
+
+  <a href="player.html" style="margin: 0 16px 12px; padding: 14px; background: #201B1C; border: 1px solid #C59940; border-radius: 11px; display: flex; flex-direction: column; gap: 11px;">
+    <span style="display: flex; align-items: flex-start; gap: 12px;">
+      <span style="flex-shrink: 0; width: 30px; font-family: 'Anton', 'Oswald', sans-serif; font-size: 34px; line-height: 0.9; color: #C59940; font-variant-numeric: tabular-nums;">1</span>
+      <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;">
+        <span style="font-size: 19px; font-weight: 700; color: #FFFFFF; line-height: 1.2; text-wrap: pretty;">Tom Lettieri</span>
+        <span style="font-size: 12px; font-weight: 500; color: #A6A2A3;">[TEAM NAME]</span>
+      </span>
+      <span style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+        <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 30px; line-height: 0.9; color: #FFFFFF; font-variant-numeric: tabular-nums;">835</span>
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: #8E8889;">PPW 835 · AS 8</span>
+      </span>
+    </span>
+    <span style="display: flex; flex-wrap: wrap; gap: 5px;">
+      <span style="padding: 4px 8px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">95+ ×5</span>
+      <span style="padding: 4px 8px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">R5</span>
+      <span style="padding: 4px 8px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">C3 ×2</span>
+    </span>
+  </a>
+
+  <a href="player.html" style="display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px; border-top: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 26px; padding-top: 2px; font-family: 'Anton', 'Oswald', sans-serif; font-size: 21px; line-height: 1; color: #C59940; font-variant-numeric: tabular-nums;">2</span>
+    <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px;">
+      <span style="font-size: 16px; font-weight: 600; color: #FFFFFF; line-height: 1.25; text-wrap: pretty;">Jeff Jean-Louis</span>
+      <span style="display: flex; flex-wrap: wrap; gap: 5px;">
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">95+ ×2</span>
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">R5 ×2</span>
+        <span style="padding: 3px 7px; border-radius: 4px; background: #C59940; color: #211C1D; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">R7 ×2</span>
+      </span>
+    </span>
+    <span style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; padding-top: 1px;">
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">680</span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: #8E8889;">PPW 680</span>
+    </span>
+  </a>
+
+  <a href="player.html" style="display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px; border-top: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 26px; padding-top: 2px; font-family: 'Anton', 'Oswald', sans-serif; font-size: 21px; line-height: 1; color: #C59940; font-variant-numeric: tabular-nums;">3</span>
+    <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px;">
+      <span style="font-size: 16px; font-weight: 600; color: #FFFFFF; line-height: 1.25; text-wrap: pretty;">Anaelechi "Lay" Owunwanne</span>
+      <span style="display: flex; flex-wrap: wrap; gap: 5px;">
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">95+ ×3</span>
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">R5</span>
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">R6</span>
+      </span>
+    </span>
+    <span style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; padding-top: 1px;">
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">569</span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: #8E8889;">PPW 569</span>
+    </span>
+  </a>
+
+  <a href="player.html" style="display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px; border-top: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 26px; padding-top: 2px; font-family: 'Anton', 'Oswald', sans-serif; font-size: 21px; line-height: 1; color: #8E8889; font-variant-numeric: tabular-nums;">4</span>
+    <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px;">
+      <span style="font-size: 16px; font-weight: 600; color: #FFFFFF; line-height: 1.25; text-wrap: pretty;">Ron Belfon</span>
+      <span style="display: flex; flex-wrap: wrap; gap: 5px;">
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">95+ ×4</span>
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">R5</span>
+      </span>
+    </span>
+    <span style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; padding-top: 1px;">
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">540</span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: #8E8889;">PPW 540</span>
+    </span>
+  </a>
+
+  <a href="player.html" style="display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px; border-top: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 26px; padding-top: 2px; font-family: 'Anton', 'Oswald', sans-serif; font-size: 21px; line-height: 1; color: #8E8889; font-variant-numeric: tabular-nums;">5</span>
+    <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px;">
+      <span style="font-size: 16px; font-weight: 600; color: #FFFFFF; line-height: 1.25; text-wrap: pretty;">Cam "Jiminy" Green</span>
+      <span style="display: flex; flex-wrap: wrap; gap: 5px;">
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">95+ ×2</span>
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">R5</span>
+        <span style="padding: 3px 7px; border-radius: 4px; background: #C59940; color: #211C1D; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">R7</span>
+      </span>
+    </span>
+    <span style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; padding-top: 1px;">
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">438</span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: #8E8889;">PPW 438</span>
+    </span>
+  </a>
+
+  <a href="player.html" style="display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px; border-top: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 26px; padding-top: 2px; font-family: 'Anton', 'Oswald', sans-serif; font-size: 21px; line-height: 1; color: #8E8889; font-variant-numeric: tabular-nums;">6</span>
+    <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px;">
+      <span style="font-size: 16px; font-weight: 600; color: #FFFFFF; line-height: 1.25; text-wrap: pretty;">Patrick OSullivan</span>
+      <span style="display: flex; flex-wrap: wrap; gap: 5px;">
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">R5 ×4</span>
+      </span>
+    </span>
+    <span style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; padding-top: 1px;">
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">400</span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: #8E8889;">PPW 400</span>
+    </span>
+  </a>
+
+  <div style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px dashed #C59940;">
+    <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: #C59940;">[ALL STAR CUT LINE]</span>
+    <span style="flex-grow: 1; height: 1px; background: #332C2E;"></span>
+  </div>
+
+  <a href="player.html" style="display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px; border-top: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 26px; padding-top: 2px; font-family: 'Anton', 'Oswald', sans-serif; font-size: 21px; line-height: 1; color: #8E8889; font-variant-numeric: tabular-nums;">7</span>
+    <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px;">
+      <span style="font-size: 16px; font-weight: 600; color: #FFFFFF; line-height: 1.25; text-wrap: pretty;">Tom Sievewright</span>
+      <span style="display: flex; flex-wrap: wrap; gap: 5px;">
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">95+ ×2</span>
+        <span style="padding: 3px 7px; border-radius: 4px; background: #C59940; color: #211C1D; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">R7</span>
+      </span>
+    </span>
+    <span style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; padding-top: 1px;">
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">380</span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: #8E8889;">PPW 380</span>
+    </span>
+  </a>
+
+  <a href="player.html" style="display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px; border-top: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 26px; padding-top: 2px; font-family: 'Anton', 'Oswald', sans-serif; font-size: 21px; line-height: 1; color: #8E8889; font-variant-numeric: tabular-nums;">8</span>
+    <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px;">
+      <span style="font-size: 16px; font-weight: 600; color: #FFFFFF; line-height: 1.25; text-wrap: pretty;">Mike Speciale</span>
+      <span style="display: flex; flex-wrap: wrap; gap: 5px;">
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">95+ ×2</span>
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">R5</span>
+      </span>
+    </span>
+    <span style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; padding-top: 1px;">
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">350</span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: #8E8889;">PPW 350</span>
+    </span>
+  </a>
+
+  <a href="player.html" style="display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px; border-top: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 26px; padding-top: 2px; font-family: 'Anton', 'Oswald', sans-serif; font-size: 21px; line-height: 1; color: #8E8889; font-variant-numeric: tabular-nums;">9</span>
+    <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px;">
+      <span style="font-size: 16px; font-weight: 600; color: #FFFFFF; line-height: 1.25; text-wrap: pretty;">Ryan Meehan</span>
+      <span style="display: flex; flex-wrap: wrap; gap: 5px;">
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">R5</span>
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">R6</span>
+        <span style="padding: 3px 7px; border-radius: 4px; background: #C59940; color: #211C1D; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">F90</span>
+      </span>
+    </span>
+    <span style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; padding-top: 1px;">
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">313</span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: #8E8889;">PPW 313</span>
+    </span>
+  </a>
+
+  <a href="player.html" style="display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px; border-top: 1px solid #241F20; border-bottom: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 26px; padding-top: 2px; font-family: 'Anton', 'Oswald', sans-serif; font-size: 21px; line-height: 1; color: #8E8889; font-variant-numeric: tabular-nums;">10</span>
+    <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px;">
+      <span style="font-size: 16px; font-weight: 600; color: #FFFFFF; line-height: 1.25; text-wrap: pretty;">Neil Shah</span>
+      <span style="display: flex; flex-wrap: wrap; gap: 5px;">
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">95+ ×2</span>
+        <span style="padding: 3px 7px; border-radius: 4px; background: #2B2526; color: #E4E0E1; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;">R5</span>
+      </span>
+    </span>
+    <span style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; padding-top: 1px;">
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">300</span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: #8E8889;">PPW 300</span>
+    </span>
+  </a>
+
+  <a href="#all" style="margin: 14px 16px 0; height: 46px; border-radius: 9px; border: 1px solid #332C2E; background: #201B1C; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: #C59940;">
+      SHOW ALL 22 IN DIVISION 1
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C59940" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9 L12 15 L18 9"></path></svg>
+  </a>
+
+  <p style="margin: 16px 16px 0; font-size: 11px; line-height: 1.55; color: #8E8889;">Division 1 scores roughly 2.5× Division 5, so players are only ever ranked against their own division. Tap any player to see the turns behind the number.</p>
+
+  <span style="flex-grow: 1;"></span>
+
+  <nav aria-label="Sections" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: #201B1C; border-top: 1px solid #3A3234;">
+    <a href="standings.html" style="height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"></rect><path d="M3.5 9.5 L20.5 9.5"></path><path d="M3.5 14.5 L20.5 14.5"></path></svg>
+      <span style="font-size: 8.5px; font-weight: 700; letter-spacing: 0.04em; color: #8E8889;">STANDINGS</span>
+    </a>
+    <a href="all-stars.html" aria-current="page" style="height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C59940" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 L14.6 9.1 L21 9.7 L16.2 14 L17.6 20.3 L12 17 L6.4 20.3 L7.8 14 L3 9.7 L9.4 9.1 Z"></path></svg>
+      <span style="font-size: 8.5px; font-weight: 700; letter-spacing: 0.04em; color: #C59940;">ALL-STARS</span>
+    </a>
+    <a href="match.html" style="height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="3.5"></circle></svg>
+      <span style="font-size: 8.5px; font-weight: 700; letter-spacing: 0.04em; color: #8E8889;">MATCH</span>
+    </a>
+    <a href="team.html" style="height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"></circle><path d="M3.5 19 C3.5 15.6 6 13.8 9 13.8 C12 13.8 14.5 15.6 14.5 19"></path><path d="M16 13.9 C18.6 14.2 20.5 15.9 20.5 19"></path><circle cx="16.8" cy="8.6" r="2.6"></circle></svg>
+      <span style="font-size: 8.5px; font-weight: 700; letter-spacing: 0.04em; color: #8E8889;">TEAM</span>
+    </a>
+    <a href="player.html" style="height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"></circle><path d="M5 19.5 C5 15.8 8.1 13.8 12 13.8 C15.9 13.8 19 15.8 19 19.5"></path></svg>
+      <span style="font-size: 8.5px; font-weight: 700; letter-spacing: 0.04em; color: #8E8889;">PLAYER</span>
+    </a>
+  </nav>
+
+</div>
+</body>
+</html>

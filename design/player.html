@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PSDL All Star — Player page</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Archivo:wght@400;500;600;700&amp;display=swap">
+<style>
+body { margin: 0; background: #141112; font-family: 'Archivo', 'Helvetica Neue', sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: #C59940; text-decoration: none; }
+a:hover { color: #FFFFFF; }
+</style>
+<style>
+body { display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
+</style>
+</head>
+<body>
+<div style="width: 390px; height: 1660px; box-sizing: border-box; background: #141112; display: flex; flex-direction: column; overflow: hidden;">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: #201B1C; border-bottom: 1px solid #3A3234;">
+    <a href="all-stars.html" style="display: flex; align-items: center; gap: 7px; height: 32px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: #C59940;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C59940" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 6 L8 12 L14 18"></path></svg>
+      ALL-STARS
+    </a>
+    <span style="width: 32px; height: 32px; border-radius: 50%; background: #FFFFFF; display: flex; align-items: center; justify-content: center;">
+      <img src="assets/psdl-mark.png" alt="Park Slope Dart League" style="width: 27px; height: 27px; object-fit: contain; display: block;">
+    </span>
+  </header>
+
+  <div style="padding: 20px 16px 16px; display: flex; flex-direction: column; gap: 7px;">
+    <h1 style="margin: 0; font-family: 'Anton', 'Oswald', sans-serif; font-size: 36px; line-height: 1.02; letter-spacing: 0.01em; color: #FFFFFF; text-wrap: pretty;">Cj Pospisil</h1>
+    <p style="margin: 0; font-size: 13px; font-weight: 500; color: #A6A2A3;">Division 1 &middot; [TEAM NAME] &middot; member #327447</p>
+  </div>
+
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 16px 10px;">
+    <h2 style="margin: 0; font-family: 'Anton', 'Oswald', sans-serif; font-size: 20px; line-height: 1; letter-spacing: 0.03em; color: #FFFFFF;">THE DARTS</h2>
+    <button type="button" style="height: 32px; padding: 0 11px; border: 1px solid #332C2E; border-radius: 7px; background: #201B1C; color: #E4E0E1; font-family: 'Archivo', 'Helvetica Neue', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; display: flex; align-items: center; gap: 7px; cursor: pointer;">
+      SINGLES 501 SIDO
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#C59940" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9 L12 15 L18 9"></path></svg>
+    </button>
+  </div>
+
+  <div style="margin: 0 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+    <div style="padding: 13px; background: #201B1C; border: 1px solid #C59940; border-radius: 10px; display: flex; flex-direction: column; gap: 5px;">
+      <span style="font-size: 9px; font-weight: 700; letter-spacing: 0.12em; color: #C59940;">3-DART AVG</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 38px; line-height: 0.92; color: #FFFFFF; font-variant-numeric: tabular-nums;">43.35</span>
+      <span style="display: flex; align-items: center; gap: 5px;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#C59940" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 17 L19 7"></path><path d="M12 7 L19 7 L19 14"></path></svg>
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.04em; color: #C59940; font-variant-numeric: tabular-nums;">44.50 LAST 20 LEGS</span>
+      </span>
+    </div>
+    <div style="padding: 13px; background: #201B1C; border: 1px solid #332C2E; border-radius: 10px; display: flex; flex-direction: column; gap: 5px;">
+      <span style="font-size: 9px; font-weight: 700; letter-spacing: 0.12em; color: #8E8889;">MARKS PER RD</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 38px; line-height: 0.92; color: #8E8889; font-variant-numeric: tabular-nums;">[MPR]</span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.04em; color: #8E8889;">CRICKET &mdash; NOT IN EXPORT</span>
+    </div>
+  </div>
+
+  <p style="margin: 14px 16px 8px; font-size: 9px; font-weight: 700; letter-spacing: 0.14em; color: #8E8889;">LAST 100 LEGS</p>
+
+  <div style="margin: 0 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+    <div style="padding: 11px 10px; background: #1A1617; border: 1px solid #2B2526; border-radius: 9px; display: flex; flex-direction: column; gap: 4px;">
+      <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.1em; color: #8E8889;">FIRST 9</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">53.04</span>
+    </div>
+    <div style="padding: 11px 10px; background: #1A1617; border: 1px solid #2B2526; border-radius: 9px; display: flex; flex-direction: column; gap: 4px;">
+      <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.1em; color: #8E8889;">AVG FINISH</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">20.64</span>
+    </div>
+    <div style="padding: 11px 10px; background: #1A1617; border: 1px solid #2B2526; border-radius: 9px; display: flex; flex-direction: column; gap: 4px;">
+      <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.1em; color: #8E8889;">CHECKOUT</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">13.1%</span>
+    </div>
+    <div style="padding: 11px 10px; background: #1A1617; border: 1px solid #2B2526; border-radius: 9px; display: flex; flex-direction: column; gap: 4px;">
+      <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.1em; color: #8E8889;">LEG WINS</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">60.7%</span>
+    </div>
+    <div style="padding: 11px 10px; background: #1A1617; border: 1px solid #2B2526; border-radius: 9px; display: flex; flex-direction: column; gap: 4px;">
+      <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.1em; color: #8E8889;">OPP 3DA</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">41.64</span>
+    </div>
+    <div style="padding: 11px 10px; background: #1A1617; border: 1px solid #2B2526; border-radius: 9px; display: flex; flex-direction: column; gap: 4px;">
+      <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.1em; color: #8E8889;">VS DARTS</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">56.3%</span>
+    </div>
+  </div>
+
+  <div style="margin: 12px 16px 0; padding: 12px 13px; background: #201B1C; border: 1px solid #2B2526; border-radius: 10px; display: flex; flex-direction: column; gap: 10px;">
+    <span style="font-size: 9px; font-weight: 700; letter-spacing: 0.12em; color: #8E8889;">2026 ACTIVITY</span>
+    <span style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;">
+      <span style="display: flex; flex-direction: column; gap: 3px;">
+        <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 20px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">22</span>
+        <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #8E8889;">MATCHES</span>
+      </span>
+      <span style="display: flex; flex-direction: column; gap: 3px;">
+        <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 20px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">99</span>
+        <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #8E8889;">LEGS</span>
+      </span>
+      <span style="display: flex; flex-direction: column; gap: 3px;">
+        <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 20px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">2,970</span>
+        <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #8E8889;">DARTS</span>
+      </span>
+      <span style="display: flex; flex-direction: column; gap: 3px;">
+        <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 20px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">42</span>
+        <span style="font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #8E8889;">OPPONENTS</span>
+      </span>
+    </span>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 12px; padding: 24px 16px 12px;">
+    <h2 style="margin: 0; font-family: 'Anton', 'Oswald', sans-serif; font-size: 20px; line-height: 1; letter-spacing: 0.03em; color: #FFFFFF;">ALL STAR POINTS</h2>
+    <span style="flex-grow: 1; height: 1px; background: #332C2E;"></span>
+  </div>
+
+  <div style="margin: 0 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+    <div style="padding: 13px 12px; background: #201B1C; border: 1px solid #C59940; border-radius: 10px; display: flex; flex-direction: column; gap: 4px;">
+      <span style="font-size: 9px; font-weight: 700; letter-spacing: 0.12em; color: #C59940;">POINTS</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 34px; line-height: 0.95; color: #FFFFFF; font-variant-numeric: tabular-nums;">835</span>
+    </div>
+    <div style="padding: 13px 12px; background: #201B1C; border: 1px solid #332C2E; border-radius: 10px; display: flex; flex-direction: column; gap: 4px;">
+      <span style="font-size: 9px; font-weight: 700; letter-spacing: 0.12em; color: #8E8889;">HITS (AS)</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 34px; line-height: 0.95; color: #FFFFFF; font-variant-numeric: tabular-nums;">8</span>
+    </div>
+    <div style="padding: 13px 12px; background: #201B1C; border: 1px solid #332C2E; border-radius: 10px; display: flex; flex-direction: column; gap: 4px;">
+      <span style="font-size: 9px; font-weight: 700; letter-spacing: 0.12em; color: #8E8889;">PPW</span>
+      <span style="font-family: 'Anton', 'Oswald', sans-serif; font-size: 34px; line-height: 0.95; color: #FFFFFF; font-variant-numeric: tabular-nums;">835</span>
+    </div>
+  </div>
+
+  <div style="margin: 14px 16px 0; padding: 14px; background: #1A1617; border: 1px solid #2B2526; border-radius: 10px; display: flex; flex-direction: column; gap: 11px;">
+    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px;">
+      <span style="font-size: 14px; font-weight: 600; color: #FFFFFF;">1st of 22 in Division 1</span>
+      <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: #C59940;">[ALL STAR CUT]</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(22, minmax(0, 1fr)); gap: 2px; align-items: end; height: 26px;">
+      <span style="height: 26px; border-radius: 2px; background: #C59940;"></span>
+      <span style="height: 20px; border-radius: 2px; background: #4A4143;"></span>
+      <span style="height: 18px; border-radius: 2px; background: #4A4143;"></span>
+      <span style="height: 17px; border-radius: 2px; background: #4A4143;"></span>
+      <span style="height: 15px; border-radius: 2px; background: #4A4143;"></span>
+      <span style="height: 14px; border-radius: 2px; background: #4A4143;"></span>
+      <span style="height: 13px; border-radius: 2px; background: #3A3234;"></span>
+      <span style="height: 13px; border-radius: 2px; background: #3A3234;"></span>
+      <span style="height: 12px; border-radius: 2px; background: #3A3234;"></span>
+      <span style="height: 11px; border-radius: 2px; background: #3A3234;"></span>
+      <span style="height: 10px; border-radius: 2px; background: #3A3234;"></span>
+      <span style="height: 9px; border-radius: 2px; background: #3A3234;"></span>
+      <span style="height: 9px; border-radius: 2px; background: #3A3234;"></span>
+      <span style="height: 8px; border-radius: 2px; background: #3A3234;"></span>
+      <span style="height: 8px; border-radius: 2px; background: #3A3234;"></span>
+      <span style="height: 8px; border-radius: 2px; background: #3A3234;"></span>
+      <span style="height: 7px; border-radius: 2px; background: #3A3234;"></span>
+      <span style="height: 6px; border-radius: 2px; background: #3A3234;"></span>
+      <span style="height: 5px; border-radius: 2px; background: #3A3234;"></span>
+      <span style="height: 5px; border-radius: 2px; background: #3A3234;"></span>
+      <span style="height: 4px; border-radius: 2px; background: #3A3234;"></span>
+      <span style="height: 4px; border-radius: 2px; background: #3A3234;"></span>
+    </div>
+    <p style="margin: 0; font-size: 11px; line-height: 1.5; color: #8E8889;">Every bar is a Division 1 player this week. Division 5 is a different table entirely &mdash; the two are never compared.</p>
+  </div>
+
+  <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 20px 16px 10px;">
+    <h2 style="margin: 0; font-family: 'Anton', 'Oswald', sans-serif; font-size: 20px; line-height: 1; letter-spacing: 0.03em; color: #FFFFFF;">THE 8 HITS</h2>
+    <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: #8E8889;">TAP FOR THE TURN</span>
+  </div>
+
+  <a href="https://recap.dartconnect.com/" style="margin: 0 16px 10px; padding: 13px 14px; background: #201B1C; border: 1px solid #C59940; border-radius: 10px; display: flex; align-items: center; gap: 13px;">
+    <span style="flex-shrink: 0; width: 56px; height: 44px; border-radius: 6px; background: #C59940; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; letter-spacing: 0.03em; color: #211C1D;">95+</span>
+    <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;">
+      <span style="font-size: 15px; font-weight: 700; color: #FFFFFF;">Best turn of the week</span>
+      <span style="font-size: 11px; font-weight: 500; color: #A6A2A3;">501 &middot; Tue 15 Sep &middot; view on DartConnect</span>
+    </span>
+    <span style="flex-shrink: 0; font-family: 'Anton', 'Oswald', sans-serif; font-size: 28px; line-height: 1; color: #C59940; font-variant-numeric: tabular-nums;">140</span>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C59940" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6 L15 12 L9 18"></path></svg>
+  </a>
+
+  <a href="https://recap.dartconnect.com/" style="display: flex; align-items: center; gap: 13px; padding: 11px 16px; border-top: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 56px; height: 38px; border-radius: 6px; background: #2B2526; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #E4E0E1;">95+</span>
+    <span style="flex-grow: 1; min-width: 0; font-size: 12px; font-weight: 500; color: #A6A2A3;">501 &middot; Tue 15 Sep</span>
+    <span style="flex-shrink: 0; font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">105</span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6 L15 12 L9 18"></path></svg>
+  </a>
+
+  <a href="https://recap.dartconnect.com/" style="display: flex; align-items: center; gap: 13px; padding: 11px 16px; border-top: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 56px; height: 38px; border-radius: 6px; background: #2B2526; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #E4E0E1;">95+</span>
+    <span style="flex-grow: 1; min-width: 0; font-size: 12px; font-weight: 500; color: #A6A2A3;">501 &middot; Tue 15 Sep</span>
+    <span style="flex-shrink: 0; font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">100</span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6 L15 12 L9 18"></path></svg>
+  </a>
+
+  <a href="https://recap.dartconnect.com/" style="display: flex; align-items: center; gap: 13px; padding: 11px 16px; border-top: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 56px; height: 38px; border-radius: 6px; background: #2B2526; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #E4E0E1;">95+</span>
+    <span style="flex-grow: 1; min-width: 0; font-size: 12px; font-weight: 500; color: #A6A2A3;">701 &middot; Tue 15 Sep</span>
+    <span style="flex-shrink: 0; font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">95</span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6 L15 12 L9 18"></path></svg>
+  </a>
+
+  <a href="https://recap.dartconnect.com/" style="display: flex; align-items: center; gap: 13px; padding: 11px 16px; border-top: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 56px; height: 38px; border-radius: 6px; background: #2B2526; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #E4E0E1;">95+</span>
+    <span style="flex-grow: 1; min-width: 0; font-size: 12px; font-weight: 500; color: #A6A2A3;">701 &middot; Tue 15 Sep</span>
+    <span style="flex-shrink: 0; font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">95</span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6 L15 12 L9 18"></path></svg>
+  </a>
+
+  <a href="https://recap.dartconnect.com/" style="display: flex; align-items: center; gap: 13px; padding: 11px 16px; border-top: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 56px; height: 38px; border-radius: 6px; background: #2B2526; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #E4E0E1;">R5</span>
+    <span style="flex-grow: 1; min-width: 0; font-size: 12px; font-weight: 500; color: #A6A2A3;">Cricket &middot; 5 marks in a turn</span>
+    <span style="flex-shrink: 0; font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">100</span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6 L15 12 L9 18"></path></svg>
+  </a>
+
+  <a href="https://recap.dartconnect.com/" style="display: flex; align-items: center; gap: 13px; padding: 11px 16px; border-top: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 56px; height: 38px; border-radius: 6px; background: #2B2526; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #E4E0E1;">C3</span>
+    <span style="flex-grow: 1; min-width: 0; font-size: 12px; font-weight: 500; color: #A6A2A3;">Cricket &middot; 3 bullseye marks</span>
+    <span style="flex-shrink: 0; font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">100</span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6 L15 12 L9 18"></path></svg>
+  </a>
+
+  <a href="https://recap.dartconnect.com/" style="display: flex; align-items: center; gap: 13px; padding: 11px 16px; border-top: 1px solid #241F20; border-bottom: 1px solid #241F20;">
+    <span style="flex-shrink: 0; width: 56px; height: 38px; border-radius: 6px; background: #2B2526; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #E4E0E1;">C3</span>
+    <span style="flex-grow: 1; min-width: 0; font-size: 12px; font-weight: 500; color: #A6A2A3;">Cricket &middot; 3 bullseye marks</span>
+    <span style="flex-shrink: 0; font-family: 'Anton', 'Oswald', sans-serif; font-size: 22px; line-height: 1; color: #FFFFFF; font-variant-numeric: tabular-nums;">100</span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6 L15 12 L9 18"></path></svg>
+  </a>
+
+  <span style="flex-grow: 1;"></span>
+
+  <nav aria-label="Sections" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: #201B1C; border-top: 1px solid #3A3234;">
+    <a href="standings.html" style="height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"></rect><path d="M3.5 9.5 L20.5 9.5"></path><path d="M3.5 14.5 L20.5 14.5"></path></svg>
+      <span style="font-size: 8.5px; font-weight: 700; letter-spacing: 0.04em; color: #8E8889;">STANDINGS</span>
+    </a>
+    <a href="all-stars.html" style="height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 L14.6 9.1 L21 9.7 L16.2 14 L17.6 20.3 L12 17 L6.4 20.3 L7.8 14 L3 9.7 L9.4 9.1 Z"></path></svg>
+      <span style="font-size: 8.5px; font-weight: 700; letter-spacing: 0.04em; color: #8E8889;">ALL-STARS</span>
+    </a>
+    <a href="match.html" style="height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="3.5"></circle></svg>
+      <span style="font-size: 8.5px; font-weight: 700; letter-spacing: 0.04em; color: #8E8889;">MATCH</span>
+    </a>
+    <a href="team.html" style="height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8E8889" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"></circle><path d="M3.5 19 C3.5 15.6 6 13.8 9 13.8 C12 13.8 14.5 15.6 14.5 19"></path><path d="M16 13.9 C18.6 14.2 20.5 15.9 20.5 19"></path><circle cx="16.8" cy="8.6" r="2.6"></circle></svg>
+      <span style="font-size: 8.5px; font-weight: 700; letter-spacing: 0.04em; color: #8E8889;">TEAM</span>
+    </a>
+    <a href="player.html" aria-current="page" style="height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C59940" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"></circle><path d="M5 19.5 C5 15.8 8.1 13.8 12 13.8 C15.9 13.8 19 15.8 19 19.5"></path></svg>
+      <span style="font-size: 8.5px; font-weight: 700; letter-spacing: 0.04em; color: #C59940;">PLAYER</span>
+    </a>
+  </nav>
+
+</div>
+</body>
+</html>

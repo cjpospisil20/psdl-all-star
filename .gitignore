@@ -1,0 +1,52 @@
+# ---------------------------------------------------------------------------
+# What is NOT ignored, and why it matters
+#
+#   data/recaps/*.json   The permanent archive of DartConnect match payloads.
+#                        COMMIT THESE. DartConnect owes us nothing and could
+#                        change its format or withdraw access at any time; once
+#                        a match is archived it is ours, and every number the
+#                        site publishes is rebuilt from these files.
+#   data/matches.json    Season schedule, refreshed each run. Commit it.
+#   data/standings.json  League standings, refreshed each run. Commit it.
+#   design/assets/       Copied into the built site. Commit them.
+#
+# Never add data/ or *.json to this file.
+# ---------------------------------------------------------------------------
+
+# Generated site. Rebuilt from the archive by `python3 site/build.py`, which
+# deletes and recreates the whole directory, so there is nothing here to keep.
+# GitHub Actions builds and deploys it; it is not committed.
+public/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+# Anchored to the repo root so they cannot shadow site/build.py's directory.
+/build/
+/dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Editors and OS cruft
+.DS_Store
+._*
+.idea/
+.vscode/
+*.swp
+*~
