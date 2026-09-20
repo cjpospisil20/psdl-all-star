@@ -35,8 +35,8 @@ def fetch_schedule(refresh=True):
     path = DATA / "matches.json"
     if refresh or not path.exists():
         body = _request(f"https://tv.dartconnect.com/api/league/{LEAGUE}/matches/{SEASON}", b"{}")
-        path.write_text(body)
-    return json.loads(path.read_text())
+        path.write_text(body, encoding="utf-8")
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def iter_matches(schedule):
@@ -51,13 +51,13 @@ def fetch_recap(dc_match_id):
     """Return the recap props dict, fetching and archiving it if not already on disk."""
     path = RECAPS / f"{dc_match_id}.json"
     if path.exists():
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     page = _request(f"https://recap.dartconnect.com/games/{dc_match_id}")
     m = re.search(r'data-page="([^"]+)"', page)
     if not m:
         raise RuntimeError(f"no Inertia payload found for {dc_match_id} — recap format may have changed")
     props = json.loads(html.unescape(m.group(1)))["props"]
-    path.write_text(json.dumps(props))
+    path.write_text(json.dumps(props), encoding="utf-8")
     time.sleep(DELAY_SEC)
     return props
 
@@ -70,8 +70,8 @@ def fetch_standings(refresh=True):
         m = re.search(r'data-page="([^"]+)"', page)
         if not m:
             raise RuntimeError("no Inertia payload on standings page -- format may have changed")
-        path.write_text(json.dumps(json.loads(html.unescape(m.group(1)))["props"]))
-    return json.loads(path.read_text())
+        path.write_text(json.dumps(json.loads(html.unescape(m.group(1)))["props"]), encoding="utf-8")
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def teams(standings):

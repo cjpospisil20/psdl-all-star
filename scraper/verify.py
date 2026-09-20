@@ -37,7 +37,7 @@ def _busts_by_match(season):
     import json
     out = {}
     for m in season["matches"]:
-        props = json.loads((events.fetch.RECAPS / f"{m['id']}.json").read_text())
+        props = json.loads((events.fetch.RECAPS / f"{m['id']}.json").read_text(encoding="utf-8"))
         _hits, busts = allstar.score_match(props)
         out[m["id"]] = sum(busts.values())
     return out

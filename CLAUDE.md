@@ -6,6 +6,9 @@ commissioners, almost nobody reads — and 2–3 hours a week of commissioner da
 
 ## Start here
 
+- **`docs/ROADMAP.md`** — the plan for growing this stats app into the full PSDL website: the
+  architecture, the decisions already made, and the numbered implementation steps. Work on **one
+  step at a time**, in order, and tick the step off there when it is done.
 - **`summary.md`** — the living handoff doc. Read it first: current state, the run commands, the
   data gotchas that were expensive to learn, and the session log. **Update it at the end of a
   working session.**

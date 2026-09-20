@@ -9,18 +9,25 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import allstar, fetch, players
 
 
+_DAYS   = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+_MONTHS = ("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")
+
+
 def _pretty_date(iso):
+    # Built by hand, not with strftime: "%-d" is a Linux-only directive and raises ValueError on
+    # Windows, and "%a"/"%b" follow the machine's locale. Fixed names keep the output identical
+    # everywhere -- "TUE 15 SEP".
     try:
         d = datetime.date.fromisoformat(iso)
     except (TypeError, ValueError):
         return iso
-    return d.strftime("%a %-d %b").upper()
+    return f"{_DAYS[d.weekday()]} {d.day} {_MONTHS[d.month - 1]}"
 
 
 def load_season():
     """Everything the site needs, in one pass over the archive."""
-    schedule = json.loads((fetch.DATA / "matches.json").read_text())
-    standings_props = json.loads((fetch.DATA / "standings.json").read_text())
+    schedule = json.loads((fetch.DATA / "matches.json").read_text(encoding="utf-8"))
+    standings_props = json.loads((fetch.DATA / "standings.json").read_text(encoding="utf-8"))
 
     entries = list(fetch.iter_matches(schedule))
     dates   = sorted({date for _div, date, _m in entries})
@@ -36,7 +43,7 @@ def load_season():
         if not path.exists():
             missing.append((division, date, m["dc_match_id"]))
             continue
-        props = json.loads(path.read_text())
+        props = json.loads(path.read_text(encoding="utf-8"))
         recaps.append(props)
 
         match_hits, match_busts = allstar.score_match(props, date=date, week=week_of[date])
