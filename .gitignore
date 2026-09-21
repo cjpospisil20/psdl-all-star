@@ -13,6 +13,10 @@
 # Never add data/ or *.json to this file.
 # ---------------------------------------------------------------------------
 
+# Legacy export from the old yourleaguestats.com site. Kept on the owner's disk for
+# reference only: no code reads it, and it is not ours to publish in a public repo.
+/Park Slope Dart League (PSDL) - Stats.csv
+
 # Generated site. Rebuilt from the archive by `python3 site/build.py`, which
 # deletes and recreates the whole directory, so there is nothing here to keep.
 # GitHub Actions builds and deploys it; it is not committed.

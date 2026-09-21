@@ -41,7 +41,7 @@ def main():
 
     if args.csv:
         import csv
-        with open(args.csv, "w", newline="") as fh:
+        with open(args.csv, "w", newline="", encoding="utf-8") as fh:
             w = csv.writer(fh)
             w.writerow(["rank", "player", "team", "division", "WP", "PPW", "AS", "PTS"] + allstar.COLUMNS)
             for i, r in enumerate(rows, 1):
