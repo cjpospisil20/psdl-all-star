@@ -33,7 +33,12 @@ def load_season():
     dates   = sorted({date for _div, date, _m in entries})
     week_of = {date: i for i, date in enumerate(dates, 1)}
 
+    # Team names as they stand today, keyed by DartConnect's stable team id. A recap is immutable
+    # and holds the name from match night, so these two drift apart whenever a team is renamed.
+    canonical = players.canonical_teams(standings_props)
+
     recaps, hits, busts = [], [], collections.Counter()
+    sided_recaps = []
     weeks_by_player = collections.defaultdict(set)
     matches = []
     missing = []
@@ -45,8 +50,11 @@ def load_season():
             continue
         props = json.loads(path.read_text(encoding="utf-8"))
         recaps.append(props)
+        sides = players.resolve_sides(props, m, canonical)
+        sided_recaps.append((props, sides))
 
-        match_hits, match_busts = allstar.score_match(props, date=date, week=week_of[date])
+        match_hits, match_busts = allstar.score_match(props, date=date, week=week_of[date],
+                                                      teams=sides)
         for h in match_hits:
             h["player"] = players.clean_name(h["player"])
             weeks_by_player[h["player"]].add(date)
@@ -62,13 +70,13 @@ def load_season():
             "week":     week_of[date],
             "home":     players.clean_team((m.get("left")  or {}).get("team_name")),
             "away":     players.clean_team((m.get("right") or {}).get("team_name")),
-            "teams":    allstar.teams_of(props),
+            "teams":    sides,
             "recap":    allstar.RECAP_URL.format(match_id=info["id"]),
             "hits":     match_hits,
         })
 
     # Every player who threw gets a team, not just those who scored.
-    teams = players.team_map(recaps)
+    teams = players.team_map(sided_recaps)
     for h in hits:
         h["team"] = h["team"] or teams.get(h["player"])
 
@@ -76,6 +84,7 @@ def load_season():
         "schedule":   schedule,
         "standings":  standings_props,
         "recaps":     recaps,
+        "sided_recaps": sided_recaps,
         "hits":       hits,
         "busts":      busts,
         "matches":    matches,

@@ -42,35 +42,125 @@ def standings_teams(standings_props):
     return {clean_team(c["team_name"]) for c in standings_props["competitors"]}
 
 
-def team_map(recaps):
-    """player -> team. A turn's side IS the player's team; opponents[] is in home/away order.
+def canonical_teams(standings_props):
+    """Stable DartConnect team id -> that team's CURRENT name.
 
-    Verified on Week 1: 174 players, zero appearing on two teams, all 30 team names matching
-    the standings list exactly.
+    The id is the only durable team identity DartConnect gives us. The display name is not:
+    see resolve_sides.
     """
-    seen = collections.defaultdict(collections.Counter)
-    for props in recaps:
-        teams = allstar.teams_of(props)
+    return {c["id"]: clean_team(c["team_name"]) for c in standings_props["competitors"]}
+
+
+def resolve_sides(props, row, canonical):
+    """{'home': name, 'away': name} for one match, keyed through stable team ids.
+
+    Why this exists. An archived recap is immutable, so it carries each team's name as it stood
+    on match night (`matchInfo.opponents[i].name`) -- and recaps carry no team id. `standings.json`
+    and `matches.json` are refetched every run, so they carry today's name plus the stable id.
+    Three teams were renamed mid-season in Fall 2026:
+
+        395251  Eagle Fang Darts (Finn's)   -> Eagle Fang Darts
+        395224  The Tickle Tickles (Pumps)  -> The Tickle Tickles
+        395266  Paddy's 2 (George)          -> Dart Day Afternoon
+
+    so the week-1 recaps disagree with standings permanently, and would disagree again after the
+    next rename. Left alone that splits one team across two team pages with half a roster each.
+
+    This is NOT an alias map and NOT fuzzy matching (CLAUDE.md data rule 5) -- no name is ever
+    compared approximately and nothing is hand-coded. It reads DartConnect's own team identity
+    out of the schedule row for the same match, then asks standings what that id is called now.
+
+    Two independent signals, and a hard failure rather than a guess:
+      1. exact-name match of a recap label against the row's left/right team_name
+      2. elimination -- one label and one id left over can only pair with each other
+      3. score orientation, for the case where BOTH teams were renamed
+      4. otherwise raise: verify.py is a gate, and a wrong roster must never publish
+
+    Deliberately does not assume row['left'] is the recap's home side. It usually is not --
+    left was the recap's home team in only 6 of week 1's 15 matches.
+    """
+    labels = allstar.teams_of(props)
+    row_side = {"left": (row.get("left") or {}), "right": (row.get("right") or {})}
+    by_name  = {clean_team(s.get("team_name")): s.get("id")
+                for s in row_side.values() if s.get("team_name")}
+
+    out, unmatched = {}, []
+    for side in ("home", "away"):
+        label = clean_team(labels.get(side))
+        if label in by_name:
+            out[side] = by_name[label]
+        else:
+            unmatched.append(side)
+
+    if unmatched:
+        free = [i for i in by_name.values() if i not in out.values()]
+        if len(unmatched) == 1 and len(free) == 1:
+            out[unmatched[0]] = free[0]
+        else:
+            # Both labels are stale. Fall back to which side won, which the schedule states twice.
+            left, right = row_side["left"], row_side["right"]
+            home_score, away_score = row.get("home_score"), row.get("away_score")
+            if left.get("score") == home_score and right.get("score") == away_score \
+                    and home_score != away_score:
+                pairing = {"home": left, "away": right}
+            elif left.get("score") == away_score and right.get("score") == home_score \
+                    and home_score != away_score:
+                pairing = {"home": right, "away": left}
+            else:
+                raise ValueError(
+                    f"cannot identify the teams in match {props['matchInfo']['id']}: recap says "
+                    f"{sorted(filter(None, labels.values()))}, schedule says {sorted(by_name)}. "
+                    f"Both teams appear to have been renamed and the match was drawn, so neither "
+                    f"name nor score can tell the sides apart."
+                )
+            for side in unmatched:
+                out[side] = pairing[side].get("id")
+
+    unknown = [i for i in out.values() if i not in canonical]
+    if unknown:
+        raise ValueError(f"match {props['matchInfo']['id']} names team id(s) {unknown}, which are "
+                         f"not standings competitors")
+    return {side: canonical[tid] for side, tid in out.items()}
+
+
+# DartConnect's marker for a side playing short-handed. Not a person: it has no team of its own
+# and legitimately turns up for whichever side was a player down, so it must never be counted as
+# a player on two teams, and must never reach a page.
+SENTINEL_PLAYERS = {"-SHORT-"}
+
+
+def _side_names(sided_recaps):
+    """Yield (player, team) for every turn thrown, with teams already canonicalised."""
+    for props, sides in sided_recaps:
         for g in allstar.games(props):
             for t in g["turns"]:
                 for side in ("home", "away"):
                     name = clean_name(t[side].get("name"))
-                    if name and teams.get(side):
-                        seen[name][teams[side]] += 1
+                    if name and name not in SENTINEL_PLAYERS and sides.get(side):
+                        yield name, sides[side]
+
+
+def team_map(sided_recaps):
+    """player -> team, over (props, sides) pairs from events.load_season.
+
+    A turn's side IS the player's team. Takes resolved sides rather than raw recaps so that a
+    renamed team counts as one team and not two -- see resolve_sides.
+    """
+    seen = collections.defaultdict(collections.Counter)
+    for name, team in _side_names(sided_recaps):
+        seen[name][team] += 1
     return {name: counts.most_common(1)[0][0] for name, counts in seen.items()}
 
 
-def ambiguous_teams(recaps):
-    """Players who appear under more than one team -- should always be empty."""
+def ambiguous_teams(sided_recaps):
+    """Players who appear under more than one team -- should always be empty.
+
+    Teams are canonicalised first, so this no longer fires on a mid-season rename. What it still
+    catches is the thing worth catching: one person genuinely credited to two different teams.
+    """
     seen = collections.defaultdict(set)
-    for props in recaps:
-        teams = allstar.teams_of(props)
-        for g in allstar.games(props):
-            for t in g["turns"]:
-                for side in ("home", "away"):
-                    name = clean_name(t[side].get("name"))
-                    if name and teams.get(side):
-                        seen[name].add(teams[side])
+    for name, team in _side_names(sided_recaps):
+        seen[name].add(team)
     return {n: ts for n, ts in seen.items() if len(ts) > 1}
 
 

@@ -3,10 +3,10 @@
 > **Living document.** Update this at the end of any working session. It is the handoff file for
 > future agent sessions — read it first, before exploring the code.
 
-**Last updated:** 2026-09-18
+**Last updated:** 2026-10-02
 **Owner:** cjpospisil20@gmail.com
-**Status:** Rules engine working and the mobile web app built — 165 static pages generated from
-archived DartConnect data. Not yet hosted; not yet reconciled with the commissioners.
+**Status:** Live at <https://cjpospisil20.github.io/psdl-all-star/>, rebuilt weekly by GitHub
+Actions — 280 static pages from 3 archived match nights. Not yet reconciled with the commissioners.
 
 ---
 
@@ -84,9 +84,22 @@ This discovery removed what had been the single largest piece of remaining build
 - `score_edits` exists on games — commissioners can amend scores after the fact, so processing must
   recompute rather than append.
 - **Player → team comes free from the recaps.** A turn's side (`home` / `away`) *is* the player's team;
-  `matchInfo.opponents[]` is in home/away order. `scraper/players.py:team_map()` does this — 174 players
-  mapped from Week 1, zero appearing under two teams, every team name matching the standings list.
+  `matchInfo.opponents[]` is in home/away order. `scraper/players.py:team_map()` does this.
   No roster file needed from the league.
+- **Teams get renamed mid-season, and a recap keeps the old name forever.** The archive is immutable,
+  so `matchInfo.opponents[i].name` is the name as of match night — and a recap carries **no team id**.
+  `standings.json` and `matches.json` are refetched every run, so they carry today's name *plus* the
+  stable `id`. Three teams were renamed between week 1 and week 3 of Fall 2026:
+  `Eagle Fang Darts (Finn's)` → `Eagle Fang Darts` (395251), `The Tickle Tickles (Pumps)` →
+  `The Tickle Tickles` (395224), `Paddy's 2 (George)` → `Dart Day Afternoon` (395266).
+  **Never compare team names across feeds — resolve through the id.**
+  `players.resolve_sides()` joins each recap to its schedule row and reads `left.id` / `right.id`,
+  then `players.canonical_teams()` asks standings what that id is called now.
+  Note it does *not* assume `left` is the recap's home side — it was home in only 6 of week 1's 15
+  matches — it identifies the sides by exact name match, then by elimination, then by score.
+- **`-SHORT-` is not a person.** It is DartConnect's marker for a side playing short-handed (46 turns
+  so far), and it legitimately appears for whichever team was a player down, so it looks exactly like
+  someone on two teams. `players.SENTINEL_PLAYERS` filters it.
 - **DartConnect's player-card endpoint returns 403** without a login, so form stats (3-dart average,
   first 9, MPR, leg win %, checkout %, opponent 3DA) are **recomputed from turn data** in
   `players.py:form_stats()`. Validated against DartConnect's own per-leg averages: 84 singles legs,
@@ -207,29 +220,34 @@ evenly: `95+` ×101, `R5` ×52, `C3` ×13, `R6` ×10, `R7` ×9, then `R8` ×1, `
 `F90` ×1, and `S90` ×0. Two codes carry 81% of everything. This is why a 29-column grid would be
 almost entirely zeroes, and why hits render as chips.
 
-**Build output:** 165 pages — 104 player pages, 15 match pages, 30 team pages, 5 division
-leaderboards + 5 standings pages (plus `index.html` / `standings.html` aliases to Division 1),
-a players index, a matches index, a teams index, and the rare-hit screen. 30 team pages, not 31 —
-`The Craic` (Div 1) had the Week 1 bye and has played nothing yet. Rare-hit screen currently shows
-Kevin O'Brien's 180.
+**Build output, 3 match nights (as of 2026-10-02):** 280 pages — 188 player pages, 45 match pages,
+31 team pages, 5 division leaderboards + 5 standings pages (plus `index.html` / `standings.html`
+aliases to Division 1), a players index, a matches index, a teams index, and the rare-hit screen.
+All 31 teams now have a page; with only Week 1 archived it was 30, because `The Craic` (Div 1) had
+the bye. Rare-hit screen still shows Kevin O'Brien's 180. Season to date: 188 players, 67,186 points
+across 45 matches.
 
 ---
 
 ## What's next
 
-1. **Hosting** — the deploy path is written: `.github/workflows/build.yml` publishes `public/` to
-   **GitHub Pages**, gated on `verify.py` passing, and commits newly archived recaps back to the repo
-   *before* verifying (the archive must survive a failed build). But **this folder is not a git repo
-   yet** — nothing is pushed and nothing is live. Creating the repo and pushing is the one thing
-   standing between the app and people being able to look at it.
+1. **Hosting** — **done.** Live at <https://cjpospisil20.github.io/psdl-all-star/>, published from
+   `.github/workflows/build.yml`: `fetch.py` → commit the archive → `verify.py` → `build.py` →
+   `check.py` → deploy, with the deploy job gated on the build job succeeding. Newly archived recaps
+   are committed *before* verifying, so the archive survives a failed build.
+   **Watch the Actions tab, not the site.** Because the archive is committed before the gate, a
+   failing `verify.py` looks like nothing is wrong — data keeps accumulating in the repo while the
+   published site silently freezes. That happened for 11 days (2026-09-21 to 10-02): four scheduled
+   runs archived weeks 2 and 3 correctly and every one of them failed the gate, so the live site sat
+   on its first build showing `MP 1`. `gh run list` is the fastest way to see it.
 2. **Commissioner reconciliation** — two commissioners hand-score 3 matches (one per division tier)
    against system output. This is the gate before automated numbers become official. The match pages
    are built for exactly this: every hit links to its DartConnect recap, naming set and game.
 3. **Scheduled runs** — **done**, in `.github/workflows/build.yml`: Wednesday 07:00 UTC with a
    Thursday catch-up, since GitHub sometimes drops scheduled runs and `fetch.py` skips anything
    already archived. The order is `fetch.py` → `verify.py` → `build.py` → `check.py`; run it in that
-   order by hand too, and never publish a build whose verify failed. Note the workflow does **not**
-   yet run `site/check.py` — worth adding after the build step.
+   order by hand too, and never publish a build whose verify failed. The workflow runs
+   `site/check.py` after the build; both gates fail the job and so block the deploy.
 4. **Forfeit handling** — flag forfeited matches as *awaiting commissioner credit* so they can't be
    silently forgotten. Nothing in the app surfaces this yet.
 5. **The All Star cut line** — `site/build.py:ALL_STAR_CUT` is `None`, so the cut line is simply
@@ -361,3 +379,68 @@ punctuation-stripped.
 
 **Still outstanding:** nobody has viewed the site in a real browser. The Chrome extension did
 not respond during this session. Everything above is static analysis and headless testing.
+
+---
+
+### 2026-10-02 — Unblocking the weekly publish
+
+**Symptom the owner reported:** the live site looked out of date. It was — by two weeks.
+`curl -sI .../standings-division-4.html` returned `last-modified: Sat, 19 Sep 2026 04:10:41 GMT`,
+the very first build, and every standings row read `MP 1`.
+
+**The data was never the problem.** The archive had kept up perfectly: 45 recaps over three match
+nights (09-15, 09-22, 09-29), all `status: "C"`, because the workflow commits the archive *before*
+it verifies. Every scheduled run since 2026-09-21 had failed the gate, so nothing published.
+
+Three `verify.py` failures, two root causes.
+
+**1. One assertion was never scoped to week 1.** `verify.py` documents its own rule at the top —
+the baseline is scoped to the 15 week-1 match IDs precisely so new weeks can't break it — and
+`verify.py:78` broke it: `check("Tom Lettieri's hits sum to 835", lettieri == 835)` where
+`by_player` accumulated **all** hits. 835 was his week-1 total; his 3-week total is 1215. The number
+now lives in `EXPECTED_WEEK1["top"]` and is computed from `w1` hits only, like everything else there.
+*Lesson, for the second time: any hardcoded total in `verify.py` must be scoped to the baseline
+matches, and the label string must come from the same constant so the two cannot drift.*
+
+**2. Three teams were renamed on DartConnect mid-season** — see the gotcha above. This is the
+interesting one. The two failures it caused looked unrelated (`no player on two teams`, and
+`all team names appear in standings`) and the FAIL line understated both: `verify.py` truncated the
+ambiguous list with `[:3]`, so it reported 3 players when there were **17**, and only 2 of the 3
+renamed teams appeared at all.
+
+That last part was luck, and worth understanding because it is the kind of bug that hides.
+`matches.json`'s `reg` dict is newest-date-first, so `hits` runs week 3 → week 1, and
+`players.division_table` does `meta.setdefault(...)` — first hit wins, i.e. whichever week the player
+most recently scored in. Players who scored again in week 2 or 3 silently picked up the new team name;
+players who scored **only in week 1** stayed frozen on the old one. No Tickle Tickles player had
+scored exclusively in week 1, so that rename stayed invisible. Nothing was *handling* the rename —
+the data just happened not to expose it.
+
+Fixed by resolving team identity through DartConnect's stable numeric team `id` instead of its display
+name (`players.resolve_sides` / `canonical_teams`, called from `events.load_season`, which already has
+the recap and its schedule row in the same loop iteration). `allstar.score_match` gained a `teams=`
+override so the canonical name is stamped on **every hit at score time** — which is what makes
+`division_table`'s first-hit-wins ordering harmless: all weeks now agree. `team_map` and
+`ambiguous_teams` take `(props, sides)` pairs so they see canonicalised teams too.
+
+This is not an alias map and not fuzzy matching (CLAUDE.md data rule 5 stands): no name is compared
+approximately, nothing is hand-coded, and a match it cannot identify raises rather than guesses.
+
+**Relaxing the two team assertions was never an option.** `build.py` keys team pages off `r["team"]`,
+so `Eagle Fang Darts` and `Eagle Fang Darts (Finn's)` would have rendered as two team pages with half
+a roster each, while standings linked only to the new name — orphan pages, no inbound link.
+
+**Also found:** `-SHORT-` is a DartConnect short-handed marker, not a player, and was one of the 17
+ambiguous entries (`DuckDown Darts` ×27, `Farrell's` ×19). `players.SENTINEL_PLAYERS` filters it.
+
+**Verified:** `verify.py` all checks pass, with the week-1 baseline still reproducing exactly
+(104 players / 20,326 points / 437 busts / Lettieri 835). `build.py` → 280 pages. `check.py` all
+checks pass — this was its first run at 3-week scale, and it needed no changes. 31 team pages, one
+per standings competitor. The three week-1-only players on renamed teams (Zach Desantis-Salavarria,
+Adam Caballero, Keenan Ferguson) all land on the current team on both their player page and the team
+page. `grep` for `(Finn's)`, `Paddy's 2`, `(Pumps)` and `-SHORT-` across `public/` returns nothing.
+
+**Not done, deliberately:** ROADMAP Steps 2 and 3 (pipeline hardening, season-scoped archive). Step 3
+still matters before next season — bumping `SEASON` breaks the week-1 verify baseline.
+`events.load_season` still labels schedule `left` as home, which is wrong in most matches (ROADMAP
+finding #8); the rename fix deliberately does not depend on that orientation.
