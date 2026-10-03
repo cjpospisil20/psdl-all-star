@@ -21,7 +21,12 @@ WEEK1_MATCHES = {
     "6aa9da46a9fb98f7d1de338e", "6aa9db0ea9fb98f7d1de36a4", "6aa9db7da9fb98f7d1de3838",
     "6aa9dc1da9fb98f7d1de3a6c", "6aa9de73a9fb98f7d1de436b", "6aa9e1ada9fb98f7d1de506b",
 }
-EXPECTED_WEEK1 = {"players": 104, "points": 20326, "busts": 437}
+#
+# EVERY expected value below must be scoped to those 15 matches. "top" is the week-1 leader and
+# his week-1 total: a spot-check that one player's chips still decompose to the points shown
+# above them. It was once asserted against his SEASON total, which grew with every new week and
+# so blocked the deploy from 2026-09-21 to 2026-10-02.
+EXPECTED_WEEK1 = {"players": 104, "points": 20326, "busts": 437, "top": ("Tom Lettieri", 835)}
 
 failures = []
 
@@ -63,6 +68,9 @@ def main():
         check("20,326 points", sum(h["points"] for h in w1) == EXPECTED_WEEK1["points"],
               f"got {sum(h['points'] for h in w1):,}")
         check("437 busts excluded", w1_busts == EXPECTED_WEEK1["busts"], f"got {w1_busts}")
+        top_player, top_points = EXPECTED_WEEK1["top"]
+        got = sum(h["points"] for h in w1 if h["player"] == top_player)
+        check(f"{top_player}'s week 1 hits sum to {top_points}", got == top_points, f"got {got}")
 
     print(f"\n1b. Season to date: {len(rows)} players, "
           f"{sum(r['points'] for r in rows):,} points across "
@@ -74,12 +82,11 @@ def main():
         by_player[h["player"]] += h["points"]
     mismatched = [r["player"] for r in rows if by_player[r["player"]] != r["points"]]
     check(f"all {len(rows)} decompositions sum", not mismatched, f"{len(mismatched)} mismatched")
-    lettieri = by_player.get("Tom Lettieri")
-    check("Tom Lettieri's hits sum to 835", lettieri == 835, f"got {lettieri}")
 
     print("\n3. Team mapping is complete and unambiguous")
-    ambiguous = players.ambiguous_teams(season["recaps"])
-    check("no player on two teams", not ambiguous, str(list(ambiguous)[:3]))
+    ambiguous = players.ambiguous_teams(season["sided_recaps"])
+    check("no player on two teams", not ambiguous,
+          f"{len(ambiguous)} players, e.g. {sorted(ambiguous)[:3]}")
     teamless = [r["player"] for r in rows if not r["team"]]
     check("every scoring player has a team", not teamless,
           f"{len(teamless)} without: {teamless[:3]}")

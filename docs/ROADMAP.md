@@ -115,6 +115,7 @@ existing `check.py` assertion. **Extend the checks; never loosen them.**
 | 15 | Note | PPW definition and `ALL_STAR_CUT` open; forfeits not surfaced; not reconciled → launch as beta. | Step 16 |
 | 16 | Note | BRD risk #2 (DartConnect ToS review) still open. | Step 16 checklist |
 | 17 | Note | No synthetic rule tests (BRD §5.4 #2). | Phase 2 |
+| 18 | Launch | **Teams get renamed on DartConnect mid-season**, and the immutable recaps keep the old name, so recap team names and standings drift apart permanently. Broke the deploy 2026-09-21 → 10-02. Also: `verify.py:78` asserted a season-wide total; `verify.py:82` truncated the ambiguous list with `[:3]`, under-reporting 17 players as 3; `-SHORT-` is a short-handed marker, not a player. | **Fixed 2026-10-02** (Step 1) |
 
 ---
 
@@ -282,7 +283,8 @@ DartConnect live scores beside video · player accounts / captain tools.
 One step per Claude Code session, in order. Before any refactor, save a hash of every file in
 `public/`; a pure refactor must reproduce it exactly (the "golden build").
 
-- [ ] **Step 1 — Tools, repo, first deploy of the existing site** *(in progress 2026-09-20: Python 3.12.10 and Git installed; `verify.py`, `build.py` (165 pages) and `check.py` all pass locally on Windows; the repo already exists and is deployed; remaining: push the Windows fixes, `.gitattributes` and this roadmap to `main` and watch the run)*
+- [ ] **Step 1 — Tools, repo, first deploy of the existing site** *(2026-09-20: Python 3.12.10 and Git installed; `verify.py`, `build.py` and `check.py` all pass locally on Windows; repo exists and is deployed. 2026-10-02: the Windows fixes and this roadmap are on `main`, but the four scheduled runs since all **failed the verify gate** — see finding #18 — so the live site sat on its 2026-09-19 build for 11 days while the archive kept growing. Gate fixed; `verify.py` / `build.py` (280 pages) / `check.py` all pass on 3 weeks of data. Remaining: watch one scheduled run go green end to end.)*
+  - **Runbook note:** the archive is committed *before* the gate, by design. So a broken gate is invisible from the site — data accumulates while the published pages freeze. Check `gh run list`, not the site, to know the pipeline is healthy.
   - Do: push the Windows fixes to CJ's existing repo (not a new one) and watch the deploy.
   - Verify: `verify.py`, `build.py`, `check.py` pass locally; Actions run is green; the `github.io` site loads on a phone.
   - Rollback: unpublish Pages; `git revert`.

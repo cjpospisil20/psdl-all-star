@@ -102,10 +102,17 @@ open public/index.html
    double space is real — preserve it, escape it for display (`components.esc`), wrap rather than
    truncate a long name.
 6. **Source the team list from standings competitors** (31 teams), never `schedule['teams']` (35, the
-   filter dropdown) and never from played matches (30 — Division 1 has 7 teams, so someone has a bye).
-7. **No bracketed placeholder may reach a real page.** `build.py` scans its own output and fails the
+   filter dropdown) and never from played matches (30 with only Week 1 archived — Division 1 has 7
+   teams, so someone has a bye).
+7. **Never match a team by name across feeds — use DartConnect's stable team `id`.** The archive is
+   immutable, so a recap holds the team name from match night and carries no id; `standings.json` and
+   `matches.json` are refetched every run and carry today's name plus the id. Three teams were renamed
+   mid-season in Fall 2026. `players.resolve_sides()` joins a recap to its schedule row for the id and
+   `players.canonical_teams()` resolves the id to the current name. This is not an alias map (see 5) —
+   it is DartConnect's own identity, and it raises rather than guessing.
+8. **No bracketed placeholder may reach a real page.** `build.py` scans its own output and fails the
    build if one does. If a value is unknown, omit the element — see `ALL_STAR_CUT = None`.
-8. `summary.md` holds the rest of the hard-won specifics (`ending_marks` is points not marks;
+9. `summary.md` holds the rest of the hard-won specifics (`ending_marks` is points not marks;
    `darts_thrown` only exists for the checkout player; averages are singles-only). Read it before
    touching `players.py`.
 
@@ -119,12 +126,19 @@ Out of scope: login/accounts, score entry, live in-match updates, historical sea
 
 ## Where things stand
 
-The rules engine and the app both work. `site/build.py` generates **165 pages** from the archived
-Week 1 data — 104 player pages, 15 match pages, 30 team pages, 5 division leaderboards, 5 standings
-pages, three indexes and the rare-hit screen — and `scraper/verify.py` passes.
+The site is **live** at <https://cjpospisil20.github.io/psdl-all-star/>, rebuilt weekly by
+`.github/workflows/build.yml`. `site/build.py` generates **280 pages** from 3 archived match nights —
+188 player pages, 45 match pages, 31 team pages, 5 division leaderboards, 5 standings pages, three
+indexes and the rare-hit screen — and `scraper/verify.py` and `site/check.py` both pass.
 
-Not done: **hosting** (nothing is deployed), **commissioner reconciliation** (the gate before the
-numbers become official), scheduled weekly runs, and forfeit exception handling.
+The workflow commits the archive *before* the verify gate, on purpose. A side effect worth knowing:
+**a broken gate is invisible from the site** — recaps keep accumulating in the repo while the
+published pages freeze on the last good build. Check `gh run list`, not the site. This is exactly
+what happened from 2026-09-21 to 2026-10-02; see `summary.md`'s session log.
+
+Not done: **commissioner reconciliation** (the gate before the numbers become official), forfeit
+exception handling, and `docs/ROADMAP.md` Steps 2–16 (pipeline hardening, season-scoped archive,
+and the wider league website).
 
 One design placeholder is still open and genuinely needs the league: **how many players per division
 make All Star** (`ALL_STAR_CUT`). Team rosters and MPR, both previously listed as blockers, were

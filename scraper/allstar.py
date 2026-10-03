@@ -64,15 +64,20 @@ def teams_of(props):
     return {"home": name_at(0), "away": name_at(1)}
 
 
-def score_match(props, date=None, week=None):
-    """Score one match. Returns (hits, busts_by_player)."""
+def score_match(props, date=None, week=None, teams=None):
+    """Score one match. Returns (hits, busts_by_player).
+
+    `teams` overrides the side -> team names taken from the payload. events.load_season passes
+    the names resolved through DartConnect's stable team ids, so that a team renamed mid-season
+    is stamped on every hit under one name -- see players.resolve_sides.
+    """
     info     = props["matchInfo"]
     ctx = {
         "division": info["division_title"],
         "match_id": info["id"],
         "date":     date or info.get("server_match_start_date"),
         "week":     week,
-        "teams":    teams_of(props),
+        "teams":    teams or teams_of(props),
         "recap":    RECAP_URL.format(match_id=info["id"]),
     }
 
