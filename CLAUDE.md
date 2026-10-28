@@ -119,8 +119,16 @@ open public/index.html
 ## Data source
 
 Scores come from **DartConnect**, the scoring system used at the board — no manual entry. Recap
-pages are a Laravel/Inertia app, so the full match payload arrives as JSON in the page's
-`data-page` attribute; there are no CSS selectors to break.
+pages are a Laravel/Inertia app, so the full match payload arrives as JSON — no HTML parsing, no
+CSS selectors to break.
+
+**But where that JSON sits is not stable.** Inertia embeds it two ways, and DartConnect has used
+both: HTML-escaped in the root element's `data-page` **attribute**, and raw in the **body** of
+`<script data-page="app" type="application/json">`. `recap.dartconnect.com` switched to the second
+on 2026-10-28 while `tv.dartconnect.com` stayed on the first. `fetch._inertia_props()` tries both
+and lets a successful JSON parse decide — **never infer the shape from the host, and never assume
+the `data-page` attribute holds the payload** (on the new form it holds the literal string `"app"`,
+so a regex on it still matches and then fails to parse).
 
 Out of scope: login/accounts, score entry, live in-match updates, historical seasons.
 
@@ -139,6 +147,10 @@ what happened from 2026-09-21 to 2026-10-02; see `summary.md`'s session log.
 Not done: **commissioner reconciliation** (the gate before the numbers become official), forfeit
 exception handling, and `docs/ROADMAP.md` Steps 2–16 (pipeline hardening, season-scoped archive,
 and the wider league website).
+
+`fetch.py` still aborts the whole run on the first match it cannot parse, so one bad recap stops
+the rest being archived that night. The archive-before-verify commit means nothing fetched is lost,
+but it is worth making the loop resilient — ROADMAP Step 2.
 
 One design placeholder is still open and genuinely needs the league: **how many players per division
 make All Star** (`ALL_STAR_CUT`). Team rosters and MPR, both previously listed as blockers, were

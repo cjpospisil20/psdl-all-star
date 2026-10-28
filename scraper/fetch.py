@@ -30,6 +30,55 @@ def _request(url, data=None):
     return urllib.request.urlopen(req, timeout=30).read().decode("utf-8")
 
 
+def _inertia_props(page, source):
+    """The `props` dict out of an Inertia page, however this DartConnect app embeds it.
+
+    Inertia has shipped the page payload two different ways, and they are not interchangeable:
+
+      1. HTML-ESCAPED JSON in the root element's data-page ATTRIBUTE
+         <div id="app" data-page="{&quot;component&quot;:&quot;...&quot;}">
+      2. RAW JSON in the BODY of the Inertia script tag
+         <script data-page="app" type="application/json">{"component":"..."}</script>
+
+    `recap.dartconnect.com` moved from (1) to (2) on or before 2026-10-28 and it broke every new
+    fetch in a nasty way: the old attribute regex still MATCHED, because the attribute is still
+    there -- it just holds the literal string "app" now. So the failure surfaced as an opaque
+    `JSONDecodeError: Expecting value: line 1 column 1` rather than anything about the format.
+    `tv.dartconnect.com` (schedule, standings) was still on (1) on that date.
+
+    So: never infer the shape from the host, and never trust the attribute's presence. Collect
+    both candidates, and let a successful JSON parse decide which one is real. That way whichever
+    host migrates next costs nothing.
+
+    Only the attribute form is HTML-escaped. Unescaping a raw script body would be wrong -- it
+    would turn a team genuinely called `Foo &amp; Bar` into `Foo & Bar` -- so each candidate
+    carries whether it needs unescaping.
+    """
+    candidates = []
+    body = re.search(r'<script[^>]*\bdata-page\b[^>]*>(.*?)</script>', page, re.S)
+    if body:
+        candidates.append(("script body", body.group(1), False))
+    attr = re.search(r'data-page="([^"]+)"', page)
+    if attr:
+        candidates.append(("data-page attribute", attr.group(1), True))
+
+    tried = []
+    for where, text, unescape in candidates:
+        try:
+            payload = json.loads(html.unescape(text) if unescape else text)
+        except json.JSONDecodeError as exc:
+            tried.append(f"{where}: not JSON ({exc.msg}); starts {text[:40]!r}")
+            continue
+        if isinstance(payload, dict) and isinstance(payload.get("props"), dict):
+            return payload["props"]
+        tried.append(f"{where}: JSON but no props key (keys: {list(payload)[:5]})")
+
+    raise RuntimeError(
+        f"no Inertia payload found for {source} -- the page format may have changed again. "
+        f"Tried: {'; '.join(tried) if tried else 'nothing, no data-page anywhere on the page'}"
+    )
+
+
 def fetch_schedule(refresh=True):
     """Season schedule grouped division -> date -> matches. Each match carries dc_match_id."""
     path = DATA / "matches.json"
@@ -53,10 +102,7 @@ def fetch_recap(dc_match_id):
     if path.exists():
         return json.loads(path.read_text(encoding="utf-8"))
     page = _request(f"https://recap.dartconnect.com/games/{dc_match_id}")
-    m = re.search(r'data-page="([^"]+)"', page)
-    if not m:
-        raise RuntimeError(f"no Inertia payload found for {dc_match_id} — recap format may have changed")
-    props = json.loads(html.unescape(m.group(1)))["props"]
+    props = _inertia_props(page, f"recap {dc_match_id}")
     path.write_text(json.dumps(props), encoding="utf-8")
     time.sleep(DELAY_SEC)
     return props
@@ -67,10 +113,8 @@ def fetch_standings(refresh=True):
     path = DATA / "standings.json"
     if refresh or not path.exists():
         page = _request(f"https://tv.dartconnect.com/league/{LEAGUE}/{SEASON}/standings")
-        m = re.search(r'data-page="([^"]+)"', page)
-        if not m:
-            raise RuntimeError("no Inertia payload on standings page -- format may have changed")
-        path.write_text(json.dumps(json.loads(html.unescape(m.group(1)))["props"]), encoding="utf-8")
+        props = _inertia_props(page, f"standings for season {SEASON}")
+        path.write_text(json.dumps(props), encoding="utf-8")
     return json.loads(path.read_text(encoding="utf-8"))
 
 

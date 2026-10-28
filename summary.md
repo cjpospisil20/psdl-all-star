@@ -3,10 +3,10 @@
 > **Living document.** Update this at the end of any working session. It is the handoff file for
 > future agent sessions — read it first, before exploring the code.
 
-**Last updated:** 2026-10-02
+**Last updated:** 2026-10-28
 **Owner:** cjpospisil20@gmail.com
 **Status:** Live at <https://cjpospisil20.github.io/psdl-all-star/>, rebuilt weekly by GitHub
-Actions — 280 static pages from 3 archived match nights. Not yet reconciled with the commissioners.
+Actions — 390 static pages from 7 archived match nights. Not yet reconciled with the commissioners.
 
 ---
 
@@ -100,6 +100,16 @@ This discovery removed what had been the single largest piece of remaining build
 - **`-SHORT-` is not a person.** It is DartConnect's marker for a side playing short-handed (46 turns
   so far), and it legitimately appears for whichever team was a player down, so it looks exactly like
   someone on two teams. `players.SENTINEL_PLAYERS` filters it.
+- **The Inertia payload moves.** Inertia can embed a page's JSON two ways and DartConnect has used
+  both: HTML-escaped in the root element's `data-page` **attribute**, or raw in the **body** of
+  `<script data-page="app" type="application/json">`. `recap.dartconnect.com` switched to the second
+  on or before 2026-10-28; `tv.dartconnect.com` (schedule, standings) was still on the first.
+  The nasty part: on the new form the attribute still exists and holds the literal string `"app"`,
+  so a regex over it **still matches** and then dies with
+  `JSONDecodeError: Expecting value: line 1 column 1` — a message that says nothing about formats.
+  `fetch._inertia_props()` collects both candidates and lets a successful parse decide.
+  Only the attribute form is HTML-escaped: unescaping a raw script body would silently turn a team
+  genuinely called `Foo &amp; Bar` into `Foo & Bar`.
 - **DartConnect's player-card endpoint returns 403** without a login, so form stats (3-dart average,
   first 9, MPR, leg win %, checkout %, opponent 3DA) are **recomputed from turn data** in
   `players.py:form_stats()`. Validated against DartConnect's own per-leg averages: 84 singles legs,
@@ -220,12 +230,13 @@ evenly: `95+` ×101, `R5` ×52, `C3` ×13, `R6` ×10, `R7` ×9, then `R8` ×1, `
 `F90` ×1, and `S90` ×0. Two codes carry 81% of everything. This is why a 29-column grid would be
 almost entirely zeroes, and why hits render as chips.
 
-**Build output, 3 match nights (as of 2026-10-02):** 280 pages — 188 player pages, 45 match pages,
+**Build output, 7 match nights (as of 2026-10-28):** 390 pages — 238 player pages, 105 match pages,
 31 team pages, 5 division leaderboards + 5 standings pages (plus `index.html` / `standings.html`
 aliases to Division 1), a players index, a matches index, a teams index, and the rare-hit screen.
 All 31 teams now have a page; with only Week 1 archived it was 30, because `The Craic` (Div 1) had
-the bye. Rare-hit screen still shows Kevin O'Brien's 180. Season to date: 188 players, 67,186 points
-across 45 matches.
+the bye. Rare-hit screen still shows Kevin O'Brien's 180 — it is billed as the *first* 180 of the
+season, so it is a season-long landmark, not a weekly feature. Season to date: 238 players,
+168,160 points across 105 matches, and four 180s now (O'Brien, Adam Feder, Caleb Newberg, Bill Jones).
 
 ---
 
@@ -444,3 +455,61 @@ page. `grep` for `(Finn's)`, `Paddy's 2`, `(Pumps)` and `-SHORT-` across `public
 still matters before next season — bumping `SEASON` breaks the week-1 verify baseline.
 `events.load_season` still labels schedule `left` as home, which is wrong in most matches (ROADMAP
 finding #8); the rename fix deliberately does not depend on that orientation.
+
+---
+
+### 2026-10-28 — DartConnect moved the Inertia payload
+
+**Symptom the owner reported:** a question, not a bug — "when does the website update?" Checking to
+answer it turned up that **that morning's run had failed 20 minutes earlier.** The site was on
+`WEEK 6 · TUE 20 OCT`, published 10-22. Two match nights (10-20, 10-27) were unpublished.
+
+Exactly the silent-freeze pattern the last session documented, and a good argument for the
+`gh run list` habit: the site looked a week behind, not broken.
+
+**A different fault, in a different place.** Not the verify gate this time — `fetch.py` crashing:
+
+```
+File "scraper/fetch.py", line 59, in fetch_recap
+  props = json.loads(html.unescape(m.group(1)))["props"]
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+```
+
+**Root cause: Inertia embeds the page payload two different ways, and `recap.dartconnect.com`
+switched.** It used to be HTML-escaped JSON in the root element's `data-page` *attribute*. It is now
+raw JSON in the *body* of `<script data-page="app" type="application/json">`.
+
+What made this hard to read from the traceback: **the old regex still matched.** The attribute is
+still on the page — it just holds the literal string `"app"` now. So the failure never surfaced as
+"format changed"; it surfaced as a JSON decode error on a 3-character string.
+
+A red herring on the way: the unfetched set included one match with `status: 'A'` rather than `'C'`
+(`Boats & Hoes v Those Divas`, 1–10), which looked like the obvious culprit — ROADMAP finding #3 is
+exactly about unfinished matches. It was not. Probing both an `'A'` and a `'C'` match returned the
+*same* `data-page="app"`, which is what identified the real cause. For the record that match is
+fully played — 11 games, 236 turns, 1,386 darts, a real 7:29–10:46 PM window, no `score_edits` — so
+`'A'` is some administrative state, not an abandonment. It scores and renders fine. **What `'A'`
+actually means is still unknown**, and `fetch.py` does not filter on status (ROADMAP Step 2).
+
+**Fixed** with `fetch._inertia_props(page, source)`, used by both `fetch_recap` and
+`fetch_standings`: collect both candidate locations, try to parse each, first one yielding a `props`
+dict wins. Never infer the shape from the host — `tv.dartconnect.com` was *still on the old form* on
+the same day, so the two endpoints genuinely disagreed. Whichever migrates next now costs nothing.
+
+Only the attribute form gets `html.unescape`. On the raw script body unescaping is a no-op *by
+luck* — verified the body carries raw `&`, not `&amp;` — but applying it would silently corrupt a
+team genuinely named `Foo &amp; Bar`. Tested both directions.
+
+The failure message now names what it tried and what it found, instead of surfacing a bare
+`JSONDecodeError`.
+
+**Verified:** 17 missing recaps fetched (105 archived total, complete through 10-27). `verify.py`
+all checks pass with the week-1 baseline still reproducing exactly — the payload *structure* is
+unchanged, only its location moved, so nothing downstream needed touching. `build.py` → 390 pages;
+`check.py` passes; build is byte-for-byte reproducible. Homepage reads `WEEK 7 · TUE 27 OCT`,
+Division 5 standings show `MP 7`, and the `status: 'A'` match page renders with both teams and its
+9 hits. Helper unit-tested against both formats, both-present, and four failure modes.
+
+**Still not done:** `fetch.py` aborts the whole run on the first unparseable match, so one bad recap
+blocks the rest that night. The archive-before-verify commit means nothing fetched is lost (this run
+had already saved 13 before dying), but the loop should be resilient — ROADMAP Step 2.

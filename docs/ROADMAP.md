@@ -115,6 +115,9 @@ existing `check.py` assertion. **Extend the checks; never loosen them.**
 | 15 | Note | PPW definition and `ALL_STAR_CUT` open; forfeits not surfaced; not reconciled → launch as beta. | Step 16 |
 | 16 | Note | BRD risk #2 (DartConnect ToS review) still open. | Step 16 checklist |
 | 17 | Note | No synthetic rule tests (BRD §5.4 #2). | Phase 2 |
+| 19 | Launch | **The Inertia payload moved.** `recap.dartconnect.com` switched from HTML-escaped JSON in the `data-page` attribute to raw JSON in the `<script data-page="app">` body (on/before 2026-10-28), while `tv.dartconnect.com` stayed on the old form. The old regex still matched — the attribute now holds the literal `"app"` — so it failed as an opaque `JSONDecodeError`. Broke every new fetch. | **Fixed 2026-10-28** (`fetch._inertia_props`) |
+| 20 | Should | `fetch.py` aborts the whole run on the first unparseable match, so one bad recap blocks the rest of that night's archiving. | Step 2 |
+| 21 | Note | One match carries `status: 'A'` not `'C'` (fully played: 11 games, 236 turns, no score edits). Meaning unknown; `fetch.py` does not filter on status. | Step 2 |
 | 18 | Launch | **Teams get renamed on DartConnect mid-season**, and the immutable recaps keep the old name, so recap team names and standings drift apart permanently. Broke the deploy 2026-09-21 → 10-02. Also: `verify.py:78` asserted a season-wide total; `verify.py:82` truncated the ambiguous list with `[:3]`, under-reporting 17 players as 3; `-SHORT-` is a short-handed marker, not a player. | **Fixed 2026-10-02** (Step 1) |
 
 ---
