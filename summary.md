@@ -3,10 +3,11 @@
 > **Living document.** Update this at the end of any working session. It is the handoff file for
 > future agent sessions — read it first, before exploring the code.
 
-**Last updated:** 2026-10-28
+**Last updated:** 2026-11-09
 **Owner:** cjpospisil20@gmail.com
 **Status:** Live at <https://cjpospisil20.github.io/psdl-all-star/>, rebuilt weekly by GitHub
-Actions — 390 static pages from 7 archived match nights. Not yet reconciled with the commissioners.
+Actions — 409 static pages from 120 archived matches (8 match nights). Not yet reconciled with
+the commissioners. ROADMAP Steps 1–2 complete.
 
 ---
 
@@ -192,10 +193,10 @@ README.md              outward-facing description and local run instructions
 data/matches.json      season schedule (Fall 2026, season_id 25174)
 data/standings.json    standings props — authoritative team list (31 teams)
 data/allstar-standings.csv   latest computed standings export
-data/recaps/*.json     archived match payloads — 15 matches, Week 1
+data/recaps/*.json     archived match payloads — 120 matches, 8 match nights
 docs/                  PSDL rulebook (PDF + extracted text)
 docs/design-brief.md   self-contained brief for app/UI design sessions
-docs/allstar-standings.csv   copy of latest standings, to attach alongside the brief
+docs/legacy/           stray legacy CSV files moved out of the way
 brds/                  the Business Requirements Document
 ```
 
@@ -513,3 +514,44 @@ Division 5 standings show `MP 7`, and the `status: 'A'` match page renders with 
 **Still not done:** `fetch.py` aborts the whole run on the first unparseable match, so one bad recap
 blocks the rest that night. The archive-before-verify commit means nothing fetched is lost (this run
 had already saved 13 before dying), but the loop should be resilient — ROADMAP Step 2.
+
+---
+
+### 2026-11-09 — ROADMAP Step 2: Pipeline hardening
+
+Six changes, all in service of making the weekly automation more robust.
+
+**1. Status guard on `fetch.py`.** Only archives matches with `status == "C"`. Non-complete matches
+are logged and skipped. `events.py` also only flags completed matches as missing, so a non-`C` match
+won't fail the verify gate. Currently all 120 matches are `'C'`, but the guard prevents archiving a
+mid-play match during a manual Tuesday-night run — the one real risk the ROADMAP identified.
+
+**2. Resilient fetch loop.** `fetch.py` no longer aborts the run on the first bad match. Each fetch
+is wrapped in try/except; failures are collected and reported at the end. The archive-before-verify
+commit means nothing fetched is lost, and now the loop continues past a single failure to archive
+everything it can.
+
+**3. Cron moved off `:00`.** GitHub's scheduled-action queue is busiest at the top of each hour.
+Changed from `0 7 * * 3,4` to `17 7 * * 3,4` — same effective time, lower queue contention.
+
+**4. Build timestamp.** Every page now carries `<meta name="last-modified" content="YYYY-MM-DD">`
+in the head. Set by `build.py` from `datetime.date.today()`, surfaced via `components.BUILD_DATE`.
+The only deliberately non-reproducible element in the output — the ROADMAP's golden-build comparison
+accounts for it.
+
+**5. `None` check aligned with `check.py`.** `build.py`'s placeholder scan checked for the substring
+`"None"` in raw HTML, which would false-positive on any word containing "None" or on CSS `none`
+values. Now uses word boundaries (`r"(?<![A-Za-z0-9])None(?![A-Za-z0-9])"`) — the same approach
+`check.py` uses on text nodes. The bracketed-placeholder checks (`[TEAM NAME]` etc.) are unchanged
+since brackets are distinctive enough for substring matching.
+
+**6. Slug collision check.** `verify.py` now checks that the `slug()` function produces unique
+file paths for all 242 player names and all 31 team names. This guards against names that differ
+only in characters stripped by slugification (e.g. `José` / `Jos` would both become `jos`). Both
+pass today, but the check prevents a silent page overwrite if two colliding names ever appear.
+
+**Also:** moved `Park Slope Dart League (PSDL) - Stats.csv` and `docs/allstar-standings.csv` to
+`docs/legacy/` — they were stray files from the legacy era.
+
+**Verified:** `verify.py` (all checks pass, including the new slug collision section), `build.py`
+(409 pages), and `check.py` (all checks pass). Week-1 baseline still reproduces exactly.

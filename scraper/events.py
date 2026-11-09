@@ -46,7 +46,8 @@ def load_season():
     for division, date, m in entries:
         path = fetch.RECAPS / f"{m['dc_match_id']}.json"
         if not path.exists():
-            missing.append((division, date, m["dc_match_id"]))
+            if m.get("status") == "C":
+                missing.append((division, date, m["dc_match_id"]))
             continue
         props = json.loads(path.read_text(encoding="utf-8"))
         recaps.append(props)

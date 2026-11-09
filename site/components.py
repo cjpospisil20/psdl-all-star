@@ -8,6 +8,8 @@ import tokens
 
 GOLD, MUTED = tokens.COLOURS["gold"], tokens.COLOURS["muted"]
 
+BUILD_DATE = None
+
 
 def esc(text):
     """Escape for HTML but keep real double spaces visible.
@@ -48,13 +50,14 @@ def icon(name, colour=None, size=20):
 def page(title, body, active, depth=0):
     """Full HTML document. `depth` is how many directories deep the page sits."""
     up = "../" * depth
+    stamp = f'\n<meta name="last-modified" content="{BUILD_DATE}">' if BUILD_DATE else ""
     return f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{esc(title)}</title>
-<meta name="theme-color" content="{tokens.COLOURS['surface']}">
+<meta name="theme-color" content="{tokens.COLOURS['surface']}">{stamp}
 <link rel="stylesheet" href="{tokens.FONTS_HREF}">
 <link rel="stylesheet" href="{up}app.css">
 <script src="{up}app.js" defer></script>

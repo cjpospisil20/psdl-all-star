@@ -137,9 +137,32 @@ if __name__ == "__main__":
     all_matches = list(iter_matches(sched))
     print(f"season {SEASON}: {len(all_matches)} matches with results; "
           f"{len(teams(fetch_standings()))} competing teams")
-    new = 0
+    new, errors, skipped = 0, [], []
     for division, date, m in all_matches:
-        if not (RECAPS / f"{m['dc_match_id']}.json").exists():
-            fetch_recap(m["dc_match_id"]); new += 1
-            print(f"  fetched {division} {date} {m['left']['team_name']} v {m['right']['team_name']}")
-    print(f"done — {new} newly fetched, {len(all_matches)} archived total")
+        mid = m["dc_match_id"]
+        if (RECAPS / f"{mid}.json").exists():
+            continue
+        status = m.get("status")
+        if status != "C":
+            skipped.append(f"  {division} {date} "
+                           f"{m['left']['team_name']} v {m['right']['team_name']} "
+                           f"(status={status!r})")
+            continue
+        try:
+            fetch_recap(mid)
+            new += 1
+            print(f"  fetched {division} {date} "
+                  f"{m['left']['team_name']} v {m['right']['team_name']}")
+        except Exception as exc:
+            errors.append(f"  {division} {date} {mid}: {exc}")
+            print(f"  FAILED {division} {date} {mid}: {exc}")
+    if skipped:
+        print(f"\nskipped {len(skipped)} match(es) with non-complete status:")
+        for line in skipped:
+            print(line)
+    if errors:
+        print(f"\nFAILED to fetch {len(errors)} match(es):")
+        for line in errors:
+            print(line)
+    archived = len(list(RECAPS.glob("*.json")))
+    print(f"\ndone — {new} newly fetched, {archived} archived total")
