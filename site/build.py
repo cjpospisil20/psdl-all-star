@@ -4,7 +4,7 @@
 
 Reads only what fetch.py has archived, so builds are reproducible and work offline.
 """
-import collections, pathlib, re, shutil, sys
+import collections, datetime, pathlib, re, shutil, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scraper"))
@@ -443,6 +443,8 @@ def main():
         shutil.rmtree(OUT)                      # keeps builds byte-reproducible
     OUT.mkdir(parents=True)
 
+    C.BUILD_DATE = datetime.date.today().isoformat()
+
     season = events.load_season()
     if season["missing"]:
         print(f"  ! {len(season['missing'])} match recaps missing -- run scraper/fetch.py",
@@ -467,9 +469,11 @@ def main():
     leftovers = []
     for path in OUT.rglob("*.html"):
         text = path.read_text(encoding="utf-8")
-        for marker in ("[TEAM NAME]", "[OPPONENT TEAM]", "[MPR]", "[ALL STAR CUT]", "None"):
+        for marker in ("[TEAM NAME]", "[OPPONENT TEAM]", "[MPR]", "[ALL STAR CUT]"):
             if marker in text:
                 leftovers.append(f"{path.relative_to(OUT)}: {marker}")
+        if re.search(r"(?<![A-Za-z0-9])None(?![A-Za-z0-9])", text):
+            leftovers.append(f"{path.relative_to(OUT)}: None")
     if leftovers:
         print("\n  ! placeholders left in output:", file=sys.stderr)
         for item in leftovers[:10]:

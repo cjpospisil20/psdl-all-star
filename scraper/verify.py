@@ -3,10 +3,14 @@
 These assertions encode the rules that were hard to get right, and the two bugs that were
 actually found and fixed during development. They exist to stop those bugs coming back.
 """
-import collections, pathlib, sys
+import collections, pathlib, re, sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import allstar, events, players
+
+
+def _slug(text):
+    return re.sub(r"[^a-z0-9]+", "-", str(text).lower()).strip("-")
 
 # The validated baseline. These totals were hand-checked against the rulebook for the 15
 # matches of week 1, so they are a permanent regression guard on the scoring rules.
@@ -117,7 +121,29 @@ def main():
                                               for h in hits))
     check("every hit names its game and segment", all(h["game"] and h["segment"] for h in hits))
 
-    print("\n6. Data completeness")
+    print("\n6. Slug collisions")
+    player_slugs = {}
+    collisions = []
+    for r in rows:
+        s = _slug(r["player"])
+        if s in player_slugs and player_slugs[s] != r["player"]:
+            collisions.append(f"{r['player']!r} and {player_slugs[s]!r} -> {s}")
+        player_slugs[s] = r["player"]
+    check(f"all {len(player_slugs)} player slugs are unique", not collisions,
+          f"{len(collisions)} collision(s): {collisions[:3]}")
+    team_slugs = {}
+    team_collisions = []
+    for r in rows:
+        if not r["team"]:
+            continue
+        s = _slug(r["team"])
+        if s in team_slugs and team_slugs[s] != r["team"]:
+            team_collisions.append(f"{r['team']!r} and {team_slugs[s]!r} -> {s}")
+        team_slugs[s] = r["team"]
+    check(f"all {len(team_slugs)} team slugs are unique", not team_collisions,
+          f"{len(team_collisions)} collision(s): {team_collisions[:3]}")
+
+    print("\n7. Data completeness")
     check("no missing recap files", not season["missing"], str(season["missing"][:2]))
 
     print(f"\n{'ALL CHECKS PASSED' if not failures else str(len(failures)) + ' CHECK(S) FAILED'}")

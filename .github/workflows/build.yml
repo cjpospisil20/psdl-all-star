@@ -18,13 +18,13 @@ on:
     #     02:00 EST  (UTC-5, the rest of the year)
     # Either way: the small hours of Wednesday morning in Brooklyn. Hours after
     # the last dart, and finished long before anyone opens the site over coffee.
-    - cron: "0 7 * * 3"
+    - cron: "17 7 * * 3"
     # Catch-up pass, Thursday at the same hour. GitHub delays and sometimes
     # silently drops scheduled runs when its queues are busy, and fetch.py skips
     # every match it has already archived - so this second pass normally does
     # nothing, costs nothing, and turns a missed Wednesday into a one-day delay
     # rather than a week-long gap in the archive.
-    - cron: "0 7 * * 4"
+    - cron: "17 7 * * 4"
   workflow_dispatch:
   push:
     # Both names listed so this works whatever the repo's default branch is.
