@@ -73,7 +73,7 @@ the original letterforms, colour flipped. Used once, at the foot of the rare-hit
 
 - Phone frame is **390px** wide. Screens are tall and scroll; the artboards are fixed-height
   snapshots of the full scroll.
-- Bottom tab bar, 5 items, 64px tall: Standings · All-Stars · Match · Team · Player.
+- Bottom tab bar, 5 items, 64px tall: Standings · All-Stars · Match · Team · Awards.
 - Every tappable target is **≥44px**.
 - Icons are inline stroke SVG. No icon fonts, no emoji.
 - Controls are real elements — `<a href>`, `<button>`, `<input>` + `<label>`. Keep it that way.
@@ -121,7 +121,8 @@ Common = `95+` `R5` `R6` `C3`.
    players had hits in exactly **one** category; the most anyone reached was four. Show a
    player's actual hits as chips, never a row of zeroes.
 2. **Never compare players across divisions.** Division 1 scores ~2.5× Division 5. Rank within
-   division only. Say so on screen where it could be misread.
+   division only. Say so on screen where it could be misread. **Exception:** the Largest Checkout
+   and Largest Check-In awards are league-wide by rule; the award pages note this explicitly.
 3. **Every number is traceable.** Each hit links to the DartConnect recap of the exact turn
    behind it. This is what convinces a sceptical captain that an automated number is right.
    The mockups link to `https://recap.dartconnect.com/` as a stand-in.

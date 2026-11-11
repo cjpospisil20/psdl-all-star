@@ -34,8 +34,10 @@ def icon(name, colour=None, size=20):
                      '<path d="M3.5 19 C3.5 15.6 6 13.8 9 13.8 C12 13.8 14.5 15.6 14.5 19"></path>'
                      '<path d="M16 13.9 C18.6 14.2 20.5 15.9 20.5 19"></path>'
                      '<circle cx="16.8" cy="8.6" r="2.6"></circle>',
-        "player":    '<circle cx="12" cy="8" r="3.6"></circle>'
-                     '<path d="M5 19.5 C5 15.8 8.1 13.8 12 13.8 C15.9 13.8 19 15.8 19 19.5"></path>',
+        "award":     '<path d="M6 9 A6 6 0 0 1 18 9 A6 6 0 0 1 6 9 Z"></path>'
+                     '<path d="M12 15 V20"></path><path d="M8 20 H16"></path>'
+                     '<path d="M9 3 L10.5 6"></path><path d="M15 3 L13.5 6"></path>',
+        "back":      '<path d="M14 6 L8 12 L14 18"></path>',
         "search":    '<circle cx="11" cy="11" r="7"></circle><path d="M16.5 16.5 L21 21"></path>',
         "chevron":   '<path d="M6 9 L12 15 L18 9"></path>',
         "external":  '<path d="M14 4 H20 V10"></path><path d="M20 4 L11 13"></path>'
@@ -83,12 +85,25 @@ def header(title, up=""):
 """
 
 
+def subheader(label, href, back_from, up=""):
+    """Detail-page header: a gold back link and the 32px logo plate."""
+    pages = " ".join(back_from) if isinstance(back_from, (list, tuple)) else back_from
+    return f"""  <header class="hdr sub">
+    <a class="back" href="{href}" data-back="{pages}">{icon("back", GOLD, 16)} {esc(label)}</a>
+    <span class="hdr-plate mini"><img src="{up}assets/psdl-mark.png" alt="Park Slope Dart League"></span>
+  </header>
+"""
+
+
 def statusbar(left, right="SYNCED FROM DARTCONNECT"):
     return f'  <div class="statusbar"><b>{esc(left)}</b><span>{esc(right)}</span></div>\n'
 
 
-def division_nav(divisions, current, url_for):
+def division_nav(divisions, current, url_for, all_href=None):
     out = ['  <nav aria-label="Division" class="divnav">']
+    if all_href is not None:
+        cur = ' aria-current="page"' if current is None else ""
+        out.append(f'    <a href="{all_href}"{cur}><small>&nbsp;</small><b class="num">ALL</b></a>')
     for d in divisions:
         number = d.replace("Division", "").strip()
         cur = ' aria-current="page"' if d == current else ""
@@ -109,7 +124,7 @@ def chips_for(counts, rare_set):
     hits in exactly one category, so a 29-column grid would be almost entirely zeroes.
     """
     order = ["180", "171+", "R9", "C6", "C5", "R8", "C4", "R7", "S90", "F90", "R6", "C3", "R5", "95+"]
-    known = sorted(counts, key=lambda c: order.index(c) if c in order else 99)
+    known = sorted((c for c in counts if c in order), key=lambda c: order.index(c))
     return "".join(chip(c, counts[c], c in rare_set) for c in known if counts[c])
 
 
@@ -118,7 +133,7 @@ def tabs(active, up=""):
              ("all-stars", "ALL-STARS", "star",      f"{up}index.html"),
              ("match",     "MATCH",     "match",     f"{up}matches.html"),
              ("team",      "TEAM",      "team",      f"{up}teams.html"),
-             ("player",    "PLAYER",    "player",    f"{up}players.html")]
+             ("awards",    "AWARDS",    "award",     f"{up}awards.html")]
     out = ['  <nav aria-label="Sections" class="tabs">']
     for key, label, ico, href in items:
         cur = ' aria-current="page"' if key == active else ""

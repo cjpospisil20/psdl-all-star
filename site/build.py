@@ -10,9 +10,9 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scraper"))
 sys.path.insert(0, str(ROOT / "site"))
 
-import allstar, events, players                    # noqa: E402
-import components as C, tokens                     # noqa: E402
-from components import esc, icon                   # noqa: E402
+import allstar, awards, events, players              # noqa: E402
+import components as C, tokens                       # noqa: E402
+from components import esc, icon                     # noqa: E402
 
 OUT = ROOT / "public"
 
@@ -75,7 +75,6 @@ def build_all_stars(season, table, divisions, rare=None):
         body.append('  <p class="caption" id="no-match" hidden>No player by that name on the '
                     f'{esc(division)} board this week.</p>\n')
         if len(rows) > PREVIEW_ROWS:
-            # hidden until app.js confirms JS is running -- without it the full table stands
             body.append(f'  <button class="btn" id="show-all" type="button" hidden>'
                         f'SHOW ALL {len(rows)} IN {esc(division.upper())}'
                         f'{icon("chevron", tokens.COLOURS["gold"], 15)}</button>\n')
@@ -90,8 +89,8 @@ def build_all_stars(season, table, divisions, rare=None):
             write("index.html", page)
 
 
-def leader_card(row):
-    return f"""  <a class="leader" href="player/{slug(row['player'])}.html"
+def leader_card(row, up=""):
+    return f"""  <a class="leader" href="{up}player/{slug(row['player'])}.html"
      data-row="{esc(row['player'])} {esc(row['team'])}">
     <span class="leader-top">
       <span class="leader-rank num">{row['rank']}</span>
@@ -109,9 +108,9 @@ def leader_card(row):
 """
 
 
-def player_row(row, extra=False):
+def player_row(row, extra=False, up=""):
     top = " top" if row["rank"] <= 3 else ""
-    return f"""  <a class="row" href="player/{slug(row['player'])}.html"
+    return f"""  <a class="row" href="{up}player/{slug(row['player'])}.html"
      data-row="{esc(row['player'])} {esc(row['team'])}"{' data-extra' if extra else ''}>
     <span class="row-rank num{top}">{row['rank']}</span>
     <span class="row-main">
@@ -139,22 +138,12 @@ def build_players(season, table, form):
         hits = sorted(by_player[name], key=lambda h: -h["points"])
         write(f"player/{slug(name)}.html", player_page(name, row, hits, form.get(name, {})))
 
-    index = ['  <div class="headline"><span><h1>PLAYERS</h1>'
-             f'<p>{len(rows)} scoring this season</p></span></div>\n']
-    for name in sorted(rows):
-        r = rows[name]
-        index.append(f"""  <a class="row" href="player/{slug(name)}.html">
-    <span class="row-main"><b class="name">{esc(name)}</b>
-    <small class="name">{esc(r['team'])} &middot; {esc(r['division'])}</small></span>
-    <span class="row-pts"><b class="num">{r['points']:,}</b><span>PTS</span></span>
-  </a>
-""")
-    write("players.html", C.page("PSDL All Star — Players",
-                                 C.header("PLAYERS") + "".join(index), "player"))
-
 
 def player_page(name, row, hits, form):
-    body = [C.header("ALL-STARS", up="../"),
+    back_label = f"{row['division'].upper()} ALL-STARS"
+    back_href = f"../{slug(row['division'])}.html"
+    back_from = [f"{slug(row['division'])}.html", "index.html"]
+    body = [C.subheader(back_label, back_href, back_from, up="../"),
             f"""  <div class="headline"><span>
     <h1 class="name">{esc(name)}</h1>
     <p class="name">{esc(row['division'])} &middot; {esc(row['team'])}</p>
@@ -223,7 +212,7 @@ def player_page(name, row, hits, form):
     <span class="hit-val num">{h['points']}</span>
   </div>
 """)
-    return C.page(f"PSDL All Star — {name}", "".join(body), "player", depth=1)
+    return C.page(f"PSDL All Star — {name}", "".join(body), "all-stars", depth=1)
 
 
 def ordinal(n):
@@ -234,25 +223,61 @@ def ordinal(n):
 
 # ---------------------------------------------------------------- match
 
-def build_matches(season):
+def build_matches(season, divisions):
     played = [m for m in season["matches"] if m["hits"]]
-    played.sort(key=lambda m: (m["date"], m["division"]))
+    played.sort(key=lambda m: (-sum(h["points"] for h in m["hits"]), m["date"], m["division"]))
 
-    index = [C.header("MATCH NIGHTS"),
-             C.statusbar(f"WEEK {season['latest_week']} · "
-                         f"{events._pretty_date(season['latest_date'])}"),
-             f'  <div class="headline"><span><h1>MATCH NIGHTS</h1>'
-             f'<p>{len(played)} matches with all star hits</p></span></div>\n']
-    for m in played:
+    weeks = sorted(season["week_of"].items(), key=lambda kv: kv[1])
+
+    def match_row(m, up=""):
         pts = sum(h["points"] for h in m["hits"])
-        index.append(f"""  <a class="row" href="match/{m['id']}.html">
+        return f"""  <a class="row" href="{up}match/{m['id']}.html"
+     data-week="{m['week']}">
     <span class="row-main"><b class="name">{esc(m['home'])} v {esc(m['away'])}</b>
-    <small>{esc(m['division'])} &middot; {esc(m['pretty'])} &middot; {len(m['hits'])} hits</small></span>
+    <small>{esc(m['division'])} &middot; Week {m['week']} &middot; {esc(m['pretty'])} &middot; {len(m['hits'])} hits</small></span>
     <span class="row-pts"><b class="num">{pts:,}</b><span>PTS</span></span>
   </a>
-""")
-    write("matches.html", C.page("PSDL All Star — Match nights",
-                                 "".join(index), "match"))
+"""
+
+    def week_options():
+        opts = ['<option value="">All weeks</option>']
+        for date, wk in weeks:
+            opts.append(f'<option value="{wk}">Week {wk} &middot; {esc(events._pretty_date(date))}</option>')
+        return "\n      ".join(opts)
+
+    def week_filter():
+        return f"""  <div class="filter" hidden>
+    <label for="week" class="vh">Filter by week</label>
+    <select id="week">
+      {week_options()}
+    </select>
+    <span class="chevron">{icon("chevron", tokens.COLOURS["muted"], 16)}</span>
+  </div>
+"""
+
+    def matches_page(division, match_list, page_file):
+        title = "ALL DIVISIONS" if division is None else division.upper()
+        body = [C.header("MATCH NIGHTS"),
+                C.statusbar(f"WEEK {season['latest_week']} · "
+                            f"{events._pretty_date(season['latest_date'])}"),
+                C.division_nav(divisions, division,
+                               lambda d: f"matches-{slug(d)}.html",
+                               all_href="matches.html"),
+                f'  <div class="headline"><span><h1>{esc(title)}</h1>'
+                f'<p><span id="match-count" class="num">{len(match_list)}</span> matches with all star hits</p></span></div>\n',
+                week_filter()]
+        for m in match_list:
+            body.append(match_row(m))
+        body.append('  <p class="caption" id="no-week" hidden>No matches for that week in this division.</p>\n')
+        body.append('  <p class="caption">Division 1 scores roughly 2.5&times; Division 5. '
+                    'Filter by division to compare like with like. Sorted by match points.</p>\n')
+        write(page_file, C.page(f"PSDL All Star — Match nights", "".join(body), "match"))
+
+    matches_page(None, played, "matches.html")
+    for division in divisions:
+        div_matches = [m for m in played if m["division"] == division]
+        matches_page(division, div_matches, f"matches-{slug(division)}.html")
+
     for m in played:
         write(f"match/{m['id']}.html", match_page(m))
 
@@ -262,7 +287,9 @@ def match_page(m):
     for h in m["hits"]:
         by_team[h["team"]].append(h)
 
-    body = [C.header("MATCH NIGHT", up="../"),
+    body = [C.subheader("MATCH NIGHTS", "../matches.html",
+                        ["matches.html"] + [f"matches-division-{i}.html" for i in range(1, 6)],
+                        up="../"),
             C.statusbar(f"{m['pretty']} · WEEK {m['week']} · {m['division'].upper()}"),
             f"""  <div class="headline"><span>
     <h1 class="name">{esc(m['home'])}<br>v {esc(m['away'])}</h1>
@@ -299,33 +326,59 @@ def match_page(m):
 
 # ---------------------------------------------------------------- team
 
-def build_teams(season, table):
+def build_teams(season, table, divisions):
     rows_by_team = collections.defaultdict(list)
     for rows in table.values():
         for r in rows:
             rows_by_team[r["team"]].append(r)
 
-    index = [C.header("TEAMS"),
-             f'  <div class="headline"><span><h1>TEAMS</h1>'
-             f'<p>{len(rows_by_team)} teams on the board</p></span></div>\n']
-    for team in sorted(rows_by_team, key=lambda t: -sum(r["points"] for r in rows_by_team[t])):
-        rows = rows_by_team[team]
-        index.append(f"""  <a class="row" href="team/{slug(team)}.html">
+    sorted_teams = sorted(rows_by_team, key=lambda t: -sum(r["points"] for r in rows_by_team[t]))
+
+    def team_row(team, rows, up=""):
+        return f"""  <a class="row" href="{up}team/{slug(team)}.html"
+     data-row="{esc(team)} {esc(' '.join(r['player'] for r in rows))}">
     <span class="row-main"><b class="name">{esc(team)}</b>
     <small>{esc(rows[0]['division'])} &middot; {len(rows)} scoring</small></span>
     <span class="row-pts"><b class="num">{sum(r['points'] for r in rows):,}</b><span>PTS</span></span>
   </a>
-""")
-    write("teams.html", C.page("PSDL All Star — Teams", "".join(index), "team"))
+"""
 
-    for team, rows in rows_by_team.items():
-        write(f"team/{slug(team)}.html", team_page(team, sorted(rows, key=lambda r: -r["points"])))
+    def teams_page(division, team_list, page_file):
+        title = "ALL DIVISIONS" if division is None else division.upper()
+        filtered = [t for t in team_list
+                    if division is None or rows_by_team[t][0]["division"] == division]
+        body = [C.header("TEAMS"),
+                C.statusbar(f"WEEK {season['latest_week']} · "
+                            f"{events._pretty_date(season['latest_date'])}"),
+                C.division_nav(divisions, division,
+                               lambda d: f"teams-{slug(d)}.html",
+                               all_href="teams.html"),
+                f'  <div class="headline"><span><h1>{esc(title)}</h1>'
+                f'<p>{len(filtered)} teams on the board</p></span></div>\n',
+                f'  <label for="find" class="vh">Find a team or player</label>\n'
+                f'  <div class="search">{icon("search", size=17)}\n'
+                f'    <input id="find" type="search" placeholder="Find a team or player" autocomplete="off">\n'
+                f'  </div>\n']
+        for t in filtered:
+            body.append(team_row(t, rows_by_team[t]))
+        body.append('  <p class="caption" id="no-match" hidden>No team or player by that name.</p>\n')
+        write(page_file, C.page(f"PSDL All Star — Teams", "".join(body), "team"))
+
+    teams_page(None, sorted_teams, "teams.html")
+    for division in divisions:
+        teams_page(division, sorted_teams, f"teams-{slug(division)}.html")
+
+    for team in sorted_teams:
+        rows = sorted(rows_by_team[team], key=lambda r: -r["points"])
+        write(f"team/{slug(team)}.html", team_page(team, rows))
 
 
 def team_page(team, rows):
     total = sum(r["points"] for r in rows)
     hits  = sum(r["hits"] for r in rows)
-    body = [C.header("TEAM", up="../"),
+    body = [C.subheader("TEAMS", "../teams.html",
+                        ["teams.html"] + [f"teams-division-{i}.html" for i in range(1, 6)],
+                        up="../"),
             f"""  <div class="headline"><span>
     <h1 class="name">{esc(team)}</h1>
     <p>{esc(rows[0]['division'])} &middot; captain&rsquo;s roll-up</p>
@@ -395,6 +448,143 @@ def build_standings(season, divisions):
             write("standings.html", page)
 
 
+# ---------------------------------------------------------------- awards
+
+def build_awards(season, table, divisions):
+    data = awards.compute_all(season["hits"], table)
+
+    body = [C.header("AWARDS"),
+            C.statusbar(f"WEEK {season['latest_week']} · "
+                        f"{events._pretty_date(season['latest_date'])}"),
+            f'  <div class="headline"><span><h1>AWARDS</h1>'
+            f'<p>Season-end recognition &middot; all from DartConnect</p></span></div>\n']
+
+    for award in awards.AWARDS:
+        key = award["key"]
+        kind = award["kind"]
+        entries = data[key]
+
+        if kind == "division":
+            status_parts = []
+            for div in sorted(entries):
+                rows = entries[div]
+                if rows:
+                    status_parts.append(f"{esc(rows[0]['player'])}")
+            status = " &middot; ".join(status_parts) if status_parts else "No scores yet"
+        elif kind == "many":
+            if entries:
+                latest = entries[-1]
+                status = (f"{len(entries)} so far &middot; latest "
+                          f"{esc(latest['player'])}")
+            else:
+                status = "Nobody yet this season"
+        elif kind == "one":
+            if entries:
+                leaders = [e for e in entries if e["rank"] == 1]
+                names = ", ".join(esc(e["player"]) for e in leaders)
+                status = f"{names} &middot; {entries[0]['turn_value']}"
+            else:
+                status = "Nobody yet this season"
+        else:
+            status = ""
+
+        body.append(f"""  <a class="row" href="award/{key}.html">
+    <span class="row-main"><b>{esc(award['title'])}</b>
+    <small>{esc(award['blurb'])}</small>
+    <small>{status}</small></span>
+    {icon("chevron", tokens.COLOURS["gold"], 18)}
+  </a>
+""")
+
+    body.append('  <p class="caption">Every number traces back to a DartConnect recap. '
+                'Tap an award to see the full list.</p>\n')
+    write("awards.html", C.page("PSDL All Star — Awards", "".join(body), "awards"))
+
+    for award in awards.AWARDS:
+        key = award["key"]
+        write(f"award/{key}.html",
+              award_page(award, data[key], table, divisions, season))
+
+
+def award_page(award, entries, table, divisions, season):
+    key = award["key"]
+    kind = award["kind"]
+
+    body = [C.subheader("AWARDS", "../awards.html", ["awards.html"], up="../")]
+
+    if kind == "division":
+        body.append(f'  <div class="headline"><span><h1>{esc(award["title"].upper())}</h1>'
+                    f'<p>{esc(award["blurb"])}</p></span></div>\n')
+        for division in divisions:
+            rows = entries.get(division, [])
+            body.append(f'  <div class="headline"><span>'
+                        f'<h2 class="section">{esc(division.upper())}</h2></span></div>\n')
+            if not rows:
+                body.append('  <p class="caption">No scores yet in this division.</p>\n')
+                continue
+            for row in rows:
+                if row["rank"] == 1:
+                    body.append(leader_card(row, up="../"))
+                else:
+                    body.append(player_row(row, up="../"))
+            full = table.get(division, [])
+            if len(full) > len(rows):
+                body.append(f'  <a class="btn" href="../{slug(division)}.html">'
+                            f'FULL {esc(division.upper())} TABLE'
+                            f'{icon("chevron", tokens.COLOURS["gold"], 15)}</a>\n')
+    elif kind == "many":
+        body.append(f'  <div class="headline"><span><h1>{esc(award["title"].upper())}</h1>'
+                    f'<p>{esc(award["blurb"])}</p></span></div>\n')
+        if not entries:
+            body.append('  <p class="caption">Nobody yet this season. '
+                        'Check back after more match nights.</p>\n')
+        else:
+            body.append(f'  <div class="headline"><span>'
+                        f'<p>{len(entries)} qualifying hit{"s" if len(entries) != 1 else ""}</p>'
+                        f'</span></div>\n')
+            for h in entries:
+                body.append(f"""  <div class="hit">
+    <span class="chip rare">{esc(h['display'])}</span>
+    <span class="hit-main">
+      <a href="../player/{slug(h['player'])}.html"><b class="name">{esc(h['player'])}</b></a>
+      <small class="name">{esc(h.get('team', ''))} &middot; {esc(h.get('division', ''))}</small>
+      <small>{esc(h['game'])} &middot; {esc(events._pretty_date(h['date']))} &middot;
+      {C.recap_link(h)}</small>
+    </span>
+    <span class="hit-val num">{h['turn_value']}</span>
+  </div>
+""")
+    elif kind == "one":
+        body.append(f'  <div class="headline"><span><h1>{esc(award["title"].upper())}</h1>'
+                    f'<p>{esc(award["blurb"])}</p></span></div>\n')
+        if not entries:
+            body.append('  <p class="caption">Nobody yet this season. '
+                        'Check back after more match nights.</p>\n')
+        else:
+            body.append('  <p class="caption">Ranked across all divisions &mdash; '
+                        'the league awards this one league-wide. '
+                        'Ties share a place.</p>\n')
+            for i, h in enumerate(entries):
+                extra = ' data-extra' if i >= PREVIEW_ROWS else ''
+                body.append(f"""  <div class="hit"{extra}>
+    <span class="row-rank num{' top' if h['rank'] <= 3 else ''}">{h['rank']}</span>
+    <span class="hit-main">
+      <a href="../player/{slug(h['player'])}.html"><b class="name">{esc(h['player'])}</b></a>
+      <small class="name">{esc(h.get('team', ''))} &middot; {esc(h.get('division', ''))}</small>
+      <small>{esc(h['game'])} &middot; {esc(events._pretty_date(h['date']))} &middot;
+      {C.recap_link(h)}</small>
+    </span>
+    <span class="hit-val num">{h['turn_value']}</span>
+  </div>
+""")
+            if len(entries) > PREVIEW_ROWS:
+                body.append(f'  <button class="btn" id="show-all" type="button" hidden>'
+                            f'SHOW ALL {len(entries)}'
+                            f'{icon("chevron", tokens.COLOURS["gold"], 15)}</button>\n')
+
+    return C.page(f"PSDL All Star — {award['title']}", "".join(body), "awards", depth=1)
+
+
 # ---------------------------------------------------------------- rare hit
 
 def build_rare_hit(season):
@@ -461,9 +651,10 @@ def main():
     rare = build_rare_hit(season)
     build_all_stars(season, table, divs, rare)
     build_players(season, table, form)
-    build_matches(season)
-    build_teams(season, table)
+    build_matches(season, divs)
+    build_teams(season, table, divs)
     build_standings(season, divs)
+    build_awards(season, table, divs)
 
     # A bracketed placeholder must never reach a real page.
     leftovers = []
@@ -483,7 +674,8 @@ def main():
     print(f"built {len(_written)} pages into {OUT}")
     print(f"  {len([r for r in _written if r.startswith('player/')])} players, "
           f"{len([r for r in _written if r.startswith('match/')])} matches, "
-          f"{len([r for r in _written if r.startswith('team/')])} teams")
+          f"{len([r for r in _written if r.startswith('team/')])} teams, "
+          f"{len([r for r in _written if r.startswith('award/')])} awards")
     if rare:
         print(f"  rare-hit screen: {rare['player']}'s {rare['display']}")
     return 0

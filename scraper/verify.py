@@ -146,6 +146,44 @@ def main():
     print("\n7. Data completeness")
     check("no missing recap files", not season["missing"], str(season["missing"][:2]))
 
+    print("\n8. Awards hold their definitions")
+    import awards as awards_mod
+    award_data = awards_mod.compute_all(hits, table)
+
+    club = award_data["171-plus"]
+    expected_171 = [h for h in hits if h["display"] in ("171+", "180")]
+    check("171+ club equals hits with display 171+/180",
+          len(club) == len(expected_171),
+          f"club has {len(club)}, hits have {len(expected_171)}")
+
+    fish = award_data["big-fish"]
+    bad_fish = [h for h in fish if h["code"] != "F90" or h["turn_value"] != 170]
+    check("every Big Fish entry is an F90 of exactly 170", not bad_fish,
+          f"{len(bad_fish)} wrong")
+
+    for key in ("largest-checkout", "largest-checkin"):
+        lb = award_data[key]
+        if not lb:
+            continue
+        check(f"{key} has one row per player",
+              len(lb) == len({h["player"] for h in lb}),
+              "duplicate players")
+        check(f"{key} is sorted descending",
+              all(lb[i]["turn_value"] >= lb[i + 1]["turn_value"] for i in range(len(lb) - 1)))
+        check(f"{key} rank 1 equals the maximum",
+              lb[0]["rank"] == 1)
+        for i in range(1, len(lb)):
+            if lb[i]["turn_value"] == lb[i - 1]["turn_value"]:
+                check(f"{key} ties share a rank at position {i}",
+                      lb[i]["rank"] == lb[i - 1]["rank"])
+
+    leaders = award_data["points-leader"]
+    for division, div_rows in leaders.items():
+        if div_rows:
+            check(f"points leader in {division} is rank 1",
+                  div_rows[0]["rank"] == 1,
+                  f"rank is {div_rows[0]['rank']}")
+
     print(f"\n{'ALL CHECKS PASSED' if not failures else str(len(failures)) + ' CHECK(S) FAILED'}")
     return 1 if failures else 0
 
