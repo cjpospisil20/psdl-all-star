@@ -73,7 +73,8 @@ the original letterforms, colour flipped. Used once, at the foot of the rare-hit
 
 - Phone frame is **390px** wide. Screens are tall and scroll; the artboards are fixed-height
   snapshots of the full scroll.
-- Bottom tab bar, 5 items, 64px tall: Standings · All-Stars · Match · Team · Awards.
+- Bottom tab bar, 5 items, 64px tall: Standings · All-Stars · Match · Feed · Awards.
+  (Feed replaced Team on 2026-11-11 and is empty for now; team pages open from Standings.)
 - Every tappable target is **≥44px**.
 - Icons are inline stroke SVG. No icon fonts, no emoji.
 - Controls are real elements — `<a href>`, `<button>`, `<input>` + `<label>`. Keep it that way.
@@ -121,8 +122,11 @@ Common = `95+` `R5` `R6` `C3`.
    players had hits in exactly **one** category; the most anyone reached was four. Show a
    player's actual hits as chips, never a row of zeroes.
 2. **Never compare players across divisions.** Division 1 scores ~2.5× Division 5. Rank within
-   division only. Say so on screen where it could be misread. **Exception:** the Largest Checkout
-   and Largest Check-In awards are league-wide by rule; the award pages note this explicitly.
+   division only. Say so on screen where it could be misread. **Exceptions:** the Largest Checkout
+   and Largest Check-In awards are league-wide by rule; the award pages note this explicitly. And
+   the All-Stars **ALL** board, added at the owner's request (2026-11-11), numbers every player
+   league-wide — with no leader card and no gold top three, each row naming its division, and the
+   2.5× gap stated on screen.
 3. **Every number is traceable.** Each hit links to the DartConnect recap of the exact turn
    behind it. This is what convinces a sceptical captain that an automated number is right.
    The mockups link to `https://recap.dartconnect.com/` as a stand-in.
@@ -152,7 +156,7 @@ point — the old system's real failure was that nobody looked at it.
 | `design/all-stars.html` | All-star points leaderboard by division. The heart of the app. |
 | `design/player.html` | One player: DartConnect form stats, then all-star points and every hit. |
 | `design/match.html` | One match night, both teams, every hit linking to its turn. |
-| `design/team.html` | Captain's roll-up of their players. |
+| `design/team.html` | Captain's roll-up of their players. Opened by tapping a team on Standings; lists the whole roster with singles averages. |
 | `design/rare-hit.html` | The celebration screen for a 180 / R9 / C6. |
 
 ## Data in the mockups — what's real and what isn't
