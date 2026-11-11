@@ -3,11 +3,11 @@
 > **Living document.** Update this at the end of any working session. It is the handoff file for
 > future agent sessions — read it first, before exploring the code.
 
-**Last updated:** 2026-11-09
+**Last updated:** 2026-11-11
 **Owner:** cjpospisil20@gmail.com
-**Status:** Live at <https://cjpospisil20.github.io/psdl-all-star/>, rebuilt weekly by GitHub
-Actions — 409 static pages from 120 archived matches (8 match nights). Not yet reconciled with
-the commissioners. ROADMAP Steps 1–2 complete.
+**Status:** Live at <https://psdartleague.com/>, rebuilt weekly by GitHub
+Actions — 436 static pages from 131 archived matches (9 match nights). Not yet reconciled with
+the commissioners. ROADMAP Steps 1–2 complete; Step 15's domain and HTTPS done early.
 
 ---
 
@@ -243,7 +243,8 @@ season, so it is a season-long landmark, not a weekly feature. Season to date: 2
 
 ## What's next
 
-1. **Hosting** — **done.** Live at <https://cjpospisil20.github.io/psdl-all-star/>, published from
+1. **Hosting** — **done.** Live at <https://psdartleague.com/> — GitHub Pages hosts it; the domain
+   is registered at Vercel, which serves only its DNS (records in `README.md`). Published from
    `.github/workflows/build.yml`: `fetch.py` → commit the archive → `verify.py` → `build.py` →
    `check.py` → deploy, with the deploy job gated on the build job succeeding. Newly archived recaps
    are committed *before* verifying, so the archive survives a failed build.
@@ -555,3 +556,34 @@ pass today, but the check prevents a silent page overwrite if two colliding name
 
 **Verified:** `verify.py` (all checks pass, including the new slug collision section), `build.py`
 (409 pages), and `check.py` (all checks pass). Week-1 baseline still reproduces exactly.
+
+### 2026-11-11 — Custom domain: psdartleague.com
+
+CJ bought **psdartleague.com** on Vercel and asked for the site to move to it. That is ROADMAP Step 15's
+domain and HTTPS items, brought forward at the owner's request; the rest of Step 15 (Twitch `parent`,
+page titles, share tags, favicon) is still open. **No code changed.** Every link the build writes is
+relative, `app.js`'s back link resolves against the page itself, and the workflow's environment URL
+comes from `deploy-pages`, so the site works unchanged at the root of a new domain.
+
+**Decision: Vercel holds the DNS, GitHub Pages keeps hosting.** ROADMAP §1 had already chosen Pages,
+and moving the hosting would have added a Vercel token and the npm CLI to CI for no gain. The records
+are in `README.md` → "Repository settings this depends on".
+
+Gotchas worth keeping:
+- **A `CNAME` file does nothing here.** GitHub ignores it on an Actions deploy. The domain lives only
+  in Settings → Pages, or `gh api -X PUT repos/cjpospisil20/psdl-all-star/pages -f cname=…`.
+- **Vercel DNS answers every name by default** — the apex, `www`, any made-up subdomain — with
+  Vercel's own IPs. Those default records cannot be deleted; records you add override them. Check
+  against the authoritative server, not your own resolver:
+  `dig +short @ns1.vercel-dns.com psdartleague.com A` must return GitHub's four `185.199.x.153`.
+- **CAA is already fine.** Vercel's default CAA records allow `letsencrypt.org`, which is where GitHub
+  Pages gets its certificate.
+- **The domain can go dark over paperwork.** If the registrant email differs from the Vercel account's,
+  it must be verified within 15 days of purchase, or the registrar puts the domain on `clientHold` and
+  DNS stops resolving. Auto-renew is on by default and needs a valid card on the Vercel account.
+- **The domain verification belongs to CJ's personal GitHub account**, not to the repo, and it blocks
+  every other owner — including a future PSDL organization — from publishing on the domain. Order for
+  the org move: remove the verification → transfer the repo → re-verify under the org → repoint the
+  `www` CNAME to `<org>.github.io`.
+
+**Verified:** `verify.py`, `build.py` (436 pages) and `check.py` pass unchanged.
