@@ -10,7 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scraper"))
 sys.path.insert(0, str(ROOT / "site"))
 
-import allstar, awards, events, players              # noqa: E402
+import allstar, awards, events, feed, players         # noqa: E402
 import components as C, tokens                       # noqa: E402
 from components import esc, icon                     # noqa: E402
 
@@ -659,13 +659,50 @@ def award_page(award, entries, table, divisions, season):
 
 # ---------------------------------------------------------------- feed
 
-def build_feed():
-    """The Feed tab. Empty for now, at the owner's request -- just the one heading check.py
-    requires and a line saying so, rather than a page that looks broken."""
-    body = (C.header("NEWS FEED") +
-            '  <div class="headline"><span><h1>FEED</h1>'
-            '<p>Nothing posted yet.</p></span></div>\n')
-    write("feed.html", C.page("PSDL All Star — Feed", body, "feed"))
+def feed_card(evt):
+    href = evt["link_href"]
+    is_external = href.startswith("http")
+    target = ' target="_blank" rel="noopener"' if is_external else ""
+
+    if evt["icon_type"] == "chip":
+        rare = evt["icon_name"] in allstar.RARE
+        icon_html = (f'\n    <span class="chip{" rare" if rare else ""}">'
+                     f'{esc(evt["icon_name"])}</span>')
+    else:
+        icon_html = f'\n    {icon(evt["icon_name"], tokens.COLOURS["gold"], 20)}'
+
+    div_label = f" &middot; {esc(evt['division'])}" if evt.get("division") else ""
+
+    return f"""  <a class="feed-card" href="{href}"{target}>{icon_html}
+    <span class="feed-body">
+      <b>{esc(evt['headline'])}</b>
+      <span>{esc(evt['body'])}</span>
+      <small>Week {evt['week']} &middot; {esc(events._pretty_date(evt['date']))}{div_label}</small>
+    </span>
+  </a>
+"""
+
+
+def build_feed(season, divisions):
+    feed_events = feed.generate_events(season)
+
+    body = [C.header("NEWS FEED"),
+            C.statusbar(f"WEEK {season['latest_week']} · "
+                        f"{events._pretty_date(season['latest_date'])}"),
+            f'  <div class="headline"><span><h1>NEWS FEED</h1>'
+            f'<p>{len(feed_events)} events through {season["latest_week"]} weeks</p>'
+            f'</span></div>\n']
+
+    if not feed_events:
+        body.append('  <p class="caption">Nothing posted yet.</p>\n')
+    else:
+        for evt in feed_events:
+            body.append(feed_card(evt))
+
+    body.append('  <p class="caption">Every event is computed from DartConnect data. '
+                'Achievement cards link to the turn behind them; leader changes link '
+                'to the leaderboard.</p>\n')
+    write("feed.html", C.page("PSDL All Star — Feed", "".join(body), "feed"))
 
 
 # ---------------------------------------------------------------- rare hit
@@ -738,7 +775,7 @@ def main():
     build_teams(season, table, form)
     build_standings(season, divs)
     build_awards(season, table, divs)
-    build_feed()
+    build_feed(season, divs)
 
     # A bracketed placeholder must never reach a real page.
     leftovers = []
