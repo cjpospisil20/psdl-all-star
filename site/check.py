@@ -742,6 +742,109 @@ def check_spec_rules(pages, css):
     check(f"all {len(gold_hosts)} gold fills carry only AA-safe text", not wrong, str(wrong))
 
 
+# ---------------------------------------------------------------- 11. navigation and new views
+
+TABS = ["standings.html", "index.html", "matches.html", "feed.html", "awards.html"]
+
+
+def check_navigation(pages):
+    print("\n11. Navigation, team pages, the ALL board and the awards index")
+    # Page names use the OS separator; compare them as URLs so this runs the same on Windows.
+    site = {name.replace("\\", "/"): markup for name, markup in pages.items()}
+
+    # The Team tab was retired for Feed (2026-11-11). Team pages are reached from Standings.
+    wrong_tabs = []
+    for name, markup in site.items():
+        nav = re.search(r'<nav aria-label="Sections" class="tabs">(.*?)</nav>', markup, re.S)
+        found = [u.rsplit("/", 1)[-1] for u in re.findall(r'href="([^"]+)"', nav.group(1))] \
+            if nav else []
+        if found != TABS:
+            wrong_tabs.append(f"{name}: {found}")
+    check("every tab bar is Standings · All-Stars · Match · Feed · Awards", not wrong_tabs,
+          f"{len(wrong_tabs)} pages, e.g. {wrong_tabs[:2]}")
+    check("the Feed page exists", "feed.html" in site)
+    stale = [n for n, m in site.items() if re.search(r'href="[^"]*teams(-division-\d)?\.html"', m)]
+    check("nothing links the retired Teams index", not stale, str(stale[:3]))
+
+    # ---- Standings -> team pages ----
+    standings = {n: m for n, m in site.items() if re.fullmatch(r"standings(-division-\d)?\.html", n)}
+    check("found the standings pages", len(standings) >= 2, str(sorted(standings)))
+    unlinked, reached = [], set()
+    for name, markup in standings.items():
+        for tag, attrs in re.findall(r'<(a|div) class="row"([^>]*)>', markup):
+            href = re.search(r'href="(team/[^"]+\.html)"', attrs)
+            if tag != "a" or not href:
+                unlinked.append(name)
+            else:
+                reached.add(href.group(1))
+    check("every standings row links to its team page", not unlinked,
+          f"{len(unlinked)} plain rows, e.g. on {unlinked[:2]}")
+    teams = {n for n in site if n.startswith("team/")}
+    check(f"all {len(teams)} team pages are reached from Standings, and no more",
+          teams == reached,
+          f"unlinked {sorted(teams - reached)[:3]}, linked but unbuilt {sorted(reached - teams)[:3]}")
+
+    wrong_back = []
+    for name in sorted(teams):
+        back = re.search(r'<a class="back" href="\.\./standings-division-(\d)\.html"', site[name])
+        division = re.search(r"<p>Division (\d) &middot; captain", site[name])
+        if not back or not division or back.group(1) != division.group(1):
+            wrong_back.append(name)
+    check("every team page's back link returns to its own division's standings", not wrong_back,
+          str(wrong_back[:3]))
+
+    # The full roster: every player page is listed on exactly one team page, so nobody is left off
+    # a team and nobody is credited to two.
+    listed = collections.Counter()
+    for name in teams:
+        listed.update(set(re.findall(r'href="\.\./(player/[^"]+\.html)"', site[name])))
+    player_pages = {n for n in site if n.startswith("player/")}
+    off_roster = sorted(player_pages - set(listed))
+    doubled = sorted(p for p, c in listed.items() if c > 1)
+    check(f"all {len(player_pages)} players appear on exactly one team page",
+          not off_roster and not doubled, f"missing {off_roster[:3]}, on two {doubled[:3]}")
+
+    # ---- the ALL board: the owner-approved exception to never ranking across divisions ----
+    board = site.get("all.html")
+    check("the All-Stars ALL board exists", board is not None)
+    if board:
+        rows = re.findall(r'<a class="row".*?</a>', board, re.S)
+        check("the ALL board lists players", bool(rows))
+        check("the ALL board crowns nobody: no leader card", 'class="leader"' not in board)
+        check("the ALL board crowns nobody: no gold rank",
+              not re.search(r'class="row-rank[^"]*\btop\b', board))
+        silent = [r[:60] for r in rows if not re.search(r'<small class="name">Division \d', r)]
+        check("every ALL board row names its division", not silent, str(silent[:2]))
+        check("the ALL board states the Division 1 vs Division 5 gap", "2.5&times;" in board)
+        ranks = [int(n) for n in re.findall(r'<span class="row-rank[^"]*">(\d+)</span>', board)]
+        check("the ALL board is numbered 1..N", ranks == list(range(1, len(rows) + 1)),
+              f"{len(ranks)} ranks for {len(rows)} rows")
+        points = [int(p.replace(",", "")) for p in
+                  re.findall(r'<span class="row-pts">\s*<b class="num">([\d,]+)</b>', board)]
+        check("the ALL board runs highest points first",
+              len(points) == len(rows) and points == sorted(points, reverse=True))
+    boards = [n for n in site if re.fullmatch(r"index\.html|division-\d\.html", n)]
+    no_chip = [n for n in boards if 'href="all.html"' not in site[n]]
+    check("every division board offers the ALL chip", not no_chip, str(no_chip))
+
+    # ---- the awards index names who holds each award ----
+    index = site.get("awards.html", "")
+    missing = []
+    for name in sorted(n for n in site if n.startswith("award/")):
+        first = re.search(r'href="\.\./(player/[^"]+\.html)"', site[name])
+        if first and f'href="{first.group(1)}"' not in index:
+            missing.append(f"{name}: {first.group(1)}")
+    check("the awards index names the holder of every award that has one", not missing,
+          str(missing[:3]))
+    # Division leaders are listed in division order: sorting them by points would rank them
+    # across divisions.
+    section = re.search(r"ALL STAR POINTS LEADER</h2>(.*?)<h2", index, re.S)
+    order = [int(d) for d in re.findall(r'<small class="name">Division (\d)',
+                                        section.group(1))] if section else []
+    check("the points leaders are listed in division order", order and order == sorted(order),
+          str(order))
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -773,6 +876,7 @@ def main():
     check_names_css(css)
     check_numerals(pages)
     check_spec_rules(pages, css)
+    check_navigation(pages)
 
     print(f"\n{'ALL CHECKS PASSED' if not failures else str(len(failures)) + ' CHECK(S) FAILED'}")
     if failures:

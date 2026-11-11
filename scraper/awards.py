@@ -7,6 +7,7 @@ The two "largest" awards rank across divisions. The league awards them league-wi
 this is a deliberate exception to the "never compare across divisions" rule.
 """
 
+# In the order the Awards page shows them -- the owner's order (2026-11-11).
 AWARDS = [
     {
         "key":   "points-leader",
@@ -15,16 +16,11 @@ AWARDS = [
         "kind":  "division",
     },
     {
-        "key":   "171-plus",
-        "title": "171+ Club",
-        "blurb": "Every player who threw 171 or higher in a single turn.",
-        "kind":  "many",
-    },
-    {
-        "key":   "big-fish",
-        "title": "The Big Fish",
-        "blurb": "Check out a perfect 170 and you’re in the club.",
-        "kind":  "many",
+        "key":   "largest-checkin",
+        "title": "Largest Check-In",
+        "blurb": "The highest score on the turn a side gets on the board, across the entire "
+                 "league this season.",
+        "kind":  "one",
     },
     {
         "key":   "largest-checkout",
@@ -33,10 +29,16 @@ AWARDS = [
         "kind":  "one",
     },
     {
-        "key":   "largest-checkin",
-        "title": "Largest Check-In",
-        "blurb": "The highest score on the turn a side gets on the board.",
-        "kind":  "one",
+        "key":   "big-fish",
+        "title": "The Big Fish",
+        "blurb": "Check out a perfect 170 and you’re in the club.",
+        "kind":  "many",
+    },
+    {
+        "key":   "171-plus",
+        "title": "171+ Club",
+        "blurb": "Every player who threw 171 or higher in a single turn.",
+        "kind":  "many",
     },
 ]
 

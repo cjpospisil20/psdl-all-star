@@ -184,6 +184,20 @@ def main():
                   div_rows[0]["rank"] == 1,
                   f"rank is {div_rows[0]['rank']}")
 
+    print("\n9. The ALL board's league table -- the one league-wide ranking")
+    league = players.league_table(table)
+    check(f"holds all {len(rows)} scoring players exactly once",
+          sorted(r["player"] for r in league) == sorted(r["player"] for r in rows),
+          f"{len(league)} rows for {len(rows)} players")
+    check("runs highest points first",
+          all(league[i]["points"] >= league[i + 1]["points"] for i in range(len(league) - 1)))
+    check("is numbered 1..N", [r["league_rank"] for r in league] == list(range(1, len(league) + 1)))
+    division_rank = {r["player"]: r["rank"] for r in rows}
+    check("leaves every division rank as it was",
+          all(r["rank"] == division_rank[r["player"]] for r in league)
+          and not any("league_rank" in r for r in rows),
+          "league_table renumbered or mutated the division table")
+
     print(f"\n{'ALL CHECKS PASSED' if not failures else str(len(failures)) + ' CHECK(S) FAILED'}")
     return 1 if failures else 0
 

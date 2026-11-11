@@ -30,10 +30,10 @@ def icon(name, colour=None, size=20):
         "star":      '<path d="M12 3 L14.6 9.1 L21 9.7 L16.2 14 L17.6 20.3 L12 17 '
                      'L6.4 20.3 L7.8 14 L3 9.7 L9.4 9.1 Z"></path>',
         "match":     '<circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="3.5"></circle>',
-        "team":      '<circle cx="9" cy="8" r="3.2"></circle>'
-                     '<path d="M3.5 19 C3.5 15.6 6 13.8 9 13.8 C12 13.8 14.5 15.6 14.5 19"></path>'
-                     '<path d="M16 13.9 C18.6 14.2 20.5 15.9 20.5 19"></path>'
-                     '<circle cx="16.8" cy="8.6" r="2.6"></circle>',
+        "feed":      '<path d="M7 4.5 H19 A1.5 1.5 0 0 1 20.5 6 V18 A1.5 1.5 0 0 1 19 19.5 H5.5 '
+                     'A2 2 0 0 1 3.5 17.5 V9 H7"></path><path d="M7 4.5 V18"></path>'
+                     '<path d="M10.5 8.5 H17"></path><path d="M10.5 12 H17"></path>'
+                     '<path d="M10.5 15.5 H14.5"></path>',
         "award":     '<path d="M6 9 A6 6 0 0 1 18 9 A6 6 0 0 1 6 9 Z"></path>'
                      '<path d="M12 15 V20"></path><path d="M8 20 H16"></path>'
                      '<path d="M9 3 L10.5 6"></path><path d="M15 3 L13.5 6"></path>',
@@ -132,7 +132,7 @@ def tabs(active, up=""):
     items = [("standings", "STANDINGS", "standings", f"{up}standings.html"),
              ("all-stars", "ALL-STARS", "star",      f"{up}index.html"),
              ("match",     "MATCH",     "match",     f"{up}matches.html"),
-             ("team",      "TEAM",      "team",      f"{up}teams.html"),
+             ("feed",      "FEED",      "feed",      f"{up}feed.html"),
              ("awards",    "AWARDS",    "award",     f"{up}awards.html")]
     out = ['  <nav aria-label="Sections" class="tabs">']
     for key, label, ico, href in items:
