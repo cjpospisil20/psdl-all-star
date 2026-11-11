@@ -179,11 +179,12 @@ def _record_events(entries, prev, record_type, week, date):
     hit = best
 
     if record_type == "checkin":
-        label, award_page = "check-in", "award/largest-checkin.html"
+        label = "check-in"
         verb_new, verb_open = "raises the check-in record to", "opens the check-in record at"
     else:
-        label, award_page = "checkout", "award/largest-checkout.html"
+        label = "checkout"
         verb_new, verb_open = "raises the checkout record to", "opens the checkout record at"
+    award_page = "awards.html"
 
     if prev is None:
         return [_event(
