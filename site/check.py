@@ -744,7 +744,7 @@ def check_spec_rules(pages, css):
 
 # ---------------------------------------------------------------- 11. navigation and new views
 
-TABS = ["standings.html", "index.html", "matches.html", "feed.html", "awards.html"]
+TABS = ["standings.html", "index.html", "schedule.html", "feed.html", "awards.html"]
 
 
 def check_navigation(pages):
@@ -753,6 +753,7 @@ def check_navigation(pages):
     site = {name.replace("\\", "/"): markup for name, markup in pages.items()}
 
     # The Team tab was retired for Feed (2026-11-11). Team pages are reached from Standings.
+    # The Match tab became Schedule the same day (section 12).
     wrong_tabs = []
     for name, markup in site.items():
         nav = re.search(r'<nav aria-label="Sections" class="tabs">(.*?)</nav>', markup, re.S)
@@ -760,7 +761,7 @@ def check_navigation(pages):
             if nav else []
         if found != TABS:
             wrong_tabs.append(f"{name}: {found}")
-    check("every tab bar is Standings · All-Stars · Match · Feed · Awards", not wrong_tabs,
+    check("every tab bar is Standings · All-Stars · Schedule · Feed · Awards", not wrong_tabs,
           f"{len(wrong_tabs)} pages, e.g. {wrong_tabs[:2]}")
     check("the Feed page exists", "feed.html" in site)
     stale = [n for n, m in site.items() if re.search(r'href="[^"]*teams(-division-\d)?\.html"', m)]
@@ -845,6 +846,59 @@ def check_navigation(pages):
           str(order))
 
 
+# ---------------------------------------------------------------- 12. the schedule
+
+def check_schedule(pages):
+    """The Schedule tab (2026-11-11), which replaced the Match tab and its 137 match pages."""
+    print("\n12. The schedule")
+    site = {name.replace("\\", "/"): markup for name, markup in pages.items()}
+    page = site.get("schedule.html")
+    check("the Schedule page exists", page is not None)
+    if page is None:
+        return
+    check("the old Match tab address still serves the schedule",
+          site.get("matches.html") == page)
+    stale = [n for n, m in site.items()
+             if re.search(r'href="[^"]*(?:match/[^"]*|matches-division-\d\.html)"', m)]
+    check("nothing links a retired match page or match-night list", not stale, str(stale[:3]))
+
+    # Live is decided by the clock in the browser, never baked in: a static page that said LIVE
+    # would still be saying it on Wednesday.
+    check("no night ships as live",
+          not re.search(r'class="night live"', page)
+          and all(" hidden" in tag for tag in re.findall(r"<span[^>]*live-tag[^>]*>", page)))
+
+    starts = re.findall(r'<section class="night" data-start="([^"]*)">', page)
+    malformed = [s for s in starts
+                 if not re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:00[-+]\d\d:\d\d", s)]
+    check(f"all {len(starts)} nights carry a first-darts time with its UTC offset",
+          not malformed, str(malformed[:3]))
+    # app.js gilds the FIRST live night in place, so tonight must come first: nights ascend.
+    check("nights run in date order", starts == sorted(starts), str(starts))
+
+    standings = {m.group(1) for n in site
+                 if (m := re.fullmatch(r"standings-(division-\d)\.html", n))}
+    select = re.search(r'<select id="division">(.*?)</select>', page, re.S)
+    options = re.findall(r'<option value="([^"]*)">', select.group(1)) if select else []
+    if starts:
+        check("the division menu is All plus every standings division",
+              options[:1] == [""] and sorted(options[1:]) == sorted(standings),
+              f"options {options}, standings {sorted(standings)}")
+
+    wrong = []
+    for cls, attrs, inner in re.findall(
+            r'<div class="(fixture(?: bye)?)"([^>]*)>(.*?)\n  </div>', page, re.S):
+        division = re.search(r'data-division="([^"]*)"', attrs)
+        labels = re.findall(r'<a class="fx-team(?: away)?" href="team/[^"]+\.html">'
+                            r'<b class="name">[^<]+</b><small>([A-Z]+)</small>', inner)
+        expected = ["BYE"] if cls == "fixture bye" else ["HOME", "AWAY"]
+        if labels != expected or not division or division.group(1) not in standings:
+            wrong.append(f"{cls}: {labels} {division.group(1) if division else None}")
+    fixtures = len(re.findall(r'<div class="fixture', page))
+    check(f"all {fixtures} fixtures link HOME then AWAY (or one BYE) to team pages, "
+          "in a known division", not wrong, str(wrong[:3]))
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -877,6 +931,7 @@ def main():
     check_numerals(pages)
     check_spec_rules(pages, css)
     check_navigation(pages)
+    check_schedule(pages)
 
     print(f"\n{'ALL CHECKS PASSED' if not failures else str(len(failures)) + ' CHECK(S) FAILED'}")
     if failures:

@@ -13,6 +13,9 @@ no manual entry — and every number on the site links back to the DartConnect t
 produced it. That traceability is the feature: it is what makes an automated number
 trustworthy to a sceptical captain.
 
+It also carries the **schedule** — every match night still to come, home v away, by division,
+with tonight's matches highlighted in gold while they are being played.
+
 The site is live at **<https://psdartleague.com>**.
 
 ## Running it locally
@@ -163,6 +166,8 @@ scraper/
   fetch.py       DartConnect fetch + the permanent archive. League and season IDs live here.
   allstar.py     The All Star Points rules engine (Section F of the rulebook).
   events.py      Loads the archive and scores the whole season. Never touches the network.
+  fixtures.py    Match nights still to come, for the Schedule tab. New York time, by hand.
+  feed.py        News feed events, week by week.
   awards.py      Season-end award data (171+ Club, Big Fish, largest checkout/check-in, leaders).
   players.py     Team membership, form stats, division ranks.
   standings.py   Command-line view of the standings, for debugging.
@@ -173,7 +178,8 @@ site/
   tokens.py      The design system as code. The only place colours are defined.
 data/
   recaps/*.json  The permanent archive, one file per match. Committed.
-  matches.json   Season schedule. Refreshed each run.
+  matches.json   Matches that have started (DartConnect lists nothing else here). Refreshed each run.
+  fixtures.json  Every match not yet complete, from DartConnect's lineups feed. Refreshed each run.
   standings.json League standings. Refreshed each run.
 design/          The six mockups and the logo assets.
 docs/            The original design brief and the PSDL rulebook.

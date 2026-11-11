@@ -29,7 +29,9 @@ def icon(name, colour=None, size=20):
                      '<path d="M3.5 9.5 L20.5 9.5"></path><path d="M3.5 14.5 L20.5 14.5"></path>',
         "star":      '<path d="M12 3 L14.6 9.1 L21 9.7 L16.2 14 L17.6 20.3 L12 17 '
                      'L6.4 20.3 L7.8 14 L3 9.7 L9.4 9.1 Z"></path>',
-        "match":     '<circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="3.5"></circle>',
+        "calendar":  '<rect x="3.5" y="5" width="17" height="15.5" rx="2"></rect>'
+                     '<path d="M3.5 10 H20.5"></path><path d="M8 3 V7"></path>'
+                     '<path d="M16 3 V7"></path>',
         "feed":      '<path d="M7 4.5 H19 A1.5 1.5 0 0 1 20.5 6 V18 A1.5 1.5 0 0 1 19 19.5 H5.5 '
                      'A2 2 0 0 1 3.5 17.5 V9 H7"></path><path d="M7 4.5 V18"></path>'
                      '<path d="M10.5 8.5 H17"></path><path d="M10.5 12 H17"></path>'
@@ -131,7 +133,7 @@ def chips_for(counts, rare_set):
 def tabs(active, up=""):
     items = [("standings", "STANDINGS", "standings", f"{up}standings.html"),
              ("all-stars", "ALL-STARS", "star",      f"{up}index.html"),
-             ("match",     "MATCH",     "match",     f"{up}matches.html"),
+             ("schedule",  "SCHEDULE",  "calendar",  f"{up}schedule.html"),
              ("feed",      "FEED",      "feed",      f"{up}feed.html"),
              ("awards",    "AWARDS",    "award",     f"{up}awards.html")]
     out = ['  <nav aria-label="Sections" class="tabs">']

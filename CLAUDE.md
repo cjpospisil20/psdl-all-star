@@ -36,23 +36,25 @@ scraper/   data layer — DartConnect fetch, the rules engine, player data, veri
 site/      presentation layer — design tokens, shared fragments, the page builder
 public/    GENERATED. Never hand-edit; every build deletes and recreates it.
 design/    the mockups and the two logo assets
-data/      archived DartConnect payloads (data/recaps/) plus schedule and standings
+data/      archived DartConnect payloads (data/recaps/) plus played matches, fixtures and standings
 docs/      rulebook, design brief, exports
 ```
 
 | File | Role |
 |---|---|
-| `scraper/fetch.py` | **The only module that touches the network.** Archives each recap to `data/recaps/` on first fetch. |
+| `scraper/fetch.py` | **The only module that touches the network.** Archives each recap to `data/recaps/` on first fetch; refreshes `matches.json`, `standings.json` and `fixtures.json` every run. |
 | `scraper/allstar.py` | Rules engine — Rulebook Section F applied to turn data. Emits individual hits. |
 | `scraper/players.py` | Player → team, form stats recomputed from turns, the per-division ranked table. |
 | `scraper/awards.py` | Season-end award data — 171+ Club, Big Fish, largest checkout/check-in, division leaders. Pure functions over hits. |
 | `scraper/events.py` | `load_season()` — assembles the season from the archive. The single entry point `site/` uses. |
+| `scraper/fixtures.py` | Match nights still to come, from `data/fixtures.json` — the Schedule tab. Also New York time (`eastern_offset`, `league_today`). Pure, offline. |
+| `scraper/feed.py` | News feed events, generated week by week from the archived season. |
 | `scraper/verify.py` | Assertion suite. Run before publishing. |
 | `scraper/standings.py` | Terminal view of the same data the site renders. Debugging aid. |
 | `site/tokens.py` | The palette and type from DESIGN-SPEC, in one place, emitted as `public/app.css`. |
 | `site/components.py` | Shared fragments: page shell, header, sub-header (back links), status bar, division nav, chips, icons, recap links. |
-| `site/app.js` | Progressive enhancement only — search filter, long-table collapse, back-link history, week filter. |
-| `site/build.py` | Renders all pages into `public/`: leaderboards (five divisions + ALL), players, matches, standings, team pages (reached from standings), awards, the feed. |
+| `site/app.js` | Progressive enhancement only — search filter, long-table collapse, back-link history, the schedule's filters and live night. |
+| `site/build.py` | Renders all pages into `public/`: leaderboards (five divisions + ALL), players, the schedule, standings, team pages (reached from standings), awards, the feed. |
 
 Run it:
 
@@ -117,11 +119,20 @@ open public/index.html
    mid-season in Fall 2026. `players.resolve_sides()` joins a recap to its schedule row for the id and
    `players.canonical_teams()` resolves the id to the current name. This is not an alias map (see 5) —
    it is DartConnect's own identity, and it raises rather than guessing.
+   Fixtures resolve the same way (`fixtures.upcoming()`).
 8. **No bracketed placeholder may reach a real page.** `build.py` scans its own output and fails the
    build if one does. If a value is unknown, omit the element — see `ALL_STAR_CUT = None`.
 9. `summary.md` holds the rest of the hard-won specifics (`ending_marks` is points not marks;
    `darts_thrown` only exists for the checkout player; averages are singles-only). Read it before
    touching `players.py`.
+10. **Future fixtures come from DartConnect's lineups feed, not `matches.json`.** `matches.json` only
+    ever lists matches that have started; `POST api/league/ParkSDL/lineups/{season}` lists every match
+    not yet complete, saved as `data/fixtures.json`. On the Schedule, HOME is the team DartConnect
+    lists first (`left`) — DartConnect's own live view does the same, and the owner chose it
+    (2026-11-11). That is a *scheduling* label: the side recorded as home on match night matches
+    `left` only about half the time, so never use `left` to label a played match (ROADMAP finding #8).
+    Whether a night is live comes from the clock in the browser — the site never rebuilds on a
+    Tuesday night.
 
 ## Data source
 
@@ -142,16 +153,19 @@ Out of scope: login/accounts, score entry, live in-match updates, historical sea
 ## Where things stand
 
 The site is **live** at <https://psdartleague.com/>, rebuilt weekly by
-`.github/workflows/build.yml`. `site/build.py` generates **432 pages** from 9 archived match nights —
-243 player pages, 131 match pages, 31 team pages, 5 division leaderboards + the ALL board,
-5 standings pages, 6 match-night indexes, 1 awards index, 5 award detail pages, the feed, the
-rare-hit screen, and the `index.html` / `standings.html` aliases of Division 1 — and
-`scraper/verify.py` and `site/check.py` both pass.
+`.github/workflows/build.yml`. `site/build.py` generates **300 pages** from 9 archived match nights —
+244 player pages, 31 team pages, 5 division leaderboards + the ALL board, 5 standings pages,
+1 awards index, 7 award detail pages, the schedule, the feed, the rare-hit screen, and three
+aliases: `index.html` / `standings.html` (Division 1) and `matches.html` (the schedule, so links to
+the old Match tab still work) — and `scraper/verify.py` and `site/check.py` both pass.
 
-The bottom tab bar is Standings · All-Stars · Match · Feed · Awards. There is no Teams tab or
-teams index any more (retired 2026-11-11): a team page is opened by tapping its row on Standings,
-and lists the whole roster — scorers first, then teammates with no all star hits yet — with each
-player's singles '01 average and MPR. The Feed tab is deliberately empty for now.
+The bottom tab bar is Standings · All-Stars · Schedule · Feed · Awards. The Schedule tab
+(2026-11-11) replaced the Match tab and its 131 per-match pages: it lists every match night still to
+come — home v away, division by division, with a division menu and team search — and gilds tonight's
+matches while they are on. There is no Teams tab or teams index any more (retired 2026-11-11): a team
+page is opened by tapping its row on Standings (or a team on the Schedule), and lists the whole
+roster — scorers first, then teammates with no all star hits yet — with each player's singles '01
+average and MPR. The Feed tab lists the season's notable moments, week by week.
 
 GitHub Pages hosts the site; the domain is registered at Vercel, which serves its DNS and nothing
 else. The domain is a repo setting (Settings → Pages), not a file — do not add a `CNAME` file, which

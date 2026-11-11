@@ -10,7 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scraper"))
 sys.path.insert(0, str(ROOT / "site"))
 
-import allstar, awards, events, feed, players         # noqa: E402
+import allstar, awards, events, feed, fixtures, players  # noqa: E402
 import components as C, tokens                       # noqa: E402
 from components import esc, icon                     # noqa: E402
 
@@ -271,107 +271,89 @@ def ordinal(n):
     return f"{n}{ {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th') }"
 
 
-# ---------------------------------------------------------------- match
+# ---------------------------------------------------------------- schedule
 
-def build_matches(season, divisions):
-    played = [m for m in season["matches"] if m["hits"]]
-    played.sort(key=lambda m: (-sum(h["points"] for h in m["hits"]), m["date"], m["division"]))
+def build_schedule(season, divisions):
+    """The Schedule tab: every match night still to come, from DartConnect's lineups feed.
 
-    weeks = sorted(season["week_of"].items(), key=lambda kv: kv[1])
+    Complete with JavaScript off -- every night and every fixture is in the markup, in date order.
+    app.js adds the division and team filters, and works out from the clock which night is live
+    (fixtures.py explains why a static build cannot know). Tonight is always the first night on
+    the page, so a live night is already at the top: the script only gilds it, and hides nights
+    that are over. That gilded first night is where a "watch live" link will go.
 
-    def match_row(m, up=""):
-        pts = sum(h["points"] for h in m["hits"])
-        return f"""  <a class="row" href="{up}match/{m['id']}.html"
-     data-week="{m['week']}">
-    <span class="row-main"><b class="name">{esc(m['home'])} v {esc(m['away'])}</b>
-    <small>{esc(m['division'])} &middot; Week {m['week']} &middot; {esc(m['pretty'])} &middot; {len(m['hits'])} hits</small></span>
-    <span class="row-pts"><b class="num">{pts:,}</b><span>PTS</span></span>
-  </a>
-"""
+    Written to matches.html too, so links to the old Match tab still land somewhere useful.
+    """
+    nights = season["fixtures"]
+    to_play = sum(1 for night in nights for f in night["fixtures"] if "bye" not in f)
 
-    def week_options():
-        opts = ['<option value="">All weeks</option>']
-        for date, wk in weeks:
-            opts.append(f'<option value="{wk}">Week {wk} &middot; {esc(events._pretty_date(date))}</option>')
-        return "\n      ".join(opts)
+    def team_link(label, team, cls="fx-team"):
+        return (f'<a class="{cls}" href="{team_href(team)}"><b class="name">{esc(team)}</b>'
+                f'<small>{label}</small></a>')
 
-    def week_filter():
-        return f"""  <div class="filter" hidden>
-    <label for="week" class="vh">Filter by week</label>
-    <select id="week">
-      {week_options()}
+    # Home on the left, away on the right, as on a scoreboard. Each team links to its page.
+    def fixture_row(f):
+        attrs = f'data-division="{slug(f["division"])}"'
+        division = f'<small class="fx-div">{esc(f["division"].upper())}</small>'
+        if "bye" in f:
+            return (f'  <div class="fixture bye" {attrs} data-row="{esc(f["bye"])}">\n'
+                    f'    {division}\n'
+                    f'    <span class="fx-teams">{team_link("BYE", f["bye"])}</span>\n  </div>\n')
+        return (f'  <div class="fixture" {attrs} data-row="{esc(f["home"])} {esc(f["away"])}">\n'
+                f'    {division}\n'
+                f'    <span class="fx-teams">{team_link("HOME", f["home"])}<span class="fx-v">v</span>'
+                f'{team_link("AWAY", f["away"], "fx-team away")}</span>\n  </div>\n')
+
+    if not nights:
+        body = [C.header("MATCH SCHEDULE"),
+                C.statusbar(season["standings"]["leagueInfo"]["season_label"].upper()),
+                '  <div class="headline"><span><h1>UPCOMING</h1>'
+                '<p>No upcoming matches on the DartConnect schedule.</p></span></div>\n']
+    else:
+        first = nights[0]
+        options = "\n      ".join(
+            ['<option value="">All divisions</option>'] +
+            [f'<option value="{slug(d)}">{esc(d)}</option>' for d in divisions])
+        body = [C.header("MATCH SCHEDULE"),
+                C.statusbar(f"NEXT · {events._pretty_date(first['date'])}"),
+                f"""  <div class="sched-controls" hidden>
+  <div class="filter">
+    <label for="division" class="vh">Division</label>
+    <select id="division">
+      {options}
     </select>
     <span class="chevron">{icon("chevron", tokens.COLOURS["muted"], 16)}</span>
   </div>
-"""
-
-    def matches_page(division, match_list, page_file):
-        title = "ALL DIVISIONS" if division is None else division.upper()
-        body = [C.header("MATCH NIGHTS"),
-                C.statusbar(f"WEEK {season['latest_week']} · "
-                            f"{events._pretty_date(season['latest_date'])}"),
-                C.division_nav(divisions, division,
-                               lambda d: f"matches-{slug(d)}.html",
-                               all_href="matches.html"),
-                f'  <div class="headline"><span><h1>{esc(title)}</h1>'
-                f'<p><span id="match-count" class="num">{len(match_list)}</span> matches with all star hits</p></span></div>\n',
-                week_filter()]
-        for m in match_list:
-            body.append(match_row(m))
-        body.append('  <p class="caption" id="no-week" hidden>No matches for that week in this division.</p>\n')
-        body.append('  <p class="caption">Division 1 scores roughly 2.5&times; Division 5. '
-                    'Filter by division to compare like with like. Sorted by match points.</p>\n')
-        write(page_file, C.page(f"PSDL All Star — Match nights", "".join(body), "match"))
-
-    matches_page(None, played, "matches.html")
-    for division in divisions:
-        div_matches = [m for m in played if m["division"] == division]
-        matches_page(division, div_matches, f"matches-{slug(division)}.html")
-
-    for m in played:
-        write(f"match/{m['id']}.html", match_page(m))
-
-
-def match_page(m):
-    by_team = collections.defaultdict(list)
-    for h in m["hits"]:
-        by_team[h["team"]].append(h)
-
-    body = [C.subheader("MATCH NIGHTS", "../matches.html",
-                        ["matches.html"] + [f"matches-division-{i}.html" for i in range(1, 6)],
-                        up="../"),
-            C.statusbar(f"{m['pretty']} · WEEK {m['week']} · {m['division'].upper()}"),
-            f"""  <div class="headline"><span>
-    <h1 class="name">{esc(m['home'])}<br>v {esc(m['away'])}</h1>
-    <p>{len(m['hits'])} all star hits &middot; {sum(h['points'] for h in m['hits']):,} points
-    &middot; every one links to its turn</p>
-  </span></div>
+  <label for="team-find" class="vh">Find a team</label>
+  <div class="search">{icon("search", size=17)}
+    <input id="team-find" type="search" placeholder="Find a team" autocomplete="off">
+  </div>
+  </div>
+  <div class="headline"><span><h1>UPCOMING</h1>
+    <p><span id="fx-count" class="num">{to_play}</span> <span id="fx-noun">{"match" if to_play == 1 else "matches"}</span> still to play</p></span></div>
 """]
-
-    for team in (m["teams"].get("home"), m["teams"].get("away")):
-        hits = sorted(by_team.get(team, []), key=lambda h: -h["points"])
-        if not hits:
-            continue
-        body.append(f"""  <div class="headline"><span>
-    <h2 class="section name">{esc(team)}</h2>
-    <p>{sum(h['points'] for h in hits):,} PTS &middot; {len(hits)} HITS</p>
-  </span></div>
-""")
-        for h in hits:
-            body.append(f"""  <div class="hit">
-    <span class="chip{' rare' if h['rare'] else ''}">{esc(h['display'])}</span>
-    <span class="hit-main">
-      <b class="name">{esc(h['player'])}</b>
-      <small>{esc(h['game'])} &middot; {C.recap_link(h)}</small>
-    </span>
-    <span class="hit-val num">{h['points']}</span>
+        for night in nights:
+            when = fixtures.clock(night["time"])
+            if night["week"]:
+                when = f"WEEK {night['week']} &middot; {when}"
+            body.append(f"""  <section class="night" data-start="{night['start']}">
+  <div class="headline">
+    <span><h2 class="section">{esc(events._pretty_date(night['date']))}</h2><p>{when}</p></span>
+    <span class="note live-tag" hidden>LIVE NOW</span>
   </div>
 """)
+            body.extend(fixture_row(f) for f in night["fixtures"])
+            body.append("  </section>\n")
+        body.append('  <p class="caption" id="no-fixtures" hidden>No upcoming matches for that '
+                    'selection.</p>\n')
+        body.append('  <p class="caption">Straight from DartConnect&rsquo;s schedule. Home is the '
+                    'team DartConnect lists first. Times are New York time. On match night, '
+                    'tonight&rsquo;s matches turn gold from first darts until midnight. Tap a team '
+                    'for its players.</p>\n')
 
-    body.append('  <p class="caption">Nothing here was typed by hand. Each row opens the '
-                'DartConnect recap of that match &mdash; if a captain thinks a number is wrong, '
-                'they can check it at the board.</p>\n')
-    return C.page(f"PSDL All Star — {m['home']} v {m['away']}", "".join(body), "match", depth=1)
+    page = C.page("PSDL All Star — Schedule", "".join(body), "schedule")
+    write("schedule.html", page)
+    write("matches.html", page)
 
 
 # ---------------------------------------------------------------- team
@@ -771,7 +753,7 @@ def main():
     rare = build_rare_hit(season)
     build_all_stars(season, table, divs, rare)
     build_players(season, table, form)
-    build_matches(season, divs)
+    build_schedule(season, divs)
     build_teams(season, table, form)
     build_standings(season, divs)
     build_awards(season, table, divs)
@@ -794,9 +776,10 @@ def main():
 
     print(f"built {len(_written)} pages into {OUT}")
     print(f"  {len([r for r in _written if r.startswith('player/')])} players, "
-          f"{len([r for r in _written if r.startswith('match/')])} matches, "
           f"{len([r for r in _written if r.startswith('team/')])} teams, "
           f"{len([r for r in _written if r.startswith('award/')])} awards")
+    upcoming = [f for night in season["fixtures"] for f in night["fixtures"] if "bye" not in f]
+    print(f"  schedule: {len(upcoming)} upcoming matches over {len(season['fixtures'])} nights")
     if rare:
         print(f"  rare-hit screen: {rare['player']}'s {rare['display']}")
     return 0
