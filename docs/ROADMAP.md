@@ -47,7 +47,7 @@ join forms, venues, future fixtures, livestream assignments, announcements. Stre
 under one PSDL channel; an admin pastes a video ID into a Supabase row and the Live page embeds it.
 
 Three findings that shaped the plan:
-1. **DartConnect exposes no future schedule and no venues** (confirmed against the live endpoint on 2026-09-20: Week 1 only, all `status: "C"`). Fixtures and team → bar come from PSDL.
+1. ~~**DartConnect exposes no future schedule and no venues**~~ **Corrected 2026-11-11:** DartConnect *does* expose the future schedule — not on the matches endpoint checked on 2026-09-20 (which only ever lists matches that have started), but on `POST api/league/ParkSDL/lineups/{season}`, the feed behind DartConnect's own Lineups page. It lists every match not yet complete, byes included; `fetch.py` saves it as `data/fixtures.json`. There are still **no venues** in DartConnect: team → bar still comes from PSDL.
 2. **The UI is a phone-only 430px column with a 5-tab bar** (`site/tokens.py`). It needs a responsive shell and new navigation before any new page.
 3. **The archive layout has landmines**: in-progress matches can freeze, no per-season structure, and bumping `SEASON` breaks `verify.py`.
 
@@ -299,9 +299,9 @@ One step per Claude Code session, in order. Before any refactor, save a hash of 
 - [ ] **Step 7 — Homepage v1 (existing data only).** Schedule/Live sections omitted (not placeholdered) until data exists. *Needs Step 5.*
 - [ ] **Step 8 — Supabase project + schema.** Create project (2FA), commit `supabase/schema.sql` with RLS, run it, copy URL + anon key into repo config. Verify with the anon key: insert into signups works; reading signups is **denied**; reading `streams` works. Check the admin-seat question (§10). *Needs Step 5.*
 - [ ] **Step 9 — Join forms** (`/join/player/`, `/join/venue/`): validation, honeypot, success/failure states, mailto fallback. *Needs Step 8.*
-- [ ] **Step 10 — Schedule import + Schedule page.** Owner supplies the CSV → import to `fixtures`; write `scraper/sync_managed.py` + soft managed-data check (team names must exist in standings); page merges upcoming fixtures with DartConnect results. Verify: a deliberate typo warns, doesn't block the deploy. *Needs Steps 8, 3.*
+- [ ] **Step 10 — Schedule import + Schedule page.** *Partly delivered early, at the owner's request (2026-11-11): the Schedule tab (`schedule.html`) now lists upcoming fixtures straight from DartConnect's lineups feed, so no CSV import is needed for them. What remains is overrides only — postponed/cancelled matches DartConnect doesn't reflect — plus merging results in.* Original plan: Owner supplies the CSV → import to `fixtures`; write `scraper/sync_managed.py` + soft managed-data check (team names must exist in standings); page merges upcoming fixtures with DartConnect results. Verify: a deliberate typo warns, doesn't block the deploy. *Needs Steps 8, 3.*
 - [ ] **Step 11 — Venues.** Fill `venues` / `team_venues` (owner supplies the team → bar list), show venue on schedule cards, `/about/venues/`. *Needs Step 10.*
-- [ ] **Step 12 — Live page.** `live.js` (plain `fetch`), derived status, featured player, tap-to-load grid, empty state, Home "live now" banner. Test first with a public non-PSDL video. *Needs Steps 10, 8.*
+- [ ] **Step 12 — Live page.** *Hook in place (2026-11-11): on the Schedule, `app.js` already derives live-by-the-clock and adds `.live` to tonight's `section.night` — the place a "watch live" link goes.* `live.js` (plain `fetch`), derived status, featured player, tap-to-load grid, empty state, Home "live now" banner. Test first with a public non-PSDL video. *Needs Steps 10, 8.*
 - [ ] **Step 13 — Real pub pilot.** Create the PSDL YouTube channel, enable live, issue one pub's stream key, stream a real match, test on cellular; draft the one-page pub guide. *Needs Step 12.*
 - [ ] **Step 14 — Announcements** (table, runtime banner, Home feed). *Needs Step 8.*
 - [ ] **Step 15 — Custom domain (Vercel DNS).** *(2026-11-11: domain and HTTPS done early, at the owner's request — psdartleague.com, DNS records in Vercel, Enforce HTTPS on. Still open: Twitch `parent`, page titles, share tags, favicon.)* Set the domain in repo Pages settings; add DNS records in Vercel → Domains → DNS Records; enable Enforce HTTPS; add the domain to any Twitch `parent`; page titles, share tags, favicon. Rollback: remove the custom domain — the `github.io` URL keeps working.
@@ -328,7 +328,7 @@ One step per Claude Code session, in order. Before any refactor, save a hash of 
 
 ## 13. Risks and unknowns
 
-1. **Future fixtures in DartConnect?** Recheck after Week 2 posts (Wed 2026-09-23). If they appear, `fixtures` shrinks to overrides.
+1. ~~**Future fixtures in DartConnect?**~~ **Resolved 2026-11-11: yes**, via the lineups endpoint (§2 finding 1). `fixtures` shrinks to overrides.
 2. **Home team = host bar for every team?** The rulebook says the home team captain is responsible for the host establishment's court; no team → bar list exists yet.
 3. **Season length / structure.** Fall 2025 rulebook: Division 1 = 8 teams / 14 weeks; Divisions 2–4 = 6 teams / 15 weeks. Fall 2026 has 7 teams in Division 1 (31 total). Confirm the current structure.
 4. `competition_title` is "Park Slope Dart League - **Tuesday**" — is there, or will there be, another night?

@@ -285,6 +285,32 @@ a:hover {{ color: var(--white); }}
   font-size: 11px; font-weight: 500; color: var(--muted);
 }}
 
+/* ---------- schedule ---------- */
+.sched-controls {{ padding-top: 14px; }}
+.night + .night {{ margin-top: 18px; }}
+.fixture {{ display: flex; flex-direction: column; gap: 4px; padding: 10px 16px 6px;
+           border-top: 1px solid var(--rule); }}
+.fx-div {{ font-size: 9px; font-weight: 700; letter-spacing: 0.14em; color: var(--muted); }}
+/* Home | v | away. Long names wrap inside their own column rather than truncate. */
+.fx-teams {{ display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+            align-items: center; gap: 10px; }}
+.fx-team {{ display: flex; flex-direction: column; justify-content: center; gap: 3px;
+           min-height: 44px; }}
+.fx-team.away {{ align-items: flex-end; text-align: right; }}
+.fx-team b {{ font-size: 15px; font-weight: 600; line-height: 1.25; color: var(--white); }}
+.fx-team small {{ font-size: 9px; font-weight: 700; letter-spacing: 0.12em; color: var(--muted); }}
+.fx-v {{ font-size: 12px; font-weight: 600; color: var(--muted); }}
+.fixture.bye .fx-teams {{ grid-template-columns: minmax(0, 1fr); }}
+.fixture.bye .fx-team b {{ color: var(--text2); }}
+/* Live: tonight's night, gilded by app.js between first darts and midnight. Gold border and gold
+   label only -- never a gold fill, which on this site means a rare hit. */
+.night.live .fixture {{ margin: 0 16px 10px; padding: 10px 14px 6px; background: var(--surface);
+                       border: 1px solid var(--gold); border-radius: 11px; }}
+.night.live .fixture.bye {{ border-color: var(--hairline); }}
+.night.live .fx-div {{ color: var(--gold); }}
+.live-tag::before {{ content: ""; display: inline-block; width: 8px; height: 8px;
+                    margin-right: 6px; border-radius: 50%; background: var(--gold); }}
+
 /* ---------- tab bar ---------- */
 .tabs {{
   position: fixed; bottom: 0; left: 0; right: 0; margin: 0 auto; max-width: 430px;

@@ -6,7 +6,7 @@ reads only what `fetch.py` has already archived, so a build is reproducible and 
 import collections, datetime, json, pathlib, sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-import allstar, fetch, players
+import allstar, fetch, fixtures, players
 
 
 _DAYS   = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
@@ -96,6 +96,9 @@ def load_season():
         "latest_date": dates[-1] if dates else None,
         "weeks_by_player": weeks_by_player,
         "missing":    missing,
+        # Match nights still to come, for the Schedule tab -- from the lineups feed, since
+        # matches.json only ever lists matches that have started. See fixtures.py.
+        "fixtures":   fixtures.upcoming(standings_props, fixtures.league_today()),
     }
 
 

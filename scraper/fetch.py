@@ -1,8 +1,11 @@
 """Fetch PSDL season data from DartConnect.
 
-Two public, unauthenticated endpoints supply everything:
-  1. POST tv.dartconnect.com/api/league/{league}/matches/{season}  -> schedule + match ids
+Three public, unauthenticated endpoints supply everything:
+  1. POST tv.dartconnect.com/api/league/{league}/matches/{season}  -> played matches + match ids
   2. GET  recap.dartconnect.com/games/{dc_match_id}                -> full turn-by-turn detail
+  3. POST tv.dartconnect.com/api/league/{league}/lineups/{season}  -> fixtures still to be played
+
+(1) only ever lists matches that have started, so the Schedule tab's future fixtures come from (3).
 
 Recap pages are a Laravel/Inertia app: the complete match payload is embedded as JSON in the
 root element's data-page attribute, so there is no HTML parsing and no DOM selectors to break.
@@ -118,6 +121,37 @@ def fetch_standings(refresh=True):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+FIXTURE_FIELDS = ("id", "division", "sched_date", "sched_time", "round_seq", "is_bye",
+                  "status", "dc_match_id")
+
+
+def fetch_fixtures():
+    """Every fixture DartConnect has not yet marked complete, written to data/fixtures.json.
+
+    The matches endpoint above lists a match only once it has started on the board, so it never
+    holds a future fixture. The lineups endpoint -- the one behind DartConnect's own Lineups page --
+    lists every match that is not yet complete: the rest of the season, plus a few stale rows (old
+    byes, an unplayed match, finished-but-unfinalised status 'A' matches) that schedule.py drops.
+
+    Each row is trimmed to the schedule fields. The rosters, captains and DartConnect member ids it
+    also carries are not needed for a schedule, and would churn the file every time a captain
+    publishes a lineup. Sorted, so a rerun with nothing new leaves the file byte-identical.
+    """
+    body = _request(f"https://tv.dartconnect.com/api/league/{LEAGUE}/lineups/{SEASON}", b"{}")
+    rows = json.loads(body)["lineups"]
+
+    def side(team):
+        team = team or {}
+        return {"id": team.get("id"), "team_name": team.get("team_name")}
+
+    fixtures = [{**{k: r.get(k) for k in FIXTURE_FIELDS},
+                 "left": side(r.get("left")), "right": side(r.get("right"))} for r in rows]
+    fixtures.sort(key=lambda f: (f["sched_date"] or "", f["division"] or "", f["id"] or 0))
+    (DATA / "fixtures.json").write_text(json.dumps({"fixtures": fixtures}, indent=1) + "\n",
+                                        encoding="utf-8")
+    return fixtures
+
+
 def teams(standings):
     """Competing teams only -- 31 for Fall 2026.
 
@@ -164,5 +198,14 @@ if __name__ == "__main__":
         print(f"\nFAILED to fetch {len(errors)} match(es):")
         for line in errors:
             print(line)
+    # The schedule is refreshed last, and on its own terms: a fixtures problem must never cost us a
+    # recap. On failure the previous fixtures.json stays in place (the Schedule tab goes stale, but
+    # the page's script still hides nights that are over), and the ::warning:: line surfaces as an
+    # annotation on the GitHub Actions run rather than passing silently.
+    try:
+        upcoming = fetch_fixtures()
+        print(f"fixtures: {len(upcoming)} not-yet-complete rows written to data/fixtures.json")
+    except Exception as exc:
+        print(f"::warning::fixtures refresh failed, keeping the previous data/fixtures.json: {exc}")
     archived = len(list(RECAPS.glob("*.json")))
     print(f"\ndone — {new} newly fetched, {archived} archived total")

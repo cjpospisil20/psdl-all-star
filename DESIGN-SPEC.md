@@ -73,8 +73,9 @@ the original letterforms, colour flipped. Used once, at the foot of the rare-hit
 
 - Phone frame is **390px** wide. Screens are tall and scroll; the artboards are fixed-height
   snapshots of the full scroll.
-- Bottom tab bar, 5 items, 64px tall: Standings · All-Stars · Match · Feed · Awards.
-  (Feed replaced Team on 2026-11-11 and is empty for now; team pages open from Standings.)
+- Bottom tab bar, 5 items, 64px tall: Standings · All-Stars · Schedule · Feed · Awards.
+  (Feed replaced Team on 2026-11-11; team pages open from Standings. Schedule replaced Match the
+  same day, with a calendar icon.)
 - Every tappable target is **≥44px**.
 - Icons are inline stroke SVG. No icon fonts, no emoji.
 - Controls are real elements — `<a href>`, `<button>`, `<input>` + `<label>`. Keep it that way.
@@ -116,6 +117,11 @@ A hit chip is **gold-filled** (`#C59940` bg, `#211C1D` text) when the hit is rar
 Rare = `R7` `R8` `R9` `C4` `C5` `C6` `171+` `180` `S90` `F90`.
 Common = `95+` `R5` `R6` `C3`.
 
+Because a gold *fill* means a rare hit, nothing else is gold-filled. **Live** — tonight's matches
+on the Schedule, from first darts to midnight — is gold the other way round: a 1px gold border on
+each match card, a gold division label, and a gold `LIVE NOW` label with a gold dot. No fill, no
+red, no animation.
+
 ## Hard requirements
 
 1. **Never rebuild the 29-column spreadsheet.** Measured over one real week: 68 of 104 scoring
@@ -139,7 +145,7 @@ Common = `95+` `R5` `R6` `C3`.
 ## Out of scope
 
 Login/accounts, score entry (DartConnect handles that at the board), live in-match updates,
-historical seasons.
+historical seasons. (The Schedule marks tonight's matches live from the clock; it shows no scores.)
 
 ## Tone
 
@@ -155,7 +161,7 @@ point — the old system's real failure was that nobody looked at it.
 | `design/standings.html` | League standings, straight from DartConnect. Division switcher, one division at a time. |
 | `design/all-stars.html` | All-star points leaderboard by division. The heart of the app. |
 | `design/player.html` | One player: DartConnect form stats, then all-star points and every hit. |
-| `design/match.html` | One match night, both teams, every hit linking to its turn. |
+| `design/match.html` | **Retired 2026-11-11.** One match night, both teams, every hit linking to its turn. The Match tab became the Schedule (upcoming home v away fixtures, no all-star points), which has no mockup; `site/build.py` `build_schedule()` is its reference. |
 | `design/team.html` | Captain's roll-up of their players. Opened by tapping a team on Standings; lists the whole roster with singles averages. |
 | `design/rare-hit.html` | The celebration screen for a 180 / R9 / C6. |
 

@@ -198,6 +198,37 @@ def main():
           and not any("league_rank" in r for r in rows),
           "league_table renumbered or mutated the division table")
 
+
+    print("\n10. The schedule -- fixtures still to play, from DartConnect's lineups feed")
+    import fixtures as fixtures_mod
+    # eastern_offset hand-rolls the US daylight-saving rule (no zoneinfo on Windows). Pin both
+    # 2026 changeovers, so a wrong rule cannot shift every first-darts time by an hour.
+    for day, offset in (("2026-03-07", "-05:00"), ("2026-03-08", "-04:00"),
+                        ("2026-10-31", "-04:00"), ("2026-11-01", "-05:00"),
+                        ("2026-11-17", "-05:00")):
+        check(f"New York is UTC{offset} on {day}", fixtures_mod.eastern_offset(day) == offset,
+              fixtures_mod.eastern_offset(day))
+    timezone = season["standings"]["leagueInfo"].get("timezone")
+    check("the league plays on New York time, as the live window assumes",
+          timezone == "America/New_York", repr(timezone))
+
+    nights = season["fixtures"]
+    known = set(events.divisions(season))
+    competitors = set(players.canonical_teams(season["standings"]).values())
+    dates = [n["date"] for n in nights]
+    # app.js gilds tonight in place, which only works if tonight is the first night.
+    check("match nights run in date order, one entry per night",
+          dates == sorted(set(dates)), str(dates))
+    wrong = []
+    for night in nights:
+        for f in night["fixtures"]:
+            teams = [f["bye"]] if "bye" in f else [f["home"], f["away"]]
+            if f["division"] not in known or not set(teams) <= competitors \
+                    or len(set(teams)) != len(teams):
+                wrong.append(f"{night['date']} {f}")
+    check("every fixture is in a standings division, between standings teams",
+          not wrong, str(wrong[:2]))
+
     print(f"\n{'ALL CHECKS PASSED' if not failures else str(len(failures)) + ' CHECK(S) FAILED'}")
     return 1 if failures else 0
 

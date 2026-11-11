@@ -6,8 +6,9 @@
 **Last updated:** 2026-11-11
 **Owner:** cjpospisil20@gmail.com
 **Status:** Live at <https://psdartleague.com/>, rebuilt weekly by GitHub
-Actions — 432 static pages from 131 archived matches (9 match nights). Not yet reconciled with
-the commissioners. ROADMAP Steps 1–2 complete; Step 15's domain and HTTPS done early.
+Actions — 300 static pages from 131 archived matches (9 match nights), plus the Schedule of every
+match night still to come. Not yet reconciled with the commissioners. ROADMAP Steps 1–2 complete;
+Step 15's domain and HTTPS done early; part of Step 10 (the Schedule) done early.
 
 ---
 
@@ -75,6 +76,26 @@ rule, so we do not need our own open/closed state machine. Verified in both dire
 This discovery removed what had been the single largest piece of remaining build logic.
 
 ### Other data gotchas
+
+- **Future fixtures live on the lineups feed, not `matches.json`.** `POST .../matches/{season}` only
+  ever lists matches that have *started* (true of every committed version). `POST
+  tv.dartconnect.com/api/league/ParkSDL/lineups/{season}` — the JSON behind DartConnect's Lineups
+  page — lists every match *not yet complete*: the rest of the season (16 rows a night: Division 1's
+  3 matches + 1 bye, 3 each in Divisions 2–5; Division 1 ends a week early), plus stale rows.
+  `fetch.fetch_fixtures()` trims it to schedule fields → `data/fixtures.json`.
+- **A bye is a row with one side null** (`is_bye: true`, the other side's `id`/`team_name` null). So
+  every past Division 1 bye lingers in the lineups feed with status `P` forever.
+- **Status `A` lingers after a match ends.** `P` pending → `A` started → `C` complete, but a finished
+  match stays `A` until it is finalised (three from 11-10 were still `A` the next afternoon). `A` is
+  not "live". DartConnect's real live list is `POST .../matches/live/{season}` (empty off match night);
+  unused, because the site never rebuilds on a Tuesday night.
+- **On the Schedule, HOME = `left`, by owner decision (2026-11-11).** DartConnect's own live view maps
+  `home: left, away: right`. But the side recorded as home *on the night* matched `left` in only
+  64 of 127 played matches, and some teams are `left` in 2 of 12 fixtures — so `left` is a scheduling
+  label, not who the tablet called home. Never use it to label a played match (ROADMAP finding #8).
+- **A postponed match vanishes from the Schedule** until the commissioners give it a new date in
+  DartConnect: `fixtures.upcoming()` drops every row dated before today (New York). One Division 5
+  match from 11-10 is in that state now.
 
 - **Team count is 31**, and there are two wrong ways to get it. `schedule['teams']` is the filter
   dropdown (35) and includes non-competing entries (`E-Z Buttons (Denny's)`, `Farm.One`, `Lucky 7's`,
@@ -254,8 +275,10 @@ season, so it is a season-long landmark, not a weekly feature. Season to date: 2
    runs archived weeks 2 and 3 correctly and every one of them failed the gate, so the live site sat
    on its first build showing `MP 1`. `gh run list` is the fastest way to see it.
 2. **Commissioner reconciliation** — two commissioners hand-score 3 matches (one per division tier)
-   against system output. This is the gate before automated numbers become official. The match pages
-   are built for exactly this: every hit links to its DartConnect recap, naming set and game.
+   against system output. This is the gate before automated numbers become official. The per-match
+   pages that were built for this were retired with the Match tab (2026-11-11); every hit on a
+   player page still links to its DartConnect recap, naming set and game — and git history has
+   `match_page()` if a commissioners-only per-match view is wanted back.
 3. **Scheduled runs** — **done**, in `.github/workflows/build.yml`: Wednesday 07:00 UTC with a
    Thursday catch-up, since GitHub sometimes drops scheduled runs and `fetch.py` skips anything
    already archived. The order is `fetch.py` → `verify.py` → `build.py` → `check.py`; run it in that
@@ -658,3 +681,50 @@ breaking a copy of the build nine different ways — all nine caught. Against th
 byte-identical apart from the tab bar (the fifth differs only in the Check-In blurb). Walked in
 Chrome: Standings → team → back, the ALL board's search and show-all, Feed, Awards; no console
 errors.
+
+
+### 2026-11-11 — The Match tab becomes the Schedule
+
+At the owner's request (not a ROADMAP step in order — it delivers part of Step 10 early, and
+corrects ROADMAP §2 finding 1 / §13 risk 1: DartConnect *does* publish future fixtures, on the lineups
+feed). The owner didn't want all-star points per match; they wanted to see who plays whom next.
+Decided with the owner: label DartConnect's first-listed team HOME, team names only (no bars — no
+venue data exists); remove the per-match pages.
+
+- **Removed:** the 131 `match/<id>.html` pages, the 6 match-night lists, `build_matches()` /
+  `match_page()`, the week filter in `app.js`, the dartboard `match` icon. Every all-star hit is still
+  traceable from player pages, each linking to its DartConnect recap.
+- **`schedule.html`** (tab: SCHEDULE, calendar icon; also written to `matches.html` so old links
+  land). Every match night from today on, in date order: `TUE 17 NOV · WEEK 10 · 7:30 PM`, then
+  each fixture as home | v | away with HOME/AWAY under the names, both linking to their team pages,
+  and Division 1's bye. A division menu and a team search (both `hidden` until `app.js` reveals them;
+  the division is kept in `#division-N` and `localStorage`).
+- **Live comes from the clock** (ROADMAP §7's decision): each night carries `data-start` with New
+  York's offset (`2026-11-17T19:30:00-05:00`); from first darts until midnight (`LIVE_MS`, 4.5 h)
+  `app.js` adds `.live` to that night — gold-bordered cards, gold `LIVE NOW` — and after midnight it
+  hides the night. Tonight is always the first night, so live matches are already at the top. It
+  re-checks every minute and when the phone returns to the page. `section.night.live` is the hook for
+  ROADMAP Step 12's "watch live".
+- **New York time by hand:** `fixtures.eastern_offset()` hard-codes the US DST rule (2nd Sunday of
+  March → 1st Sunday of November) because `zoneinfo` needs `tzdata` on Windows; `league_today()`
+  uses it so a manual Tuesday-night build (already Wednesday in UTC) keeps tonight's matches.
+- **Week numbers on the Schedule are DartConnect's `round_seq`**, not the date position `week_of`
+  uses: a make-up played on an off night keeps its round instead of shifting every later week. On
+  regular nights they agree (round 9 = 11-10 = week 9).
+- **The fixtures refresh never blocks archiving.** `fetch.py` runs it after the recap loop; a failure
+  prints a GitHub `::warning::` and keeps the previous `fixtures.json`.
+
+Gotchas: a local variable `schedule` (the `matches.json` dict) inside `load_season` shadowed a module
+of the same name — hence `fixtures.py`. Headless Chrome won't render narrower than ~500px, so phone
+screenshots go through a 390px iframe. `--dump-dom` needs script, so the JS-off state was checked as
+the raw HTML (and screenshotted with `app.js` stripped).
+
+**Verified:** `verify.py` (new §10: DST offsets at both 2026 changeovers, league timezone, nights in
+order, every fixture between standings teams in a standings division), `build.py` (300 pages =
+435 − 131 match pages − 6 lists + `schedule.html` + `matches.html`), `check.py` (new §12: the page
+exists and `matches.html` matches it, nothing links a retired page, no night ships live, every
+`data-start` has an offset, nights ascend, the menu is All + every standings division, all 92
+fixtures link HOME then AWAY or one BYE to team pages) all pass; the new fixture check caught a real
+markup change mid-session. In headless Chrome with a faked clock: 7:29 PM nothing live; 8:15 PM the
+first night live; 12:30 AM it is gone (87 → 72 matches); `#division-3` → 18; "craic" → The Craic's
+5; a nonsense search → the empty-state line.
