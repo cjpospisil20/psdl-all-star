@@ -264,6 +264,27 @@ a:hover {{ color: var(--white); }}
 .hit-val {{ flex-shrink: 0; font-family: var(--display); font-weight: 400; font-size: 22px;
            color: var(--white); }}
 
+/* ---------- feed cards ---------- */
+.feed-card {{
+  display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px;
+  border-top: 1px solid var(--rule); border-left: 3px solid var(--gold);
+  min-height: 44px; text-decoration: none;
+}}
+.feed-card:hover {{ background: var(--surface); }}
+.feed-body {{
+  flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px;
+}}
+.feed-card b {{
+  font-family: var(--body); font-weight: 600; font-size: 15px;
+  color: var(--white); line-height: 1.3;
+}}
+.feed-card > .feed-body > span {{
+  font-size: 13px; font-weight: 400; color: var(--text2); line-height: 1.4;
+}}
+.feed-card small {{
+  font-size: 11px; font-weight: 500; color: var(--muted);
+}}
+
 /* ---------- tab bar ---------- */
 .tabs {{
   position: fixed; bottom: 0; left: 0; right: 0; margin: 0 auto; max-width: 430px;

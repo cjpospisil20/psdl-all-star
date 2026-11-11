@@ -40,6 +40,18 @@ AWARDS = [
         "blurb": "Every player who threw 171 or higher in a single turn.",
         "kind":  "many",
     },
+    {
+        "key":   "r8-plus",
+        "title": "R8+",
+        "blurb": "Throw 8 or more marks in a single turn of Cricket and you’re in the club.",
+        "kind":  "many",
+    },
+    {
+        "key":   "c5-plus",
+        "title": "C5+",
+        "blurb": "Five or more bullseye marks in a single turn of Cricket.",
+        "kind":  "many",
+    },
 ]
 
 
@@ -98,6 +110,22 @@ def largest_checkins(hits):
     return _best_per_player(hits, "S90")
 
 
+def club_r8(hits):
+    """Every round of 8+ marks in Cricket."""
+    return sorted(
+        [h for h in hits if h["code"] in ("R8", "R9")],
+        key=lambda h: (-h["turn_value"], h["date"] or ""),
+    )
+
+
+def club_c5(hits):
+    """Every round of 5+ bullseye marks in Cricket."""
+    return sorted(
+        [h for h in hits if h["code"] in ("C5", "C6")],
+        key=lambda h: (-h["turn_value"], h["date"] or ""),
+    )
+
+
 def compute_all(hits, table):
     """All award data in one call."""
     return {
@@ -106,4 +134,6 @@ def compute_all(hits, table):
         "big-fish":         big_fish(hits),
         "largest-checkout": largest_checkouts(hits),
         "largest-checkin":  largest_checkins(hits),
+        "r8-plus":          club_r8(hits),
+        "c5-plus":          club_c5(hits),
     }
