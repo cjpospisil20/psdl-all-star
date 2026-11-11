@@ -3,7 +3,7 @@
    The site is static HTML and every page is complete and usable with JavaScript off -- all
    rows are present in the markup. This file adds conveniences on top:
 
-     1. the player/team search filters the leaderboard in place
+     1. the player search filters the leaderboard in place
      2. long leaderboards collapse to a preview until asked to expand
      3. back links use history.back() when the referrer matches
      4. the week filter on match nights

@@ -52,7 +52,7 @@ docs/      rulebook, design brief, exports
 | `site/tokens.py` | The palette and type from DESIGN-SPEC, in one place, emitted as `public/app.css`. |
 | `site/components.py` | Shared fragments: page shell, header, sub-header (back links), status bar, division nav, chips, icons, recap links. |
 | `site/app.js` | Progressive enhancement only — search filter, long-table collapse, back-link history, week filter. |
-| `site/build.py` | Renders all pages into `public/`: leaderboards, players, matches, teams, standings, awards. |
+| `site/build.py` | Renders all pages into `public/`: leaderboards (five divisions + ALL), players, matches, standings, team pages (reached from standings), awards, the feed. |
 
 Run it:
 
@@ -73,8 +73,12 @@ open public/index.html
 2. **The logo is used unaltered**, on a white circular plate (its outline is near-black and
    would vanish on the dark ground).
 3. **Never rank players across divisions.** Division 1 scores ~2.5× Division 5.
-   **Exception:** the Largest Checkout and Largest Check-In awards rank across divisions because
-   the league awards them league-wide. The award pages note this explicitly.
+   **Exceptions, both deliberate:** the Largest Checkout and Largest Check-In awards rank across
+   divisions because the league awards them league-wide (the award pages say so); and the
+   All-Stars **ALL** board (`all.html`, `players.league_table`) numbers every scoring player
+   league-wide because the owner asked for it (2026-11-11). That board crowns nobody — no leader
+   card, no gold top three — names each player's division on every row, and states the 2.5× gap
+   on screen. Every other page still ranks within division only.
 4. **Never render an empty stat column.** The median player has hits in exactly one category.
    Show the hits they actually have, as chips (`components.chips_for`).
 5. **Every number links to its DartConnect turn** (`components.recap_link`). Traceability is the
@@ -138,10 +142,16 @@ Out of scope: login/accounts, score entry, live in-match updates, historical sea
 ## Where things stand
 
 The site is **live** at <https://psdartleague.com/>, rebuilt weekly by
-`.github/workflows/build.yml`. `site/build.py` generates **424 pages** from 8 archived match nights —
-242 player pages, 120 match pages, 31 team pages (6 team indexes), 5 division leaderboards,
-5 standings pages, 6 match-night indexes, 1 awards index, 5 award detail pages, and the rare-hit
-screen — and `scraper/verify.py` and `site/check.py` both pass.
+`.github/workflows/build.yml`. `site/build.py` generates **432 pages** from 9 archived match nights —
+243 player pages, 131 match pages, 31 team pages, 5 division leaderboards + the ALL board,
+5 standings pages, 6 match-night indexes, 1 awards index, 5 award detail pages, the feed, the
+rare-hit screen, and the `index.html` / `standings.html` aliases of Division 1 — and
+`scraper/verify.py` and `site/check.py` both pass.
+
+The bottom tab bar is Standings · All-Stars · Match · Feed · Awards. There is no Teams tab or
+teams index any more (retired 2026-11-11): a team page is opened by tapping its row on Standings,
+and lists the whole roster — scorers first, then teammates with no all star hits yet — with each
+player's singles '01 average and MPR. The Feed tab is deliberately empty for now.
 
 GitHub Pages hosts the site; the domain is registered at Vercel, which serves its DNS and nothing
 else. The domain is a repo setting (Settings → Pages), not a file — do not add a `CNAME` file, which
