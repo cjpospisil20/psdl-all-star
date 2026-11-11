@@ -111,6 +111,14 @@ a:hover {{ color: var(--white); }}
 .hdr-title {{ font-family: var(--display); font-size: 23px; line-height: 1;
              letter-spacing: 0.02em; color: var(--white); }}
 
+.hdr.sub {{ justify-content: space-between; }}
+.back {{
+  display: flex; align-items: center; gap: 6px; min-height: 44px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: var(--gold);
+}}
+.hdr-plate.mini {{ width: 32px; height: 32px; }}
+.hdr-plate.mini img {{ width: 27px; height: 27px; }}
+
 .statusbar {{
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 9px 16px; background: var(--sunken); border-bottom: 1px solid var(--raised);
@@ -119,7 +127,7 @@ a:hover {{ color: var(--white); }}
 .statusbar span {{ font-size: 10px; font-weight: 600; letter-spacing: 0.08em; color: var(--gold); }}
 
 /* ---------- division switcher ---------- */
-.divnav {{ display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+.divnav {{ display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
           gap: 6px; padding: 14px 16px 10px; }}
 .divnav a {{
   height: 52px; border-radius: 8px; background: var(--surface);
@@ -155,6 +163,23 @@ a:hover {{ color: var(--white); }}
   color: var(--white); font-family: var(--body); font-size: 15px;
 }}
 .search input::placeholder {{ color: var(--muted); }}
+
+/* ---------- filter select ---------- */
+.filter {{
+  display: flex; align-items: center; gap: 9px; margin: 0 16px 14px;
+  position: relative;
+}}
+.filter select {{
+  flex-grow: 1; height: 46px; padding: 0 36px 0 12px; border-radius: 9px;
+  background: var(--surface); border: 1px solid var(--hairline);
+  color: var(--white); font-family: var(--body); font-size: 15px;
+  appearance: none; -webkit-appearance: none;
+}}
+.filter select option {{ background: var(--surface); color: var(--white); }}
+.filter .chevron {{
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  pointer-events: none;
+}}
 
 /* ---------- hit chips ---------- */
 .chips {{ display: flex; flex-wrap: wrap; gap: 5px; }}

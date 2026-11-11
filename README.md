@@ -120,6 +120,7 @@ The non-negotiables, in short:
    the black for surfaces.
 2. The logo is used **unaltered**, on a white circular plate.
 3. **Never rank players across divisions.** Division 1 scores roughly 2.5× Division 5.
+   (Exception: the Largest Checkout and Largest Check-In awards are league-wide by rule.)
 4. **Never render an empty stat column.** The median player has hits in exactly one
    category; show the hits they actually have, as chips.
 5. **Every number links to its DartConnect turn.**
@@ -136,6 +137,7 @@ scraper/
   fetch.py       DartConnect fetch + the permanent archive. League and season IDs live here.
   allstar.py     The All Star Points rules engine (Section F of the rulebook).
   events.py      Loads the archive and scores the whole season. Never touches the network.
+  awards.py      Season-end award data (171+ Club, Big Fish, largest checkout/check-in, leaders).
   players.py     Team membership, form stats, division ranks.
   standings.py   Command-line view of the standings, for debugging.
   verify.py      The assertion suite. The publishing gate.

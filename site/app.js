@@ -1,10 +1,12 @@
 /* Progressive enhancement only.
 
    The site is static HTML and every page is complete and usable with JavaScript off -- all
-   rows are present in the markup. This file adds two conveniences on top:
+   rows are present in the markup. This file adds conveniences on top:
 
-     1. the player search filters the leaderboard in place
+     1. the player/team search filters the leaderboard in place
      2. long leaderboards collapse to a preview until asked to expand
+     3. back links use history.back() when the referrer matches
+     4. the week filter on match nights
 
    Written against the markup build.py emits. No framework, no build step. */
 
@@ -18,12 +20,8 @@
     var list = document.querySelectorAll("[data-row]");
     var empty = document.getElementById("no-match");
 
-    // Two indexes per row. League names are full of nicknames and apostrophes, and people
-    // search for the name they know, not the one DartConnect stores:
-    //   "cam green"  must find  Cam "Jiminy" Green      -> needs per-token matching
-    //   "obrien"     must find  Kevin O'Brien           -> needs punctuation stripped, not spaced
     var strip = function (s) {
-      return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      return (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
     };
     var spaced = function (s) {
       return strip(s).replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
@@ -36,7 +34,6 @@
       var loose = spaced(haystack), solid = tight(haystack);
       var tokens = spaced(query).split(" ").filter(Boolean);
       if (!tokens.length) return true;
-      // every word typed has to appear somewhere -- order and nicknames don't matter
       return tokens.every(function (t) {
         return loose.indexOf(t) !== -1 || solid.indexOf(t) !== -1;
       });
@@ -44,14 +41,13 @@
 
     var filter = function () {
       var q = search.value;
+      if (spaced(q)) expand();
       var shown = 0;
       Array.prototype.forEach.call(list, function (row) {
         var hit = matches(row.getAttribute("data-row"), q);
         row.hidden = !hit;
         if (hit) shown++;
       });
-      // Searching should reach the whole division, not just the preview.
-      if (spaced(q)) expand();
       if (empty) empty.hidden = shown !== 0;
     };
 
@@ -73,7 +69,6 @@
   }
 
   if (more) {
-    // Only collapse once JS is confirmed running, so a no-JS visitor keeps the full table.
     Array.prototype.forEach.call(document.querySelectorAll("[data-extra]"), function (row) {
       row.hidden = true;
     });
@@ -82,5 +77,64 @@
       e.preventDefault();
       expand();
     });
+  }
+
+  /* ---- 3. back links: history.back() when the referrer matches ---------- */
+
+  var back = document.querySelector("a.back[data-back]");
+  if (back) {
+    back.addEventListener("click", function (e) {
+      var pages = (back.getAttribute("data-back") || "").split(" ");
+      var root = new URL(".", back.href).href;
+      try {
+        var ref = document.referrer;
+        var fromList = pages.some(function (p) { return ref === root + p; });
+        if (fromList && history.length > 1) {
+          e.preventDefault();
+          history.back();
+        }
+      } catch (_) { /* cross-origin referrer -- fall through to the plain link */ }
+    });
+  }
+
+  /* ---- 4. week filter on match nights ----------------------------------- */
+
+  var weekSelect = document.getElementById("week");
+  if (weekSelect) {
+    var filterWrap = weekSelect.closest(".filter");
+    if (filterWrap) filterWrap.hidden = false;
+
+    var matchRows = document.querySelectorAll("[data-week]");
+    var noWeek = document.getElementById("no-week");
+    var countEl = document.getElementById("match-count");
+    var divLinks = document.querySelectorAll(".divnav a");
+
+    var applyWeek = function () {
+      var w = weekSelect.value;
+      var shown = 0;
+      Array.prototype.forEach.call(matchRows, function (row) {
+        var visible = !w || row.getAttribute("data-week") === w;
+        row.hidden = !visible;
+        if (visible) shown++;
+      });
+      if (noWeek) noWeek.hidden = shown !== 0;
+      if (countEl) countEl.textContent = shown;
+
+      var hash = w ? "#week-" + w : "";
+      if (history.replaceState) history.replaceState(null, "", location.pathname + hash);
+      Array.prototype.forEach.call(divLinks, function (a) {
+        var base = a.href.split("#")[0];
+        a.href = base + hash;
+      });
+    };
+
+    var hash = location.hash.match(/^#week-(\d+)$/);
+    if (hash) {
+      weekSelect.value = hash[1];
+      if (weekSelect.value !== hash[1]) weekSelect.value = "";
+    }
+
+    weekSelect.addEventListener("change", applyWeek);
+    applyWeek();
   }
 })();

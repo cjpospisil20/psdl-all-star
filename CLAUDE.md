@@ -45,13 +45,14 @@ docs/      rulebook, design brief, exports
 | `scraper/fetch.py` | **The only module that touches the network.** Archives each recap to `data/recaps/` on first fetch. |
 | `scraper/allstar.py` | Rules engine — Rulebook Section F applied to turn data. Emits individual hits. |
 | `scraper/players.py` | Player → team, form stats recomputed from turns, the per-division ranked table. |
+| `scraper/awards.py` | Season-end award data — 171+ Club, Big Fish, largest checkout/check-in, division leaders. Pure functions over hits. |
 | `scraper/events.py` | `load_season()` — assembles the season from the archive. The single entry point `site/` uses. |
 | `scraper/verify.py` | Assertion suite. Run before publishing. |
 | `scraper/standings.py` | Terminal view of the same data the site renders. Debugging aid. |
 | `site/tokens.py` | The palette and type from DESIGN-SPEC, in one place, emitted as `public/app.css`. |
-| `site/components.py` | Shared fragments: page shell, header, status bar, division nav, chips, icons, recap links. |
-| `site/app.js` | Progressive enhancement only — search filter, long-table collapse. |
-| `site/build.py` | Renders all six screens into `public/`. |
+| `site/components.py` | Shared fragments: page shell, header, sub-header (back links), status bar, division nav, chips, icons, recap links. |
+| `site/app.js` | Progressive enhancement only — search filter, long-table collapse, back-link history, week filter. |
+| `site/build.py` | Renders all pages into `public/`: leaderboards, players, matches, teams, standings, awards. |
 
 Run it:
 
@@ -72,6 +73,8 @@ open public/index.html
 2. **The logo is used unaltered**, on a white circular plate (its outline is near-black and
    would vanish on the dark ground).
 3. **Never rank players across divisions.** Division 1 scores ~2.5× Division 5.
+   **Exception:** the Largest Checkout and Largest Check-In awards rank across divisions because
+   the league awards them league-wide. The award pages note this explicitly.
 4. **Never render an empty stat column.** The median player has hits in exactly one category.
    Show the hits they actually have, as chips (`components.chips_for`).
 5. **Every number links to its DartConnect turn** (`components.recap_link`). Traceability is the
@@ -135,9 +138,10 @@ Out of scope: login/accounts, score entry, live in-match updates, historical sea
 ## Where things stand
 
 The site is **live** at <https://cjpospisil20.github.io/psdl-all-star/>, rebuilt weekly by
-`.github/workflows/build.yml`. `site/build.py` generates **280 pages** from 3 archived match nights —
-188 player pages, 45 match pages, 31 team pages, 5 division leaderboards, 5 standings pages, three
-indexes and the rare-hit screen — and `scraper/verify.py` and `site/check.py` both pass.
+`.github/workflows/build.yml`. `site/build.py` generates **424 pages** from 8 archived match nights —
+242 player pages, 120 match pages, 31 team pages (6 team indexes), 5 division leaderboards,
+5 standings pages, 6 match-night indexes, 1 awards index, 5 award detail pages, and the rare-hit
+screen — and `scraper/verify.py` and `site/check.py` both pass.
 
 The workflow commits the archive *before* the verify gate, on purpose. A side effect worth knowing:
 **a broken gate is invisible from the site** — recaps keep accumulating in the repo while the
@@ -145,8 +149,8 @@ published pages freeze on the last good build. Check `gh run list`, not the site
 what happened from 2026-09-21 to 2026-10-02; see `summary.md`'s session log.
 
 Not done: **commissioner reconciliation** (the gate before the numbers become official), forfeit
-exception handling, and `docs/ROADMAP.md` Steps 2–16 (pipeline hardening, season-scoped archive,
-and the wider league website).
+exception handling, and `docs/ROADMAP.md` Steps 3–16 (season-scoped archive and the wider league
+website). Step 2 (pipeline hardening) is complete.
 
 `fetch.py` still aborts the whole run on the first match it cannot parse, so one bad recap stops
 the rest being archived that night. The archive-before-verify commit means nothing fetched is lost,
