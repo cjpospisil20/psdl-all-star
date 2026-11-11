@@ -17,9 +17,9 @@ rules and the history.
 | Topic | Decision |
 |---|---|
 | Approach | **Extend** the existing app; do not rewrite. Keep the scraper, archive, rules engine, verify/check gates and static generator. |
-| Repository | **Public, and it already exists: <https://github.com/cjpospisil20/psdl-all-star>** (created by CJ 2026-09-19; one commit; Pages on; first Actions run green; site live at <https://cjpospisil20.github.io/psdl-all-star/>). **Do not create a second repo.** The owner is happy for the raw DartConnect archive to be downloadable; CJ's email (in `summary.md` and the BRD) and the legacy stats CSV are already public in its history. Plan to move the repo into a shared GitHub organization before the custom-domain step (Pages settings are owner-only on a personal account). The DartConnect ToS review from the BRD is still an open checklist item — see §12. |
+| Repository | **Public, and it already exists: <https://github.com/cjpospisil20/psdl-all-star>** (created by CJ 2026-09-19; one commit; Pages on; first Actions run green; site live at <https://cjpospisil20.github.io/psdl-all-star/>). **Do not create a second repo.** The owner is happy for the raw DartConnect archive to be downloadable; CJ's email (in `summary.md` and the BRD) and the legacy stats CSV are already public in its history. Plan to move the repo into a shared GitHub organization (Pages settings are owner-only on a personal account). The custom domain went live first (2026-11-11) and is verified on CJ's personal account, which blocks any other owner from publishing on it — so the order for the move is: remove that verification → transfer the repo → re-verify the domain under the org → repoint the `www` CNAME to `<org>.github.io`. The DartConnect ToS review from the BRD is still an open checklist item — see §12. |
 | Hosting | **GitHub Pages** for launch. Moving to Cloudflare Pages later only changes the last two workflow steps. |
-| Domain | Bought at **Namecheap**. DNS records are added there (Step 15). |
+| Domain | **psdartleague.com**, bought at **Vercel** on 2026-11-11 (replacing the Namecheap plan). Vercel serves the DNS only; GitHub Pages hosts the site. The records are listed in `README.md`. |
 | Database | **Supabase, Free plan.** Used only for human-entered data (§5). Never in the stats path. |
 | Streaming | **One PSDL-owned YouTube channel**, with a **separate stream key for each pub**. Twitch remains a supported alternative in the data model. |
 | Launch | **Beta / "unofficial"** label until commissioners reconcile the numbers. |
@@ -189,7 +189,7 @@ Revisit Cloudflare Pages only if a private repo is wanted, or server-side code b
 (spam protection, email). Cloudflare Pages free plan (verified): 500 builds/mo, 20,000 files, 25 MiB per
 asset. Deploying a prebuilt `public/` from Actions means the migration is small.
 
-Running cost: $0 hosting + $0 Supabase Free + domain at Namecheap (~$10–20/yr).
+Running cost: $0 hosting + $0 Supabase Free + the yearly renewal of psdartleague.com at Vercel.
 
 ---
 
@@ -304,7 +304,7 @@ One step per Claude Code session, in order. Before any refactor, save a hash of 
 - [ ] **Step 12 — Live page.** `live.js` (plain `fetch`), derived status, featured player, tap-to-load grid, empty state, Home "live now" banner. Test first with a public non-PSDL video. *Needs Steps 10, 8.*
 - [ ] **Step 13 — Real pub pilot.** Create the PSDL YouTube channel, enable live, issue one pub's stream key, stream a real match, test on cellular; draft the one-page pub guide. *Needs Step 12.*
 - [ ] **Step 14 — Announcements** (table, runtime banner, Home feed). *Needs Step 8.*
-- [ ] **Step 15 — Custom domain (Namecheap).** Set the domain in repo Pages settings; add DNS records in Namecheap → Advanced DNS; enable Enforce HTTPS; add the domain to any Twitch `parent`; page titles, share tags, favicon. Rollback: remove the custom domain — the `github.io` URL keeps working.
+- [ ] **Step 15 — Custom domain (Vercel DNS).** *(2026-11-11: domain and HTTPS done early, at the owner's request — psdartleague.com, DNS records in Vercel, Enforce HTTPS on. Still open: Twitch `parent`, page titles, share tags, favicon.)* Set the domain in repo Pages settings; add DNS records in Vercel → Domains → DNS Records; enable Enforce HTTPS; add the domain to any Twitch `parent`; page titles, share tags, favicon. Rollback: remove the custom domain — the `github.io` URL keeps working.
 - [ ] **Step 16 — Docs, runbook, launch QA.** Refresh README / CLAUDE.md / summary.md / DESIGN-SPEC.md; write `docs/RUNBOOK.md` (weekly admin checklist, adding a stream, new season, backups, restore); real-device tests; beta/unofficial banner; complete the launch checklist in §12.
 
 ---
@@ -315,8 +315,8 @@ One step per Claude Code session, in order. Before any refactor, save a hash of 
 
 **The owner must do (external services / machines):**
 - [ ] Install Python 3.12 and Git on the Windows PC.
-- [ ] GitHub: the repo already exists (CJ's). Add the second admin as a collaborator now; move the repo into a shared organization before Step 15; both admins turn on 2FA.
-- [ ] Namecheap: buy the domain; add DNS records as GitHub instructs; enable Enforce HTTPS.
+- [ ] GitHub: the repo already exists (CJ's). Add the second admin as a collaborator now; move the repo into a shared organization (the domain went first — see §1 for the order); both admins turn on 2FA.
+- [x] Domain: buy it; add DNS records as GitHub instructs; enable Enforce HTTPS. *(2026-11-11: psdartleague.com, bought at Vercel.)*
 - [ ] Supabase: create account + project, 2FA, run `schema.sql`, copy Project URL + **anon** key into the repo config. **Never commit the `service_role` key.**
 - [ ] YouTube: create the PSDL channel, verify it, enable live streaming, generate a stream key per pub, pre-create scheduled broadcasts weekly.
 - [ ] Supply the season schedule CSV and the team → bar list.

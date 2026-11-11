@@ -13,6 +13,8 @@ no manual entry — and every number on the site links back to the DartConnect t
 produced it. That traceability is the feature: it is what makes an automated number
 trustworthy to a sceptical captain.
 
+The site is live at **<https://psdartleague.com>**.
+
 ## Running it locally
 
 You need nothing but `python3`. There are **no third-party dependencies** — the scraper
@@ -81,12 +83,34 @@ drifts by an hour against New York twice a year. The 07:00 UTC slot has hours of
 both sides, so the drift never matters. The reasoning is written out in comments at the
 top of the workflow file.
 
-### Repository setting this depends on
+### Repository settings this depends on
 
 In **Settings → Pages**, the build and deployment **Source** must be set to
 **GitHub Actions** (not "Deploy from a branch"). The workflow will fail at the deploy
 step until that is done. This is a one-time, manual setting — a workflow cannot set it
 for you.
+
+The same screen holds the **custom domain**, `psdartleague.com`, with **Enforce HTTPS**
+ticked. Do not add a `CNAME` file to `public/`: GitHub ignores it when a site deploys from
+Actions, so that setting is the only place the domain lives. Old
+`cjpospisil20.github.io/psdl-all-star/` links redirect to the domain. After changing anything
+on that screen, re-run the workflow from the Actions tab: an Actions-deployed site only picks
+up some settings, Enforce HTTPS among them, on its next deploy.
+
+The domain is registered at **Vercel**, which only answers its DNS. Vercel hosts nothing
+here, and the domain must not be added to a Vercel project. The records, under Vercel →
+Domains → psdartleague.com → DNS Records:
+
+| Type | Name | Value | Why |
+|---|---|---|---|
+| A ×4 | *(blank — the apex)* | `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153` | GitHub Pages |
+| CNAME | `www` | `cjpospisil20.github.io` | `www` redirects to the apex |
+| TXT | `_github-pages-challenge-cjpospisil20` | the code GitHub issued | verifies the domain for CJ's GitHub account, so no other account can claim it |
+
+Vercel's own default records cannot be deleted; the records above override them. Its
+default CAA records already allow Let's Encrypt, which is where GitHub gets the HTTPS
+certificate, so leave them alone. Moving the repo to a GitHub organization means
+re-verifying the domain first — see `docs/ROADMAP.md` §1.
 
 ## The archive is permanent — keep it committed
 

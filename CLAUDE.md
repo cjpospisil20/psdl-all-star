@@ -137,11 +137,15 @@ Out of scope: login/accounts, score entry, live in-match updates, historical sea
 
 ## Where things stand
 
-The site is **live** at <https://cjpospisil20.github.io/psdl-all-star/>, rebuilt weekly by
+The site is **live** at <https://psdartleague.com/>, rebuilt weekly by
 `.github/workflows/build.yml`. `site/build.py` generates **424 pages** from 8 archived match nights —
 242 player pages, 120 match pages, 31 team pages (6 team indexes), 5 division leaderboards,
 5 standings pages, 6 match-night indexes, 1 awards index, 5 award detail pages, and the rare-hit
 screen — and `scraper/verify.py` and `site/check.py` both pass.
+
+GitHub Pages hosts the site; the domain is registered at Vercel, which serves its DNS and nothing
+else. The domain is a repo setting (Settings → Pages), not a file — do not add a `CNAME` file, which
+an Actions deploy ignores. The DNS records are listed in `README.md`.
 
 The workflow commits the archive *before* the verify gate, on purpose. A side effect worth knowing:
 **a broken gate is invisible from the site** — recaps keep accumulating in the repo while the
