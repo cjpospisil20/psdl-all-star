@@ -212,6 +212,11 @@ a:hover {{ color: var(--white); }}
 .row-rank {{ flex-shrink: 0; width: 26px; padding-top: 2px; font-family: var(--display);
             font-size: 21px; line-height: 1; color: var(--muted); }}
 .row-rank.top {{ color: var(--gold); }}
+/* The default column fits two digits. Measured in Anton at 21px: a three-digit league rank is
+   31px ("243", the ALL board) and an ordinal up to 42px ("22nd", team pages). Every row on those
+   pages carries the modifier, so the names still line up. */
+.row-rank.wide {{ width: 32px; }}
+.row-rank.ordinal {{ width: 44px; }}
 .row-main {{ flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }}
 .row-main b {{ font-size: 16px; font-weight: 600; color: var(--white); line-height: 1.25; }}
 .row-main small {{ font-size: 11px; font-weight: 500; color: var(--text2); }}
@@ -240,6 +245,10 @@ a:hover {{ color: var(--white); }}
   background: var(--surface); display: flex; align-items: center; justify-content: center;
   gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: var(--gold);
 }}
+
+/* A section heading straight after a button or caption -- the Awards index runs five sections
+   down one page -- needs air above it, or it reads as the tail of the section before. */
+.btn + .headline, .caption + .headline {{ margin-top: 20px; }}
 
 .cutline {{ display: flex; align-items: center; gap: 10px; padding: 10px 16px;
            border-top: 1px dashed var(--gold); }}

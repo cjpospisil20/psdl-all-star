@@ -6,7 +6,7 @@
 **Last updated:** 2026-11-11
 **Owner:** cjpospisil20@gmail.com
 **Status:** Live at <https://psdartleague.com/>, rebuilt weekly by GitHub
-Actions — 436 static pages from 131 archived matches (9 match nights). Not yet reconciled with
+Actions — 432 static pages from 131 archived matches (9 match nights). Not yet reconciled with
 the commissioners. ROADMAP Steps 1–2 complete; Step 15's domain and HTTPS done early.
 
 ---
@@ -607,3 +607,54 @@ every page type (division, player, match, team, award, standings) plus `app.css`
 logo return 200, and a match page is byte-identical to the local build. `http://` → 301 to `https://`;
 `www` → 301 to the apex; old `github.io` links land on the same path at `https://psdartleague.com`
 (one or two hops — GitHub sometimes routes deep links via `http://` first). Run 43055123188 green.
+
+### 2026-11-11 — Standings → team pages, Feed tab, the ALL board, award holders up front
+
+Five changes the owner asked for, all in the generator (`site/`), plus one pure helper in
+`players.py`. Not a ROADMAP step; done at the owner's request, like the Awards tab before it.
+
+1. **Standings rows open the team page.** Every row is now a link. Team pages are built from the
+   **standings competitors** (data rule 6), not from who has scored, so all 31 rows always have a
+   page — this also settles ROADMAP finding #13. `build.team_href()` builds both the link and the
+   file path, so they cannot drift. A team page lists the **whole roster**: scorers first (ordinal
+   division rank, chips, points), then teammates who have thrown but have no all star hits yet
+   (19 league-wide today) as plain, unlinked rows — no player page exists for them. Each row carries
+   the singles `’01` average and MPR from `players.form_stats`, two decimals to match the standings
+   rows. The back link returns to that team's division standings.
+2. **Feed replaces Team in the tab bar** (Standings · All-Stars · Match · Feed · Awards). The Teams
+   index (`teams.html`, `teams-division-N.html`) is gone — Standings is the way into a team now.
+3. **The All-Stars ALL board** (`all.html`). Every scoring player, numbered 1–N league-wide, at the
+   owner's explicit request — a second, documented exception to "never rank across divisions"
+   (CLAUDE.md #3, DESIGN-SPEC hard requirement 2). It crowns nobody: no leader card, no gold top
+   three, no rare-hit banner; every row names its division; the 2.5× gap is stated on screen.
+   `players.league_table()` returns *copies* with a `league_rank`, so the division `rank` every other
+   page shows can never be renumbered by it (verify.py asserts that).
+4. **The Feed page** exists and says "Nothing posted yet." It cannot be literally blank: `check.py`
+   requires exactly one `<h1>` per page.
+5. **The Awards index names the holders**, in the owner's order: Points Leader → Largest Check-In →
+   Largest Checkout → The Big Fish → 171+ Club. Division leaders are listed in division order, never
+   by points (that would rank them across divisions — `check.py` asserts it). Ties show every holder
+   (Largest Checkout is a 115 tie today). A club's holders are its whole membership. The detail pages
+   are unchanged; the index links to them where they show more. The old index's "latest Brian Tuohy"
+   was wrong — it took the *last item in value order*, not the latest by date — and is gone.
+
+Gotchas worth keeping:
+- **The 26px rank column only fits two digits.** Measured in Anton at 21px: `3rd` is 28px, `22nd`
+  42px, `243` 31px. Team-page ordinals had always run into the names; `.row-rank.ordinal` (44px)
+  and `.row-rank.wide` (32px, the ALL board) fix it — width only, no colour.
+- **`esc(x or '&mdash;')` prints a literal `&mdash;`** — `esc()` escapes the fallback's ampersand.
+  The standings rows and the division-average note did this for any team yet to play (invisible
+  today, every team has played). `build.dash()` now emits the dash as markup.
+- `.btn + .headline` / `.caption + .headline` get a 20px top margin so the five award sections read
+  as five; the same rule loosens the points-leader detail page's division sections.
+
+**Verified:** `verify.py` (new §9, the league table), `build.py` (432 pages = 436 − 6 team indexes +
+`all.html` + `feed.html`) and `check.py` (new §11: tab bar on every page, every standings row links
+a team page and every team page is reached, back links return to the right division, all 243
+players on exactly one team page, the ALL board crowns nobody and runs 1..N by points, the awards
+index names every holder, leaders in division order) all pass. Each new check was proved by
+breaking a copy of the build nine different ways — all nine caught. Against the previous build, the
+131 match pages, 6 match-night indexes, the rare-hit screen and 4 of 5 award detail pages are
+byte-identical apart from the tab bar (the fifth differs only in the Check-In blurb). Walked in
+Chrome: Standings → team → back, the ALL board's search and show-all, Feed, Awards; no console
+errors.

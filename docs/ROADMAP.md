@@ -110,7 +110,7 @@ existing `check.py` assertion. **Extend the checks; never loosen them.**
 | 10 | Should | Player identity is name-only; slugs strip non-`a-z0-9` ("José"/"Jos" collide). | Step 2 (verify check) |
 | 11 | Should | Docs drifted (README baseline warning, CLAUDE.md "not done" list, summary.md). | Step 16 |
 | 12 | Minor | `build.py` fails on raw substring `"None"`; `check.py` correctly uses word boundaries. | Step 2 |
-| 13 | Minor | Teams index lists only teams with scoring players (30 of 31); team pages lack standings/results. | Step 5/7 |
+| 13 | Minor | Teams index lists only teams with scoring players (30 of 31); team pages lack standings/results. | **Partly fixed 2026-11-11:** team pages are built from the standings competitors (all 31) and opened from Standings; the Teams index and tab are retired. Standings/results on team pages still Step 5/7. |
 | 14 | Minor | Stray legacy `Park Slope Dart League (PSDL) - Stats.csv` at repo root; duplicate `docs/allstar-standings.csv`. | Step 2 |
 | 15 | Note | PPW definition and `ALL_STAR_CUT` open; forfeits not surfaced; not reconciled → launch as beta. | Step 16 |
 | 16 | Note | BRD risk #2 (DartConnect ToS review) still open. | Step 16 checklist |
