@@ -585,5 +585,25 @@ Gotchas worth keeping:
   every other owner — including a future PSDL organization — from publishing on the domain. Order for
   the org move: remove the verification → transfer the repo → re-verify under the org → repoint the
   `www` CNAME to `<org>.github.io`.
+- **The machine you test from can lie for half an hour.** Anything that looked the domain up before
+  the switch caches Vercel's default answer (TTL 1800 s). Here the Mac's system resolver kept returning
+  Vercel's IPs — and Vercel's `DEPLOYMENT_NOT_FOUND` 404 — after every public resolver had moved on.
+  Test with `curl --resolve psdartleague.com:443:185.199.108.153 https://psdartleague.com/` or
+  `dig @1.1.1.1`, not a browser on that machine.
+- **A Pages setting change needs a deploy to take effect.** The custom domain itself served at once,
+  but after Enforce HTTPS was switched on, `http://` kept serving plain pages for 4½ minutes; a
+  "Build and deploy" run applied it within 25 seconds of finishing. On an Actions-deployed site,
+  re-run the workflow after changing anything in Settings → Pages.
 
-**Verified:** `verify.py`, `build.py` (436 pages) and `check.py` pass unchanged.
+**Cutover, same day (~16:00 UTC).** CJ verified the domain on the GitHub account and added the records
+in Vercel. Both Vercel nameservers, 1.1.1.1 and 8.8.8.8 returned GitHub's IPs within minutes — Vercel's
+defaults were overridden as documented. The custom domain was set through the Pages API; GitHub reported
+it `verified`, its DNS health check passed for the apex and `www`, and the Let's Encrypt certificate
+(both names, valid to 2027-02-09, renewed by GitHub) was approved within minutes. HTTPS enforced; the
+repo's About link points at the domain.
+
+**Verified:** `verify.py`, `build.py` (436 pages) and `check.py` pass unchanged. On the live domain,
+every page type (division, player, match, team, award, standings) plus `app.css`, `app.js` and the
+logo return 200, and a match page is byte-identical to the local build. `http://` → 301 to `https://`;
+`www` → 301 to the apex; old `github.io` links land on the same path at `https://psdartleague.com`
+(one or two hops — GitHub sometimes routes deep links via `http://` first). Run 43055123188 green.

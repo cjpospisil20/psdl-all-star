@@ -93,7 +93,9 @@ for you.
 The same screen holds the **custom domain**, `psdartleague.com`, with **Enforce HTTPS**
 ticked. Do not add a `CNAME` file to `public/`: GitHub ignores it when a site deploys from
 Actions, so that setting is the only place the domain lives. Old
-`cjpospisil20.github.io/psdl-all-star/` links redirect to the domain.
+`cjpospisil20.github.io/psdl-all-star/` links redirect to the domain. After changing anything
+on that screen, re-run the workflow from the Actions tab: an Actions-deployed site only picks
+up some settings, Enforce HTTPS among them, on its next deploy.
 
 The domain is registered at **Vercel**, which only answers its DNS. Vercel hosts nothing
 here, and the domain must not be added to a Vercel project. The records, under Vercel →
