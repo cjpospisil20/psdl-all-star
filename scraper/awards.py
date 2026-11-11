@@ -23,10 +23,10 @@ AWARDS = [
         "kind":  "one",
     },
     {
-        "key":   "171-plus",
-        "title": "171+ Club",
-        "blurb": "Every player who threw 171 or higher in a single turn.",
-        "kind":  "many",
+        "key":   "largest-checkout",
+        "title": "Largest Checkout",
+        "blurb": "The highest checkout across the entire league this season.",
+        "kind":  "one",
     },
     {
         "key":   "big-fish",
@@ -38,6 +38,18 @@ AWARDS = [
         "key":   "171-plus",
         "title": "171+ Club",
         "blurb": "Every player who threw 171 or higher in a single turn.",
+        "kind":  "many",
+    },
+    {
+        "key":   "r8-plus",
+        "title": "R8+",
+        "blurb": "Throw 8 or more marks in a single turn of Cricket and you’re in the club.",
+        "kind":  "many",
+    },
+    {
+        "key":   "c5-plus",
+        "title": "C5+",
+        "blurb": "Five or more bullseye marks in a single turn of Cricket.",
         "kind":  "many",
     },
 ]
