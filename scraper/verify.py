@@ -43,21 +43,20 @@ def check(name, condition, detail=""):
 
 def _busts_by_match(season):
     """Busts per match, so the week 1 baseline stays measurable as later weeks arrive."""
-    import json
     out = {}
-    for m in season["matches"]:
-        props = json.loads((events.fetch.RECAPS / f"{m['id']}.json").read_text(encoding="utf-8"))
+    for props in season["recaps"]:
         _hits, busts = allstar.score_match(props)
-        out[m["id"]] = sum(busts.values())
+        out[props["matchInfo"]["id"]] = sum(busts.values())
     return out
 
 
-def main():
-    season = events.load_season()
-    hits   = season["hits"]
-    table  = players.division_table(hits, season["weeks_by_player"])
-    rows   = [r for rs in table.values() for r in rs]
+# The season the week-1 baseline belongs to: Tuesday's Fall 2026 (ParkSDL). Pinned by id, so a new
+# season becoming current can never make the baseline look missing.
+BASELINE_SEASON = 25174
 
+
+def check_baseline(season):
+    hits = season["hits"]
     print("\n1. The hand-checked week 1 baseline still reproduces")
     archived = {m["id"] for m in season["matches"]}
     if not WEEK1_MATCHES <= archived:
@@ -75,6 +74,13 @@ def main():
         top_player, top_points = EXPECTED_WEEK1["top"]
         got = sum(h["points"] for h in w1 if h["player"] == top_player)
         check(f"{top_player}'s week 1 hits sum to {top_points}", got == top_points, f"got {got}")
+
+
+def check_season(season):
+    """Sections 1b-11, for one season. Every season in the archive gets all of them."""
+    hits   = season["hits"]
+    table  = players.division_table(hits, season["weeks_by_player"])
+    rows   = [r for rs in table.values() for r in rs]
 
     print(f"\n1b. Season to date: {len(rows)} players, "
           f"{sum(r['points'] for r in rows):,} points across "
@@ -162,13 +168,14 @@ def main():
     check("R9 Club equals the R9 hits -- no R8",
           len(r9) == len(expected_r9) and all(h["code"] == "R9" for h in r9),
           f"club has {len(r9)} {sorted({h['code'] for h in r9})}, hits have {len(expected_r9)}")
-    import feed as feed_mod
-    cricket_cards = [e["hit"]["code"] for e in feed_mod.generate_events(season)
-                     if e["hit"] and e["hit"]["code"] in ("R8", "R9")]
-    check("the feed posts every R9 and no R8",
-          cricket_cards.count("R9") == len(expected_r9) and "R8" not in cricket_cards,
-          f"{cricket_cards.count('R9')} R9 and {cricket_cards.count('R8')} R8 cards, "
-          f"{len(expected_r9)} R9 hits")
+    if season["primary"] and season["current"]:          # the season the Feed shows
+        import feed as feed_mod
+        cricket_cards = [e["hit"]["code"] for e in feed_mod.generate_events(season)
+                         if e["hit"] and e["hit"]["code"] in ("R8", "R9")]
+        check("the feed posts every R9 and no R8",
+              cricket_cards.count("R9") == len(expected_r9) and "R8" not in cricket_cards,
+              f"{cricket_cards.count('R9')} R9 and {cricket_cards.count('R8')} R8 cards, "
+              f"{len(expected_r9)} R9 hits")
 
     fish = award_data["big-fish"]
     bad_fish = [h for h in fish if h["code"] != "F90" or h["turn_value"] != 170]
@@ -214,14 +221,6 @@ def main():
 
 
     print("\n10. The schedule -- fixtures still to play, from DartConnect's lineups feed")
-    import fixtures as fixtures_mod
-    # eastern_offset hand-rolls the US daylight-saving rule (no zoneinfo on Windows). Pin both
-    # 2026 changeovers, so a wrong rule cannot shift every first-darts time by an hour.
-    for day, offset in (("2026-03-07", "-05:00"), ("2026-03-08", "-04:00"),
-                        ("2026-10-31", "-04:00"), ("2026-11-01", "-05:00"),
-                        ("2026-11-17", "-05:00")):
-        check(f"New York is UTC{offset} on {day}", fixtures_mod.eastern_offset(day) == offset,
-              fixtures_mod.eastern_offset(day))
     timezone = season["standings"]["leagueInfo"].get("timezone")
     check("the league plays on New York time, as the live window assumes",
           timezone == "America/New_York", repr(timezone))
@@ -252,7 +251,7 @@ def main():
           not unplayed, str(unplayed[:3]))
     # What catches GP regressing to each leg's opener: in doubles and triples the partners
     # alternate, and 14 scorers hit an all star on a night they never opened a leg.
-    missed = sorted(p for p, dates in season["weeks_by_player"].items()
+    missed = sorted(p for p, dates in season["hit_nights_by_player"].items()
                     if not dates <= played.get(p, set()))
     check("every night with an all star hit counts as a night played", not missed,
           str(missed[:3]))
@@ -270,9 +269,131 @@ def main():
               set(lengths) == set(events.divisions(season)), str(sorted(lengths)))
         check("every season length is a whole number of nights",
               all(isinstance(n, int) and n > 0 for n in lengths.values()), str(lengths))
-    else:
+    elif season["current"]:
         print("  NOTE  no season length in players.SEASON_NIGHTS for this season -- team pages "
               "show GP without playoff check marks")
+
+
+# Every game format the rules engine knows how to score. A new one (a 301, say) would be scored as
+# whatever it superficially resembles, so it must stop the build until someone looks.
+KNOWN_FORMATS = {("P", "501 SIDO"), ("P", "501 DIDO"), ("P", "701 DIDO"), ("M", "Cricket")}
+
+
+def check_archive(seasons):
+    """Section 12: the seasons agree with each other and with the registry."""
+    print("\n12. The season archive -- every season, both leagues")
+    registered = {e["id"] for e in events.registry()}
+    on_disk = {int(p.name) for p in events.fetch.SEASONS.iterdir()
+               if p.is_dir() and p.name.isdigit()}
+    check("every season directory on disk is in data/seasons.json",
+          on_disk <= registered, str(sorted(on_disk - registered)))
+
+    # DartConnect's API ignores the league in its URLs, so every file must say which it is.
+    wrong = []
+    for s in seasons:
+        info = s["standings"].get("leagueInfo") or {}
+        if info.get("id") != s["league"] or info.get("season_id") != s["id"]:
+            wrong.append(f"{s['key']}: standings say {info.get('id')} {info.get('season_id')}")
+        for props in s["recaps"]:
+            if props["matchInfo"].get("league_id") != s["league"]:
+                wrong.append(f"{s['key']}: recap {props['matchInfo']['id']} is "
+                             f"{props['matchInfo'].get('league_id')}")
+    check(f"all {len(seasons)} seasons' standings and recaps belong to their own league",
+          not wrong, str(wrong[:3]))
+
+    seen, twice = {}, []
+    for s in seasons:
+        for m in s["matches"]:
+            if m["id"] in seen:
+                twice.append(f"{m['id']} in {seen[m['id']]} and {s['key']}")
+            seen[m["id"]] = s["key"]
+    check(f"each of the {len(seen)} matches is in exactly one season", not twice, str(twice[:3]))
+
+    # ROADMAP finding 7: a recap on disk that no schedule lists would silently drop out.
+    orphans = []
+    for s in seasons:
+        listed = {m["dc_match_id"] for _d, _date, m in events.fetch.iter_matches(s["schedule"])}
+        orphans += [f"{s['key']}: {p.stem}" for p in (s["dir"] / "recaps").glob("*.json")
+                    if p.stem not in listed]
+    check("every archived recap is on its season's schedule", not orphans, str(orphans[:3]))
+
+    stray = []
+    for s in seasons:
+        divisions = set(events.divisions(s))
+        stray += [f"{s['key']}: {d}" for d in sorted({h["division"] for h in s["hits"]})
+                  if d not in divisions]
+    check("every hit sits in one of its season's standings divisions", not stray, str(stray[:3]))
+
+    formats = collections.Counter()
+    for s in seasons:
+        for props in s["recaps"]:
+            for g in allstar.games(props):
+                formats[(g["score_type"], g["game_name"])] += 1
+    unknown = sorted(f for f in formats if f not in KNOWN_FORMATS)
+    check(f"all {sum(formats.values()):,} games are in a format the rules engine scores",
+          not unknown, str(unknown))
+
+    keys = [s["key"] for s in seasons]
+    check("every season has its own key", len(keys) == len(set(keys)), str(keys))
+
+    # A player page is one per DartConnect name across every season, so two names that slug alike
+    # in different seasons would overwrite each other's page.
+    names = {h["player"] for s in seasons for h in s["hits"]}
+    by_slug = collections.defaultdict(set)
+    for name in names:
+        by_slug[_slug(name)].add(name)
+    clashes = sorted(f"{sorted(n)} -> {sl}" for sl, n in by_slug.items() if len(n) > 1)
+    check(f"all {len(names)} scoring players across every season have their own slug",
+          not clashes, str(clashes[:3]))
+
+    for league, night in events.fetch.LEAGUES:
+        current = [s["key"] for s in seasons if s["league"] == league and s["current"]]
+        if any(s["league"] == league for s in seasons):
+            check(f"the {night} league has exactly one current season", len(current) == 1,
+                  str(current))
+
+    # Informational: why PPW counts rounds, not dates.
+    for s in seasons:
+        dates = len({m["date"] for m in s["matches"]})
+        rounds = len({m.get("round_seq") for _d, _date, m in events.fetch.iter_matches(s["schedule"])})
+        print(f"  NOTE  {s['label']} · {s['night']}: {len(s['matches'])} matches over {dates} "
+              f"dates and {rounds} rounds")
+
+
+def main():
+    print("\n0. Every season with archived recaps loads")
+    seasons = []
+    for entry in events.registry():
+        if not events._has_recaps(entry["id"]):
+            continue                      # listed by DartConnect, nothing played yet
+        name = f"{entry['label']} · {entry['night']} (season {entry['id']})"
+        try:
+            seasons.append(events.load_season(entry["id"]))
+            check(f"{name} loads", True)
+        except Exception as exc:
+            check(f"{name} loads", False, f"{type(exc).__name__}: {exc}")
+
+    # New York's daylight-saving rule is hand-rolled (no zoneinfo on Windows), and the Schedule's
+    # first-darts times hang on it. Pin both 2026 changeovers.
+    import fixtures as fixtures_mod
+    for day, offset in (("2026-03-07", "-05:00"), ("2026-03-08", "-04:00"),
+                        ("2026-10-31", "-04:00"), ("2026-11-01", "-05:00"),
+                        ("2026-11-17", "-05:00")):
+        check(f"New York is UTC{offset} on {day}", fixtures_mod.eastern_offset(day) == offset,
+              fixtures_mod.eastern_offset(day))
+
+    baseline = [s for s in seasons if s["id"] == BASELINE_SEASON]
+    if baseline:
+        check_baseline(baseline[0])
+    else:
+        check(f"the baseline season {BASELINE_SEASON} is archived", False)
+
+    for season in seasons:
+        print(f"\n===== {season['label']} · {season['night']} (season {season['id']})"
+              f"{' -- current' if season['current'] else ''} =====")
+        check_season(season)
+
+    check_archive(seasons)
 
     print(f"\n{'ALL CHECKS PASSED' if not failures else str(len(failures)) + ' CHECK(S) FAILED'}")
     return 1 if failures else 0

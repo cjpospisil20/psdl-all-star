@@ -1,6 +1,11 @@
 """Print or export the All Star standings from archived recaps.
 
-Usage:  python3 scraper/standings.py [--division "Division 1"] [--csv out.csv] [--top N]
+Usage:  python3 scraper/standings.py [--season ID] [--division "Division 1"] [--csv out.csv]
+                                     [--top N]
+
+--season is a DartConnect season id from data/seasons.json (e.g. 25432, Monday's Fall 2026). The
+default is the Tuesday league's current season. With no --division the list runs across divisions,
+which the site never does -- this is a debugging view.
 
 This is the debugging view of exactly what the site renders -- both read the same hits.
 """
@@ -12,12 +17,14 @@ import allstar, events, players
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--season", type=int)
     ap.add_argument("--division")
     ap.add_argument("--csv")
     ap.add_argument("--top", type=int, default=25)
     args = ap.parse_args()
 
-    season = events.load_season()
+    season = events.load_season(args.season)
+    print(f"{season['label']} · {season['night']} (season {season['id']})\n")
     for division, date, match_id in season["missing"]:
         print(f"  ! missing recap {match_id} ({division} {date}) -- run fetch.py", file=sys.stderr)
 

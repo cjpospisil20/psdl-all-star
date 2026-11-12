@@ -162,7 +162,9 @@ def throwers(props):
 # DartConnect's lineups feed agreed that day -- Division 1's seven teams play each other twice,
 # 12 nights over 14 weeks with two byes each; every team in Divisions 2-5 plays 15.
 # A season or division missing here gets GP but no playoff check mark: a guessed season length
-# would mark the wrong players. Moves to data/seasons.json with ROADMAP Step 3.
+# would mark the wrong players. It stays here in code, hand-entered, rather than in
+# data/seasons.json: fetch.py rewrites that file from DartConnect on every run. Monday's lengths
+# (season 25432, "PS Monday") are not known yet.
 SEASON_NIGHTS = {
     25174: {"Division 1": 12, "Division 2": 15, "Division 3": 15,        # Fall 2026
             "Division 4": 15, "Division 5": 15},
