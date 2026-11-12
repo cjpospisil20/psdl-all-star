@@ -31,9 +31,13 @@ python3 site/build.py        # generate the site into public/
 
 Then open `public/index.html` in a browser.
 
-`fetch.py` skips every match it has already archived, so re-running it is cheap: it only
-pulls what is new. A full season is roughly 180 matches, and requests are spaced 1.5
-seconds apart to be a polite guest on DartConnect's servers.
+`fetch.py` covers both of the league's nights — the Tuesday league (`ParkSDL` on
+DartConnect) and the Monday league (`ParkSlopeDLM`) — and every season DartConnect still
+lists for them, back to Fall 2025. It skips every match it has already archived, so
+re-running it is cheap: it only pulls what is new. A Tuesday season is roughly 180 matches
+and a Monday one about 30, and recap requests are spaced 1.5 seconds apart to be a polite
+guest on DartConnect's servers. (A fresh clone already has the archive committed; fetching
+every season from nothing would take about 15 minutes.)
 
 `build.py` never touches the network. It reads only what `fetch.py` has archived, so a
 build is offline and reproducible — you can rebuild the whole site on a plane.
@@ -117,8 +121,9 @@ re-verifying the domain first — see `docs/ROADMAP.md` §1.
 
 ## The archive is permanent — keep it committed
 
-`data/recaps/*.json` holds the raw DartConnect payload for every match ever fetched. It
-is committed to this repository and it must stay that way.
+`data/seasons/<season id>/recaps/*.json` holds the raw DartConnect payload for every match
+ever fetched, one directory per season of either league. It is committed to this repository
+and it must stay that way.
 
 DartConnect owes this league nothing. It could change its page format or withdraw access
 at any time, and the two endpoints the scraper uses are public and unauthenticated —
@@ -163,7 +168,8 @@ in a template.
 
 ```
 scraper/
-  fetch.py       DartConnect fetch + the permanent archive. League and season IDs live here.
+  fetch.py       DartConnect fetch + the permanent archive. The two league IDs live here;
+                 seasons are discovered from DartConnect on every run.
   allstar.py     The All Star Points rules engine (Section F of the rulebook).
   events.py      Loads the archive and scores the whole season. Never touches the network.
   fixtures.py    Match nights still to come, for the Schedule tab. New York time, by hand.
@@ -177,10 +183,14 @@ site/
   components.py  Shared page fragments, lifted from the mockups.
   tokens.py      The design system as code. The only place colours are defined.
 data/
-  recaps/*.json  The permanent archive, one file per match. Committed.
-  matches.json   Matches that have started (DartConnect lists nothing else here). Refreshed each run.
-  fixtures.json  Every match not yet complete, from DartConnect's lineups feed. Refreshed each run.
-  standings.json League standings. Refreshed each run.
+  seasons.json   Every season of both leagues: id, league, night, label, start date.
+  seasons/<id>/  One directory per DartConnect season, e.g. 25174 = Tuesday's Fall 2026:
+    recaps/*.json  The permanent archive, one file per match. Committed.
+    matches.json   Matches that have started (DartConnect lists nothing else here).
+    standings.json League standings.
+    fixtures.json  Every match not yet complete, from DartConnect's lineups feed.
+                 The last three are refreshed each run while DartConnect calls the season
+                 active, once more when it stops, and never again after that.
 design/          The six mockups and the logo assets.
 docs/            The original design brief and the PSDL rulebook.
 public/          Generated output. Not committed.
@@ -188,30 +198,28 @@ public/          Generated output. Not committed.
 
 ## Things an inheriting volunteer should know
 
-**A new season needs a new season ID.** `scraper/fetch.py` opens with:
+**A new season needs nothing from you.** `scraper/fetch.py` names the two leagues:
 
 ```python
-LEAGUE = "ParkSDL"
-SEASON = 25174                  # Fall 2026
+LEAGUES = [("ParkSDL", "Tuesday"), ("ParkSlopeDLM", "Monday")]
 ```
 
-When the league starts a new season, `SEASON` has to be bumped. Find the new number in
-the DartConnect league URL. Nothing else in the pipeline is season-specific.
+and reads each league's season list from DartConnect on every run, so a new season is
+archived as soon as DartConnect lists it, and becomes the one the site shows once its first
+match is archived. Only a third night, or a league moving to a new DartConnect ID, means
+editing that line.
 
-**`verify.py`'s baseline is a fixed one.** Its first three assertions compare the season
-to a hand-validated week-1 snapshot:
+**`verify.py`'s baseline is a fixed one, and stays fixed.** Its first assertions compare a
+hand-validated snapshot — the 15 matches of week 1 of Tuesday's Fall 2026 (season 25174) —
+with what the rules engine produces from them today:
 
 ```python
-EXPECTED_WEEK1 = {"players": 104, "points": 20326, "busts": 437}
+EXPECTED_WEEK1 = {"players": 104, "points": 20326, "busts": 437, "top": ("Tom Lettieri", 835)}
 ```
 
-That is exactly right for the 15 matches archived today, and it is what makes the suite
-trustworthy. But those three numbers grow every week the league plays. **The first time a
-week-2 match is archived, those three checks will fail and the automation will refuse to
-deploy.** That is the suite doing its job — an unexplained change in the totals *should*
-stop a publish — but somebody has to then re-validate the new totals by hand and update
-the baseline. Do not simply delete the check. Expect to do this, and budget a few minutes
-for it on the first Wednesday of the season.
+It is scoped to those 15 match IDs and that season, so new weeks and new seasons never move it.
+If it ever fails, the scoring rules changed. That is the suite doing its job — find out why
+before publishing, and do not simply delete the check.
 
 **Three questions are still open with the league**, and they are why some things are
 absent rather than guessed at (`DESIGN-SPEC.md` lists them in full):

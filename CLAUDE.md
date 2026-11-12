@@ -36,18 +36,19 @@ scraper/   data layer — DartConnect fetch, the rules engine, player data, veri
 site/      presentation layer — design tokens, shared fragments, the page builder
 public/    GENERATED. Never hand-edit; every build deletes and recreates it.
 design/    the mockups and the two logo assets
-data/      archived DartConnect payloads (data/recaps/) plus played matches, fixtures and standings
+data/      the archive: data/seasons/<id>/ per DartConnect season (recaps/, matches.json,
+           standings.json, fixtures.json), and data/seasons.json listing every season of both leagues
 docs/      rulebook, design brief, exports
 ```
 
 | File | Role |
 |---|---|
-| `scraper/fetch.py` | **The only module that touches the network.** Archives each recap to `data/recaps/` on first fetch; refreshes `matches.json`, `standings.json` and `fixtures.json` every run. |
+| `scraper/fetch.py` | **The only module that touches the network.** Both leagues (`LEAGUES`: Tuesday `ParkSDL`, Monday `ParkSlopeDLM`). Discovers each league's seasons into `data/seasons.json`; archives each recap to `data/seasons/<id>/recaps/` on first fetch; refreshes a season's `matches.json`, `standings.json` and `fixtures.json` while it is active. |
 | `scraper/allstar.py` | Rules engine — Rulebook Section F applied to turn data. Emits individual hits. |
 | `scraper/players.py` | Player → team, form stats recomputed from turns, the per-division ranked table, nights played (GP) and playoff eligibility (`SEASON_NIGHTS`, `playoff_minimum`). |
 | `scraper/awards.py` | Season-end award data — 171+ Club, Big Fish, largest checkout/check-in, division leaders. Pure functions over hits. |
-| `scraper/events.py` | `load_season()` — assembles the season from the archive. The single entry point `site/` uses. |
-| `scraper/fixtures.py` | Match nights still to come, from `data/fixtures.json` — the Schedule tab. Also New York time (`eastern_offset`, `league_today`). Pure, offline. |
+| `scraper/events.py` | `load_season(id)` — assembles one season from the archive (no id: the Tuesday league's current season); `load_all()`, `registry()`, `current_id(league)`. The single entry point `site/` uses. |
+| `scraper/fixtures.py` | Match nights still to come, from a season's `fixtures.json` — the Schedule tab. Also New York time (`eastern_offset`, `league_today`). Pure, offline. |
 | `scraper/feed.py` | News feed events, generated week by week from the archived season. |
 | `scraper/verify.py` | Assertion suite. Run before publishing. |
 | `scraper/standings.py` | Terminal view of the same data the site renders. Debugging aid. |
@@ -112,9 +113,10 @@ open public/index.html
    names. Normalise display artifacts only (`players.clean_name`), and note that `Colin  Ratner`'s
    double space is real — preserve it, escape it for display (`components.esc`), wrap rather than
    truncate a long name.
-6. **Source the team list from standings competitors** (31 teams), never `schedule['teams']` (35, the
-   filter dropdown) and never from played matches (30 with only Week 1 archived — Division 1 has 7
-   teams, so someone has a bye).
+6. **Source the team list from standings competitors** (31 teams on Tuesday), never
+   `schedule['teams']` (35, the filter dropdown) and never from played matches (30 with only Week 1
+   archived — Division 1 has 7 teams, so someone has a bye). Likewise divisions: from standings
+   `competitors`, never `leagueDivisions`, which keeps divisions that no longer have teams.
 7. **Never match a team by name across feeds — use DartConnect's stable team `id`.** The archive is
    immutable, so a recap holds the team name from match night and carries no id; `standings.json` and
    `matches.json` are refetched every run and carry today's name plus the id. Three teams were renamed
@@ -136,6 +138,17 @@ open public/index.html
     `left` only about half the time, so never use `left` to label a played match (ROADMAP finding #8).
     Whether a night is live comes from the clock in the browser — the site never rebuilds on a
     Tuesday night.
+11. **Two leagues, many seasons — and DartConnect's API ignores the league in its URLs.** PSDL plays
+    Tuesday (`ParkSDL`) and Monday (`ParkSlopeDLM`); DartConnect has both back to Fall 2025 and
+    nothing older. `/api/league/ParkSDL/matches/25432` happily returns *Monday's* season 25432, so a
+    season id is only ever requested under the league whose page listed it, and `fetch.py` checks
+    standings, schedule, recaps and fixtures against that league before writing them; `verify.py` §12
+    checks it again. Team ids are per season (resolve within the season). A Monday recap's
+    `division_title` reads `"Division: PS Monday"` — hits take the schedule's division
+    (`score_match(division=…)`). PPW counts DartConnect rounds (`round_seq`), not dates: make-up
+    nights gave Fall 2025 23 dates over 15 rounds. A league's **current** season is its latest with
+    an archived recap (`events.current_id`) — not DartConnect's `active` flag, which a new season
+    gets weeks before its first match night.
 
 ## Data source
 
