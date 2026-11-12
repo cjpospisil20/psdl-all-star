@@ -62,8 +62,11 @@ jobs:
           # volunteer should be able to run this on any machine with python3.
 
       # ---------------------------------------------------------------------
-      # 1. Fetch. Archives any match recap not already on disk, and refreshes
-      #    the schedule and standings. Rate-limited to ~1.5s per request.
+      # 1. Fetch. Both leagues (Tuesday ParkSDL, Monday ParkSlopeDLM), every
+      #    season DartConnect lists: refreshes data/seasons.json and each active
+      #    season's schedule, standings and fixtures, and archives any match
+      #    recap not already on disk under data/seasons/<id>/recaps/.
+      #    Rate-limited to ~1.5s per recap.
       - name: Fetch new matches from DartConnect
         run: python3 scraper/fetch.py
 
@@ -128,7 +131,7 @@ jobs:
           {
             echo "### PSDL All Star build"
             echo ""
-            echo "- Archived recaps: $(ls data/recaps/*.json 2>/dev/null | wc -l | tr -d ' ')"
+            echo "- Archived recaps: $(find data/seasons -path '*/recaps/*.json' 2>/dev/null | wc -l | tr -d ' ') across $(find data/seasons -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ') seasons"
             echo "- Generated pages: $(find public -name '*.html' 2>/dev/null | wc -l | tr -d ' ')"
           } >> "$GITHUB_STEP_SUMMARY"
 

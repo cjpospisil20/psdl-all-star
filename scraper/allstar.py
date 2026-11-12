@@ -41,8 +41,15 @@ RECAP_URL = "https://recap.dartconnect.com/games/{match_id}"
 
 
 def games(props):
-    """Yield every game in a match recap."""
-    for _set, entries in props["segments"].items():
+    """Yield every game in a match recap.
+
+    `segments` is normally {set number: [games]}. A match recorded with no games at all -- a
+    forfeit entered as 11-0, like Lucky Bastards v Farrell's on 2025-09-30 -- has none, and PHP
+    serialises that empty map as an empty LIST, `[]`. It yields nothing, which is right: forfeit
+    all stars are credited by hand at season's end (Rulebook F.3), never derived.
+    """
+    segments = props.get("segments") or {}
+    for entries in (segments.values() if isinstance(segments, dict) else segments):
         for entry in entries:
             yield from (entry if isinstance(entry, list) else [entry])
 
@@ -64,16 +71,22 @@ def teams_of(props):
     return {"home": name_at(0), "away": name_at(1)}
 
 
-def score_match(props, date=None, week=None, teams=None):
+def score_match(props, date=None, week=None, teams=None, division=None):
     """Score one match. Returns (hits, busts_by_player).
 
     `teams` overrides the side -> team names taken from the payload. events.load_season passes
     the names resolved through DartConnect's stable team ids, so that a team renamed mid-season
     is stamped on every hit under one name -- see players.resolve_sides.
+
+    `division` overrides the recap's own `division_title`, the same way. events.load_season passes
+    the schedule's division, which is the name standings uses. The two agree on Tuesday
+    ("Division 1"), but a Monday recap says "Division: PS Monday" where its schedule row and
+    standings say "PS Monday" -- left alone, every Monday hit would sit in a division no standings
+    page has.
     """
     info     = props["matchInfo"]
     ctx = {
-        "division": info["division_title"],
+        "division": division or info["division_title"],
         "match_id": info["id"],
         "date":     date or info.get("server_match_start_date"),
         "week":     week,
@@ -172,7 +185,8 @@ def _hit(ctx, g, side, name, code, points, turn_value, game, detail="", display=
         "points":      points,
         "turn_value":  turn_value,    # the number the player brags about
         "game":        game,
-        "segment":     g["league_segment"]["label"],
+        # Stripped: some older seasons store labels like "501 Singles " with a trailing space.
+        "segment":     g["league_segment"]["label"].strip(),
         "set_index":   g.get("set_index"),
         "game_number": g.get("set_game_number"),
         "detail":      detail,

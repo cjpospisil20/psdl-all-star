@@ -32,7 +32,7 @@ rules and the history.
 2. "Works with JS off" → every page still renders without JS (Live shows a build-time snapshot; Join shows a mailto fallback), but Live refresh and the join forms need JS.
 3. "No dependencies" is **kept**: plain `fetch()` against Supabase's REST API (no client library) and a small custom Markdown-subset renderer (no packages).
 4. "Three colours only" is kept: LIVE is gold.
-5. "Out of scope: historical seasons / live updates" → storage becomes per-season now; **no backfill**. "Live" means video, not scores.
+5. "Out of scope: historical seasons / live updates" → storage becomes per-season now; **no backfill**. "Live" means video, not scores. *(Amended 2026-11-12 at the owner's request: every season DartConnect still has — both leagues, back to Fall 2025 — is backfilled, for the All-Stars season history. Nothing older exists on DartConnect, and nothing is imported from anywhere else.)*
 
 ---
 
@@ -101,10 +101,10 @@ existing `check.py` assertion. **Extend the checks; never loosen them.**
 | 1 | Launch | Not a git repo, not deployed; no Python/git on the owner's Windows PC. | Step 1 |
 | 2 | Launch | `events._pretty_date` used `strftime("%-d")` → `ValueError` on Windows. Bare `read_text()`/`write_text()` used the Windows code page. | **Fixed 2026-09-20** (Step 1) |
 | 3 | Launch | `fetch.py` doesn't check `status == "C"`; a match archived mid-play would be frozen forever. | Step 2 |
-| 4 | Before next season | Single-season assumptions (`SEASON` constant, flat `data/recaps`, week-1 baseline needs those IDs → bumping `SEASON` fails verify and blocks deploy). | Step 3 |
+| 4 | Before next season | Single-season assumptions (`SEASON` constant, flat `data/recaps`, week-1 baseline needs those IDs → bumping `SEASON` fails verify and blocks deploy). | **Fixed 2026-11-12** (Step 3): seasons are discovered per league, archived under `data/seasons/<id>/`, and the baseline is pinned to season 25174. |
 | 5 | Launch | Phone-only shell; `check.py` asserts the 5-tab bar and `index.html` / `division-N.html` URLs. | Step 5 |
 | 6 | Before season end | Post-fetch score corrections (`score_edits`) are never re-fetched. | Phase 2 drift check |
-| 7 | Should | `load_season` iterates `matches.json` (overwritten each run), not the archive. | Step 3 |
+| 7 | Should | `load_season` iterates `matches.json` (overwritten each run), not the archive. | **Guarded 2026-11-12:** `verify.py` §12 fails if any archived recap is missing from its season's schedule, and an archived season's `matches.json` is no longer refetched. |
 | 8 | Should | Schedule `left` is the recap's home team in only 6 of 15 matches; `events.py` labels `left` as "home". | Step 3 (use recap `opponents[0]`) |
 | 9 | Should | Cron at `:00` (GitHub's high-load minute). Public-repo scheduled workflows are disabled after 60 days of no repo activity. | Step 2 / runbook |
 | 10 | Should | Player identity is name-only; slugs strip non-`a-z0-9` ("José"/"Jos" collide). | Step 2 (verify check) |
@@ -292,7 +292,7 @@ One step per Claude Code session, in order. Before any refactor, save a hash of 
   - Verify: `verify.py`, `build.py`, `check.py` pass locally; Actions run is green; the `github.io` site loads on a phone.
   - Rollback: unpublish Pages; `git revert`.
 - [x] **Step 2 — Pipeline hardening.** *(2026-11-09: `fetch.py` now archives only `status == "C"` matches and continues past individual fetch failures instead of aborting the run. Cron moved off `:00` to `:17`. Every page carries a `<meta name="last-modified">` build timestamp. `build.py`'s `None` check uses word boundaries, matching `check.py`. Slug-collision checks added to `verify.py` (242 player slugs, 31 team slugs, all unique). Stray root CSV and duplicate `docs/allstar-standings.csv` moved to `docs/legacy/`. All three gates pass — 409 pages.)* Archive only `status == "C"` matches; move cron off `:00`; add a "last updated" stamp; align `build.py`'s `None` check with `check.py`; add a slug-collision check to `verify.py`; move the stray root CSV to `docs/legacy/`. Verify: golden build identical except the stamp; a fake non-`C` match is skipped. *Needs Step 1.*
-- [ ] **Step 3 — Season-scoped archive.** `data/seasons/<id>/{recaps,matches.json,standings.json}` + `data/seasons.json` (current season); per-season verify baseline; derive matches from the archive plus a per-run schedule snapshot; use the recap's home/away, not `left`. Verify: golden build identical; a pretend new `SEASON` doesn't break old-season verification. *Needs Step 2.*
+- [x] **Step 3 — Season-scoped archive.** *(2026-11-12: `data/seasons/<id>/{recaps/,matches.json,standings.json,fixtures.json}` + `data/seasons.json`, covering both leagues — Tuesday `ParkSDL` and Monday `ParkSlopeDLM` — and all six seasons DartConnect lists. The 137 existing files moved with `git mv`, byte for byte; the build stayed byte-identical. `fetch.py` discovers seasons per league and validates the league of everything it writes (DartConnect's API ignores it). `verify.py` runs every check per season, pins the week-1 baseline to season 25174, and adds a cross-season section that also guards finding #7. Not done here: finding #8 — the Schedule now labels `left` HOME by owner decision, and played matches no longer have pages.)* `data/seasons/<id>/{recaps,matches.json,standings.json}` + `data/seasons.json` (current season); per-season verify baseline; derive matches from the archive plus a per-run schedule snapshot; use the recap's home/away, not `left`. Verify: golden build identical; a pretend new `SEASON` doesn't break old-season verification. *Needs Step 2.*
 - [ ] **Step 4 — Mockups for new pages** in `design/`: Home, Schedule, Live (live / empty / multi-stream), About, Join (player, venue), a desktop layout of an existing page, the new nav; gold LIVE indicator; beta banner. Owner approves. *Needs Step 3.*
 - [ ] **Step 5 — Responsive shell, navigation, URL restructure.** Widen at ≥768 px; top nav; mobile bottom bar with Stats/More; move existing pages to new URLs; update `check.py` invariants in step (never loosen). Verify: `check.py` passes; same 165 stats pages at new URLs, unchanged content; zero broken links. *Needs Step 4.*
 - [ ] **Step 6 — About and content pages** from `content/*.md` with a small stdlib Markdown-subset renderer. *Needs Step 5.*
@@ -331,7 +331,7 @@ One step per Claude Code session, in order. Before any refactor, save a hash of 
 1. ~~**Future fixtures in DartConnect?**~~ **Resolved 2026-11-11: yes**, via the lineups endpoint (§2 finding 1). `fixtures` shrinks to overrides.
 2. **Home team = host bar for every team?** The rulebook says the home team captain is responsible for the host establishment's court; no team → bar list exists yet.
 3. **Season length / structure.** Fall 2025 rulebook: Division 1 = 8 teams / 14 weeks; Divisions 2–4 = 6 teams / 15 weeks. Fall 2026 has 7 teams in Division 1 (31 total). Confirm the current structure.
-4. `competition_title` is "Park Slope Dart League - **Tuesday**" — is there, or will there be, another night?
+4. `competition_title` is "Park Slope Dart League - **Tuesday**" — is there, or will there be, another night? **Answered 2026-11-12: yes — a Monday league, `ParkSlopeDLM` on DartConnect ("Park Slope Dart League - Monday"), since Spring 2026. Most teams play in both.**
 5. Can the schedule feed ever list a `status` other than `C`? Step 2's guard protects against it.
 6. YouTube live-enablement wait and the 50-subscriber rule for RTMP/laptop streaming — prove in the pilot.
 7. Supabase Free: pausing after a week idle; admin seat limits; no backups.

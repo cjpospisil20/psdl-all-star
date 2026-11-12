@@ -1,13 +1,17 @@
 # ---------------------------------------------------------------------------
 # What is NOT ignored, and why it matters
 #
-#   data/recaps/*.json   The permanent archive of DartConnect match payloads.
+#   data/seasons/<id>/recaps/*.json
+#                        The permanent archive of DartConnect match payloads,
+#                        one directory per season of either league.
 #                        COMMIT THESE. DartConnect owes us nothing and could
 #                        change its format or withdraw access at any time; once
 #                        a match is archived it is ours, and every number the
 #                        site publishes is rebuilt from these files.
-#   data/matches.json    Season schedule, refreshed each run. Commit it.
-#   data/standings.json  League standings, refreshed each run. Commit it.
+#   data/seasons/<id>/{matches,standings,fixtures}.json
+#                        A season's schedule, standings and fixtures, refreshed
+#                        while it is active. Commit them.
+#   data/seasons.json    Every season of both leagues. Commit it.
 #   design/assets/       Copied into the built site. Commit them.
 #
 # Never add data/ or *.json to this file.

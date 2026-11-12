@@ -1,0 +1,50 @@
+[
+  {
+    "active": false,
+    "id": 16922,
+    "label": "Fall 2025",
+    "league": "ParkSDL",
+    "night": "Tuesday",
+    "start_date": "2025-06-05"
+  },
+  {
+    "active": false,
+    "id": 21724,
+    "label": "Spring 2026",
+    "league": "ParkSDL",
+    "night": "Tuesday",
+    "start_date": "2026-02-10"
+  },
+  {
+    "active": false,
+    "id": 21994,
+    "label": "Spring 2026 Stage 1",
+    "league": "ParkSlopeDLM",
+    "night": "Monday",
+    "start_date": "2026-02-26"
+  },
+  {
+    "active": false,
+    "id": 22129,
+    "label": "Spring 2026 Stage 2",
+    "league": "ParkSlopeDLM",
+    "night": "Monday",
+    "start_date": "2026-03-09"
+  },
+  {
+    "active": true,
+    "id": 25174,
+    "label": "Fall 2026",
+    "league": "ParkSDL",
+    "night": "Tuesday",
+    "start_date": "2026-09-03"
+  },
+  {
+    "active": true,
+    "id": 25432,
+    "label": "Fall 2026",
+    "league": "ParkSlopeDLM",
+    "night": "Monday",
+    "start_date": "2026-09-10"
+  }
+]

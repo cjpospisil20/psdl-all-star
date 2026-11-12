@@ -42,12 +42,19 @@ DartConnect's recap site is a **Laravel/Inertia app** — each page embeds its f
 JSON in the root element's `data-page` attribute. This is *not* conventional screen scraping: there
 are no CSS selectors or DOM structure to break when they restyle.
 
-Two public, unauthenticated endpoints:
+PSDL plays two nights, and DartConnect runs each as its own league: **Tuesday `ParkSDL`** and
+**Monday `ParkSlopeDLM`**. Both go back to Fall 2025 on DartConnect and no further. The core public,
+unauthenticated endpoints (`fetch.py`'s docstring lists all five):
 
 ```
-POST https://tv.dartconnect.com/api/league/ParkSDL/matches/25174   # schedule + dc_match_ids
-GET  https://recap.dartconnect.com/games/{dc_match_id}             # full turn-by-turn detail
+GET  https://tv.dartconnect.com/league/{league}                      # the league's seasons
+POST https://tv.dartconnect.com/api/league/{league}/matches/{season}  # schedule + dc_match_ids
+GET  https://recap.dartconnect.com/games/{dc_match_id}                # full turn-by-turn detail
 ```
+
+**DartConnect's API ignores `{league}`**: `/api/league/ParkSDL/matches/25432` returns Monday's
+season 25432. `fetch.py` only asks for a season under the league whose page listed it, and checks
+what comes back before writing it.
 
 A turn record:
 
@@ -215,10 +222,11 @@ README.md              outward-facing description and local run instructions
 .github/workflows/build.yml   weekly rebuild — Wed 07:00 UTC (small hours in Brooklyn,
                        hours after the last dart), with a Thursday catch-up pass
 
-data/matches.json      season schedule (Fall 2026, season_id 25174)
-data/standings.json    standings props — authoritative team list (31 teams)
+data/seasons.json      every season of both leagues (id, league, night, label, start date)
+data/seasons/<id>/     one DartConnect season: recaps/*.json (the permanent archive),
+                       matches.json, standings.json (the authoritative team list) and, while
+                       active, fixtures.json. 25174 = Tuesday Fall 2026, 25432 = Monday Fall 2026.
 data/allstar-standings.csv   latest computed standings export
-data/recaps/*.json     archived match payloads — 120 matches, 8 match nights
 docs/                  PSDL rulebook (PDF + extracted text)
 docs/design-brief.md   self-contained brief for app/UI design sessions
 docs/legacy/           stray legacy CSV files moved out of the way
@@ -839,3 +847,67 @@ Awards and Feed — see the entries that follow).
 only the five division boards (and `index.html`), `all.html` and the 244 player pages changed — each
 by exactly the caption, plus the banner on Division 3 — and `rare-hit.html` and the wordmark are
 gone.
+
+### 2026-11-12 — ROADMAP Step 3: the season-scoped archive, both leagues, every season
+
+The second of the four PRs. No visible change: it is the foundation the season picker, All Time
+and the Monday pages stand on. The owner asked for it via those features; Step 3 was next anyway.
+
+**PSDL plays two nights, and DartConnect runs them as two leagues** — Tuesday `ParkSDL` and Monday
+`ParkSlopeDLM` ("Park Slope Dart League - Monday", since Spring 2026). Searching DartConnect's league
+list, past leagues included, finds no other Park Slope league: **history starts at Fall 2025.** Six
+seasons, all now archived (519 recaps, 48 MB, 8,423 hits):
+
+| Season | id | Recaps | Divisions | Scorers |
+|---|---|---|---|---|
+| Fall 2026 · Tuesday | 25174 | 134 | 5 | 244 |
+| Fall 2026 · Monday | 25432 | 27 | PS Monday | 61 |
+| Spring 2026 · Tuesday | 21724 | 130 | 5 | 217 |
+| Spring 2026 Stage 2 · Monday | 22129 | 12 | Monday D1, D2 | 53 |
+| Spring 2026 Stage 1 · Monday | 21994 | 27 | PS Monday | 68 |
+| Fall 2025 · Tuesday | 16922 | 189 | 4 | 197 |
+
+- **Layout:** `data/seasons/<id>/{recaps/, matches.json, standings.json, fixtures.json}` and
+  `data/seasons.json`. The 137 existing files moved with `git mv`, byte for byte; `.gitattributes`
+  now says `data/**/*.json -text`, or the nested archive would have lost its byte-for-byte guard.
+- **`fetch.py`** names the two leagues and reads each one's season list from
+  `tv.dartconnect.com/league/{id}` (`activeSeasons` + `archivedSeasons`) every run, merging it into
+  the registry — never dropping a season. A season's schedule, standings and fixtures refresh while
+  DartConnect calls it active, once more on the run it stops, and never again.
+- **`events.load_season(id)`** loads any season; no id is the Tuesday league's current season, so
+  every existing caller was untouched and the build stayed byte-identical. `load_all()`,
+  `current_id(league)` and `registry()` are new.
+- **`verify.py`** runs every section on every season, pins the week-1 baseline to season 25174, and
+  adds §12, across seasons: registry and disk agree, every file is the league it claims, every match
+  is in exactly one season, no archived recap is missing from its schedule (ROADMAP finding #7),
+  every hit sits in a standings division, every game is a format the rules engine knows, one
+  current season per league.
+
+Gotchas, each found by the backfill or by probing DartConnect, each handled:
+- **DartConnect's API ignores the league in its URL.** `/api/league/ParkSDL/matches/25432` returns
+  Monday's season. A season id is only requested under the league whose page listed it, and
+  standings (`leagueInfo`), schedule (division ids), recaps (`matchInfo.league_id`) and fixtures
+  (divisions) are checked before they are written.
+- **A Monday recap says `"Division: PS Monday"`**; its schedule row and standings say `"PS Monday"`.
+  `score_match(division=…)` now takes the schedule's division, as `teams=` already took its names.
+- **Dates are not weeks in older seasons.** Make-up nights gave Fall 2025 23 dates over 15 rounds,
+  Spring 2026 16 over 10, and Monday's Fall 2026 already 10 over 9. PPW now divides by DartConnect
+  rounds (`round_seq`). Fall 2026 Tuesday is 1:1, so no published PPW changed.
+- **A forfeit is a recap with no games**: Lucky Bastards 11–0 Farrell's, 2025-09-30, has
+  `segments: []` — PHP's empty map serialised as a list. `allstar.games()` handled only a dict and
+  crashed; it now yields nothing for it, which is right (forfeit all stars are hand-credited, F.3).
+  `verify.py` lists such matches as a NOTE so a commissioner can see them.
+- **`leagueDivisions` keeps empty divisions** (Monday Stage 2 still lists `PS Monday`). Divisions
+  come from standings `competitors`, as they always did.
+- **A league's current season is its latest with an archived recap**, not DartConnect's `active`
+  flag — a new season is "active" weeks before its first match night, and following the flag would
+  empty the home page for those weeks.
+- **DartConnect's recap server stalls now and then.** 7 of 384 requests hit the 30 s timeout; the
+  resilient loop carried on, and a second run fetched all 7 in seconds.
+- **The same person can have differently spelt records on the two nights** (`Johnny  Colonna` on
+  Tuesday, `Johnny Colonna` on Monday; eight such people). That matters once player pages span
+  seasons — see the next entry.
+
+**Verified:** `verify.py` passes on all six seasons, the week-1 baseline unchanged. `build.py` and
+`check.py` pass, and the build is byte-identical to the one before this PR — the five older
+seasons cannot leak into today's pages.

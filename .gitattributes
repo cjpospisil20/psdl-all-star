@@ -3,8 +3,8 @@
 
 # The DartConnect archive is evidence. Git must never rewrite a single byte of it
 # (no line-ending conversion, no "helpful" normalisation) -- on any operating system.
-data/recaps/*.json -text
-data/*.json -text
+# `**` reaches every season directory: data/seasons/<id>/recaps/*.json and the rest.
+data/**/*.json -text
 
 # Binary assets: never diffed or converted.
 *.png binary

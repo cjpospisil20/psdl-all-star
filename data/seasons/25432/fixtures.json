@@ -1,0 +1,526 @@
+{
+ "fixtures": [
+  {
+   "id": 10572187,
+   "division": "PS Monday",
+   "sched_date": "2026-09-14",
+   "sched_time": "19:30",
+   "round_seq": 1,
+   "is_bye": true,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": null,
+    "team_name": null
+   },
+   "right": {
+    "id": 401872,
+    "team_name": "The DartSmiths"
+   }
+  },
+  {
+   "id": 10572190,
+   "division": "PS Monday",
+   "sched_date": "2026-09-21",
+   "sched_time": "19:30",
+   "round_seq": 2,
+   "is_bye": true,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401890,
+    "team_name": "Chairmen of the Other Board (Barry's)"
+   },
+   "right": {
+    "id": null,
+    "team_name": null
+   }
+  },
+  {
+   "id": 10572211,
+   "division": "PS Monday",
+   "sched_date": "2026-09-28",
+   "sched_time": "19:30",
+   "round_seq": 3,
+   "is_bye": true,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": null,
+    "team_name": null
+   },
+   "right": {
+    "id": 401875,
+    "team_name": "Paddy's"
+   }
+  },
+  {
+   "id": 10572214,
+   "division": "PS Monday",
+   "sched_date": "2026-10-05",
+   "sched_time": "19:30",
+   "round_seq": 4,
+   "is_bye": true,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401893,
+    "team_name": "BuckTown Falcons"
+   },
+   "right": {
+    "id": null,
+    "team_name": null
+   }
+  },
+  {
+   "id": 10572229,
+   "division": "PS Monday",
+   "sched_date": "2026-10-12",
+   "sched_time": "19:30",
+   "round_seq": 5,
+   "is_bye": true,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": null,
+    "team_name": null
+   },
+   "right": {
+    "id": 401884,
+    "team_name": "Johnny Pumps"
+   }
+  },
+  {
+   "id": 10572238,
+   "division": "PS Monday",
+   "sched_date": "2026-10-19",
+   "sched_time": "19:30",
+   "round_seq": 6,
+   "is_bye": true,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401917,
+    "team_name": "Prospect (Marta)"
+   },
+   "right": {
+    "id": null,
+    "team_name": null
+   }
+  },
+  {
+   "id": 10572253,
+   "division": "PS Monday",
+   "sched_date": "2026-10-26",
+   "sched_time": "19:30",
+   "round_seq": 7,
+   "is_bye": true,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": null,
+    "team_name": null
+   },
+   "right": {
+    "id": 401887,
+    "team_name": "Shenanigans"
+   }
+  },
+  {
+   "id": 10572271,
+   "division": "PS Monday",
+   "sched_date": "2026-11-02",
+   "sched_time": "19:30",
+   "round_seq": 8,
+   "is_bye": true,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401872,
+    "team_name": "The DartSmiths"
+   },
+   "right": {
+    "id": null,
+    "team_name": null
+   }
+  },
+  {
+   "id": 10572274,
+   "division": "PS Monday",
+   "sched_date": "2026-11-09",
+   "sched_time": "19:30",
+   "round_seq": 9,
+   "is_bye": true,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": null,
+    "team_name": null
+   },
+   "right": {
+    "id": 401890,
+    "team_name": "Chairmen of the Other Board (Barry's)"
+   }
+  },
+  {
+   "id": 10572286,
+   "division": "PS Monday",
+   "sched_date": "2026-11-16",
+   "sched_time": "19:30",
+   "round_seq": 10,
+   "is_bye": false,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401872,
+    "team_name": "The DartSmiths"
+   },
+   "right": {
+    "id": 401884,
+    "team_name": "Johnny Pumps"
+   }
+  },
+  {
+   "id": 10572289,
+   "division": "PS Monday",
+   "sched_date": "2026-11-16",
+   "sched_time": "19:30",
+   "round_seq": 10,
+   "is_bye": false,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401893,
+    "team_name": "BuckTown Falcons"
+   },
+   "right": {
+    "id": 401887,
+    "team_name": "Shenanigans"
+   }
+  },
+  {
+   "id": 10572292,
+   "division": "PS Monday",
+   "sched_date": "2026-11-16",
+   "sched_time": "19:30",
+   "round_seq": 10,
+   "is_bye": false,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401890,
+    "team_name": "Chairmen of the Other Board (Barry's)"
+   },
+   "right": {
+    "id": 401917,
+    "team_name": "Prospect (Marta)"
+   }
+  },
+  {
+   "id": 10572295,
+   "division": "PS Monday",
+   "sched_date": "2026-11-16",
+   "sched_time": "19:30",
+   "round_seq": 10,
+   "is_bye": true,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401875,
+    "team_name": "Paddy's"
+   },
+   "right": {
+    "id": null,
+    "team_name": null
+   }
+  },
+  {
+   "id": 10572298,
+   "division": "PS Monday",
+   "sched_date": "2026-11-23",
+   "sched_time": "19:30",
+   "round_seq": 11,
+   "is_bye": true,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": null,
+    "team_name": null
+   },
+   "right": {
+    "id": 401893,
+    "team_name": "BuckTown Falcons"
+   }
+  },
+  {
+   "id": 10572301,
+   "division": "PS Monday",
+   "sched_date": "2026-11-23",
+   "sched_time": "19:30",
+   "round_seq": 11,
+   "is_bye": false,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401872,
+    "team_name": "The DartSmiths"
+   },
+   "right": {
+    "id": 401917,
+    "team_name": "Prospect (Marta)"
+   }
+  },
+  {
+   "id": 10572304,
+   "division": "PS Monday",
+   "sched_date": "2026-11-23",
+   "sched_time": "19:30",
+   "round_seq": 11,
+   "is_bye": false,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401887,
+    "team_name": "Shenanigans"
+   },
+   "right": {
+    "id": 401875,
+    "team_name": "Paddy's"
+   }
+  },
+  {
+   "id": 10572307,
+   "division": "PS Monday",
+   "sched_date": "2026-11-23",
+   "sched_time": "19:30",
+   "round_seq": 11,
+   "is_bye": false,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401884,
+    "team_name": "Johnny Pumps"
+   },
+   "right": {
+    "id": 401890,
+    "team_name": "Chairmen of the Other Board (Barry's)"
+   }
+  },
+  {
+   "id": 10572310,
+   "division": "PS Monday",
+   "sched_date": "2026-11-30",
+   "sched_time": "19:30",
+   "round_seq": 12,
+   "is_bye": false,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401887,
+    "team_name": "Shenanigans"
+   },
+   "right": {
+    "id": 401917,
+    "team_name": "Prospect (Marta)"
+   }
+  },
+  {
+   "id": 10572313,
+   "division": "PS Monday",
+   "sched_date": "2026-11-30",
+   "sched_time": "19:30",
+   "round_seq": 12,
+   "is_bye": true,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401884,
+    "team_name": "Johnny Pumps"
+   },
+   "right": {
+    "id": null,
+    "team_name": null
+   }
+  },
+  {
+   "id": 10572316,
+   "division": "PS Monday",
+   "sched_date": "2026-11-30",
+   "sched_time": "19:30",
+   "round_seq": 12,
+   "is_bye": false,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401890,
+    "team_name": "Chairmen of the Other Board (Barry's)"
+   },
+   "right": {
+    "id": 401872,
+    "team_name": "The DartSmiths"
+   }
+  },
+  {
+   "id": 10572319,
+   "division": "PS Monday",
+   "sched_date": "2026-11-30",
+   "sched_time": "19:30",
+   "round_seq": 12,
+   "is_bye": false,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401875,
+    "team_name": "Paddy's"
+   },
+   "right": {
+    "id": 401893,
+    "team_name": "BuckTown Falcons"
+   }
+  },
+  {
+   "id": 10572322,
+   "division": "PS Monday",
+   "sched_date": "2026-12-07",
+   "sched_time": "19:30",
+   "round_seq": 13,
+   "is_bye": true,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": null,
+    "team_name": null
+   },
+   "right": {
+    "id": 401917,
+    "team_name": "Prospect (Marta)"
+   }
+  },
+  {
+   "id": 10572325,
+   "division": "PS Monday",
+   "sched_date": "2026-12-07",
+   "sched_time": "19:30",
+   "round_seq": 13,
+   "is_bye": false,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401875,
+    "team_name": "Paddy's"
+   },
+   "right": {
+    "id": 401890,
+    "team_name": "Chairmen of the Other Board (Barry's)"
+   }
+  },
+  {
+   "id": 10572328,
+   "division": "PS Monday",
+   "sched_date": "2026-12-07",
+   "sched_time": "19:30",
+   "round_seq": 13,
+   "is_bye": false,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401887,
+    "team_name": "Shenanigans"
+   },
+   "right": {
+    "id": 401884,
+    "team_name": "Johnny Pumps"
+   }
+  },
+  {
+   "id": 10572331,
+   "division": "PS Monday",
+   "sched_date": "2026-12-07",
+   "sched_time": "19:30",
+   "round_seq": 13,
+   "is_bye": false,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401893,
+    "team_name": "BuckTown Falcons"
+   },
+   "right": {
+    "id": 401872,
+    "team_name": "The DartSmiths"
+   }
+  },
+  {
+   "id": 10572334,
+   "division": "PS Monday",
+   "sched_date": "2026-12-14",
+   "sched_time": "19:30",
+   "round_seq": 14,
+   "is_bye": false,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401890,
+    "team_name": "Chairmen of the Other Board (Barry's)"
+   },
+   "right": {
+    "id": 401893,
+    "team_name": "BuckTown Falcons"
+   }
+  },
+  {
+   "id": 10572337,
+   "division": "PS Monday",
+   "sched_date": "2026-12-14",
+   "sched_time": "19:30",
+   "round_seq": 14,
+   "is_bye": true,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401887,
+    "team_name": "Shenanigans"
+   },
+   "right": {
+    "id": null,
+    "team_name": null
+   }
+  },
+  {
+   "id": 10572340,
+   "division": "PS Monday",
+   "sched_date": "2026-12-14",
+   "sched_time": "19:30",
+   "round_seq": 14,
+   "is_bye": false,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401875,
+    "team_name": "Paddy's"
+   },
+   "right": {
+    "id": 401872,
+    "team_name": "The DartSmiths"
+   }
+  },
+  {
+   "id": 10572343,
+   "division": "PS Monday",
+   "sched_date": "2026-12-14",
+   "sched_time": "19:30",
+   "round_seq": 14,
+   "is_bye": false,
+   "status": "P",
+   "dc_match_id": null,
+   "left": {
+    "id": 401884,
+    "team_name": "Johnny Pumps"
+   },
+   "right": {
+    "id": 401917,
+    "team_name": "Prospect (Marta)"
+   }
+  }
+ ]
+}

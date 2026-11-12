@@ -1,7 +1,7 @@
-"""Upcoming fixtures for the Schedule tab -- pure functions over data/fixtures.json.
+"""Upcoming fixtures for the Schedule tab -- pure functions over a season's fixtures.json.
 
-fetch.py writes that file (the only networked step); this module only reads it, so a build stays
-offline and reproducible.
+fetch.py writes data/seasons/<id>/fixtures.json for each season DartConnect calls active (the only
+networked step); this module only reads it, so a build stays offline and reproducible.
 
 Three things here were not obvious:
 
@@ -19,9 +19,7 @@ Three things here were not obvious:
 import collections, datetime, json, pathlib, sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-import fetch, players
-
-PATH = fetch.DATA / "fixtures.json"
+import players
 
 
 def _nth_sunday(year, month, n):
@@ -64,7 +62,7 @@ def clock(time):
     return f"{(hours - 1) % 12 + 1}:{minutes:02d} {'PM' if hours >= 12 else 'AM'}"
 
 
-def upcoming(standings, today, path=PATH):
+def upcoming(standings, today, path):
     """Match nights from `today` (a date, New York) on, earliest first.
 
         [{"date", "time", "start", "week",
