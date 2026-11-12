@@ -805,6 +805,38 @@ def check_navigation(pages):
     check(f"all {len(player_pages)} players appear on exactly one team page",
           not off_roster and not doubled, f"missing {off_roster[:3]}, on two {doubled[:3]}")
 
+    # ---- GP and the playoff check mark (2026-11-11) ----
+    # The caption states the rule; every row must follow it. A page whose caption states no
+    # minimum (season length unknown) must mark nobody.
+    no_gp, wrong_mark, bad_rule, mute_mark = [], [], [], []
+    roster_rows = 0
+    for name in sorted(teams):
+        markup = site[name]
+        rule = re.search(r"played at least (\d+) of the (\d+) nights", markup)
+        need = int(rule.group(1)) if rule else None
+        if rule and need != (int(rule.group(2)) - 1) // 2:
+            bad_rule.append(f"{name}: {rule.group(0)}")
+        for _tag, row in re.findall(r'<(a|div) class="row"[^>]*>(.*?)</\1>', markup, re.S):
+            roster_rows += 1
+            gp = re.search(r'<small class="num">GP (\d+)\b', row)
+            if not gp:
+                no_gp.append(name)
+                continue
+            marked = 'class="eligible"' in row
+            if marked != (need is not None and int(gp.group(1)) >= need):
+                wrong_mark.append(f"{name}: GP {gp.group(1)}, minimum {need}, marked {marked}")
+            if marked and not re.search(r'<span class="eligible"><svg[^>]*aria-hidden="true"'
+                                        r'.*?</svg><span class="vh">[^<]+</span>', row):
+                mute_mark.append(name)
+    check(f"all {roster_rows} team-page roster rows show GP", roster_rows and not no_gp,
+          f"{len(no_gp)} without, e.g. on {no_gp[:2]}")
+    check("every stated playoff minimum is the largest whole number below half the season",
+          not bad_rule, str(bad_rule[:2]))
+    check("a player is marked playoff eligible exactly when GP reaches the stated minimum",
+          not wrong_mark, f"{len(wrong_mark)}x e.g. {wrong_mark[:2]}")
+    check("every check mark is an SVG with words for screen readers", not mute_mark,
+          str(mute_mark[:3]))
+
     # ---- the ALL board: the owner-approved exception to never ranking across divisions ----
     board = site.get("all.html")
     check("the All-Stars ALL board exists", board is not None)

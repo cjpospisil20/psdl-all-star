@@ -162,7 +162,7 @@ point — the old system's real failure was that nobody looked at it.
 | `design/all-stars.html` | All-star points leaderboard by division. The heart of the app. |
 | `design/player.html` | One player: DartConnect form stats, then all-star points and every hit. |
 | `design/match.html` | **Retired 2026-11-11.** One match night, both teams, every hit linking to its turn. The Match tab became the Schedule (upcoming home v away fixtures, no all-star points), which has no mockup; `site/build.py` `build_schedule()` is its reference. |
-| `design/team.html` | Captain's roll-up of their players. Opened by tapping a team on Standings; lists the whole roster with singles averages. |
+| `design/team.html` | Captain's roll-up of their players. Opened by tapping a team on Standings; lists the whole roster with GP (league nights played) and singles averages, and a gold check mark (inline SVG, never a glyph) after the name of each playoff-eligible player. |
 | `design/rare-hit.html` | The celebration screen for a 180 / R9 / C6. |
 
 ## Data in the mockups — what's real and what isn't
@@ -204,4 +204,5 @@ point — the old system's real failure was that nobody looked at it.
 1. How many players per division make All Star? (unblocks `[ALL STAR CUT]`)
 2. Team rosters — which player is on which team?
 3. Cricket stats: is MPR available from the DartConnect export?
-4. Season length — the brief says 10–16 weeks.
+4. Season length — the brief says 10–16 weeks. **Answered for Fall 2026** (owner, 2026-11-11):
+   15 nights in Divisions 2–5, 12 in Division 1 (14 weeks, two byes). `players.SEASON_NIGHTS`.

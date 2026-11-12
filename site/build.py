@@ -186,10 +186,12 @@ def build_players(season, table, form):
     rows = {r["player"]: r for rs in table.values() for r in rs}
     for name, row in rows.items():
         hits = sorted(by_player[name], key=lambda h: -h["points"])
-        write(f"player/{slug(name)}.html", player_page(name, row, hits, form.get(name, {})))
+        nights = len(season["nights_by_player"].get(name, ()))
+        write(f"player/{slug(name)}.html", player_page(name, row, hits, form.get(name, {}), nights))
 
 
-def player_page(name, row, hits, form):
+def player_page(name, row, hits, form, nights):
+    """`nights` is league nights played -- the GP a team page shows, so the two always agree."""
     back_label = f"{row['division'].upper()} ALL-STARS"
     back_href = f"../{slug(row['division'])}.html"
     back_from = [f"{slug(row['division'])}.html", "index.html"]
@@ -219,7 +221,7 @@ def player_page(name, row, hits, form):
   <div class="card">
     <h2>THIS SEASON</h2>
     <div class="statgrid three">
-      {stat("MATCHES", form.get("matches"))}
+      {stat("MATCHES", nights)}
       {stat("LEGS", form.get("legs"))}
       {stat("DARTS", f"{form.get('darts', 0):,}")}
     </div>
@@ -369,6 +371,9 @@ def build_teams(season, table, form):
 
     The list comes from standings (CLAUDE.md data rule 6), not from who has scored, so every
     standings row has a page to open -- including a team with no all star hits yet.
+
+    Every roster row shows GP, the league nights the player has played, and a gold check mark
+    once that reaches the playoff minimum for the division (players.playoff_minimum).
     """
     scored = {r["player"]: r for rows in table.values() for r in rows}
 
@@ -387,24 +392,45 @@ def build_teams(season, table, form):
         rows = sorted((scored[p] for p in names if p in scored),
                       key=lambda r: (-r["points"], r["player"]))
         zero = sorted(p for p in names if p not in scored)
-        write(team_href(team), team_page(team, c["division"], rows, zero, form))
+        played = {p: len(season["nights_by_player"].get(p, ())) for p in names}
+        write(team_href(team), team_page(team, c["division"], rows, zero, form, played,
+                                         season["season_nights"].get(c["division"])))
 
 
-def averages(form):
-    """A player's singles '01 average and cricket MPR, labelled and formatted as on the standings
-    rows a captain has just tapped through from (two decimals, as DartConnect prints them).
+def roster_stats(nights, form):
+    """GP, then the singles '01 average and cricket MPR -- labelled and formatted as on the
+    standings rows a captain has just tapped through from (two decimals, as DartConnect prints
+    them).
 
-    Omitted when neither is known (a doubles-only player); a single unknown is an em dash.
+    GP is league nights played, and always present: the roster and the count come from the same
+    turn records. The averages are omitted when neither is known (a doubles-only player); a single
+    unknown is an em dash.
     """
+    parts = [f"GP {nights}"]
     form = form or {}
     three, mpr = form.get("three_dart_avg"), form.get("mpr")
-    if three is None and mpr is None:
+    if three is not None or mpr is not None:
+        shown = lambda v: "&mdash;" if v is None else f"{v:.2f}"
+        parts += [f"&rsquo;01 {shown(three)}", f"CRK {shown(mpr)}"]
+    return f'\n      <small class="num">{" &middot; ".join(parts)}</small>'
+
+
+def eligible_mark(nights, need):
+    """The gold check mark after a playoff-eligible player's name, or nothing.
+
+    Nothing at all while the season length is unknown (`need` is None) -- never a guessed one.
+    The SVG is decoration; the words are for screen readers.
+    """
+    if need is None or nights < need:
         return ""
-    shown = lambda v: "&mdash;" if v is None else f"{v:.2f}"
-    return f'\n      <small class="num">&rsquo;01 {shown(three)} &middot; CRK {shown(mpr)}</small>'
+    return (f'<span class="eligible">{icon("check", tokens.COLOURS["gold"], 16)}'
+            f'<span class="vh">, playoff eligible</span></span>')
 
 
-def team_page(team, division, rows, zero, form):
+def team_page(team, division, rows, zero, form, played, season_nights):
+    """`played` maps each player on the roster to league nights played; `season_nights` is how
+    many nights each team in the division plays this season, or None if nobody has said."""
+    need = players.playoff_minimum(season_nights) if season_nights else None
     total = sum(r["points"] for r in rows)
     hits  = sum(r["hits"] for r in rows)
     standings = f"standings-{slug(division)}.html"
@@ -423,7 +449,7 @@ def team_page(team, division, rows, zero, form):
     for r in rows:
         body.append(f"""  <a class="row" href="../player/{slug(r['player'])}.html">
     <span class="row-rank num ordinal">{ordinal(r['rank'])}</span>
-    <span class="row-main"><b class="name">{esc(r['player'])}</b>{averages(form.get(r['player']))}
+    <span class="row-main"><b class="name">{esc(r['player'])}{eligible_mark(played[r['player']], need)}</b>{roster_stats(played[r['player']], form.get(r['player']))}
       <span class="chips">{C.chips_for(r['counts'], allstar.RARE)}</span>
     </span>
     <span class="row-pts"><b class="num">{r['points']:,}</b><span>PTS</span></span>
@@ -434,14 +460,21 @@ def team_page(team, division, rows, zero, form):
     for name in zero:
         body.append(f"""  <div class="row">
     <span class="row-rank num ordinal">&mdash;</span>
-    <span class="row-main"><b class="name">{esc(name)}</b>{averages(form.get(name))}
+    <span class="row-main"><b class="name">{esc(name)}{eligible_mark(played[name], need)}</b>{roster_stats(played[name], form.get(name))}
       <small>No all star hits yet</small>
     </span>
     <span class="row-pts"><b class="num">0</b><span>PTS</span></span>
   </div>
 """)
     if rows or zero:
-        body.append(f'  <p class="caption">Ranks are within {esc(division)}. &rsquo;01 and CRK '
+        eligible = ""
+        if need is not None:
+            mark = f'<span class="eligible">{icon("check", tokens.COLOURS["gold"], 13)}</span>'
+            eligible = (f' A gold check mark {mark} means '
+                        f'playoff eligible: played at least {need} of the {season_nights} nights '
+                        f'each {esc(division)} team plays (Rulebook &sect;H.2).')
+        body.append(f'  <p class="caption">Ranks are within {esc(division)}. GP is league nights '
+                    f'played &mdash; one game in a night counts.{eligible} &rsquo;01 and CRK '
                     'are singles averages &mdash; in doubles the darts belong to the pair, so '
                     'they cannot be split fairly. Tap a name for the turns behind the total.</p>\n')
     else:
@@ -741,6 +774,10 @@ def main():
     if season["missing"]:
         print(f"  ! {len(season['missing'])} match recaps missing -- run scraper/fetch.py",
               file=sys.stderr)
+
+    if not season["season_nights"]:
+        print("  ! no season length for this season in players.SEASON_NIGHTS -- team pages "
+              "show GP without playoff check marks", file=sys.stderr)
 
     table = players.division_table(season["hits"], season["weeks_by_player"])
     form  = players.form_stats(season["recaps"])

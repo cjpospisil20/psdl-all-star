@@ -229,6 +229,37 @@ def main():
     check("every fixture is in a standings division, between standings teams",
           not wrong, str(wrong[:2]))
 
+    print("\n11. Nights played (GP) and playoff eligibility")
+    check("the rulebook's examples hold: 10 nights need 4, 14 need 6, 15 need 7",
+          [players.playoff_minimum(n) for n in (10, 14, 15)] == [4, 6, 7])
+    played = season["nights_by_player"]
+    unplayed = sorted(p for p in season["teams"] if not played.get(p))
+    check(f"all {len(season['teams'])} rostered players have played at least one night",
+          not unplayed, str(unplayed[:3]))
+    # What catches GP regressing to each leg's opener: in doubles and triples the partners
+    # alternate, and 14 scorers hit an all star on a night they never opened a leg.
+    missed = sorted(p for p, dates in season["weeks_by_player"].items()
+                    if not dates <= played.get(p, set()))
+    check("every night with an all star hit counts as a night played", not missed,
+          str(missed[:3]))
+    team_nights = collections.defaultdict(set)
+    for m in season["matches"]:
+        for team in m["teams"].values():
+            team_nights[team].add(m["date"])
+    stray = sorted(p for p, dates in played.items()
+                   if not dates <= team_nights[season["teams"].get(p)])
+    check("nobody is credited with a night their team did not play", not stray, str(stray[:3]))
+    lengths = season["season_nights"]
+    if lengths:
+        # A typo'd division would silently drop its check marks.
+        check("the season length names exactly the standings divisions",
+              set(lengths) == set(events.divisions(season)), str(sorted(lengths)))
+        check("every season length is a whole number of nights",
+              all(isinstance(n, int) and n > 0 for n in lengths.values()), str(lengths))
+    else:
+        print("  NOTE  no season length in players.SEASON_NIGHTS for this season -- team pages "
+              "show GP without playoff check marks")
+
     print(f"\n{'ALL CHECKS PASSED' if not failures else str(len(failures)) + ' CHECK(S) FAILED'}")
     return 1 if failures else 0
 

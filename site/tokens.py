@@ -225,6 +225,10 @@ a:hover {{ color: var(--white); }}
 .row-pts b {{ font-family: var(--display); font-weight: 400; font-size: 22px;
              line-height: 1; color: var(--white); }}
 .row-pts span {{ font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: var(--muted); }}
+/* The playoff-eligible check mark on a team page: inline after the name, so a long name wraps
+   with the mark on its last line. Its gold comes from the icon's stroke; this is layout only. */
+.eligible svg {{ vertical-align: -2px; }}
+.name .eligible {{ margin-left: 6px; }}
 
 /* ---------- cards / stat grids ---------- */
 .card {{ margin: 0 16px 14px; background: var(--surface); border: 1px solid var(--hairline);
