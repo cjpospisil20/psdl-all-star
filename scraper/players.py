@@ -129,15 +129,56 @@ def resolve_sides(props, row, canonical):
 SENTINEL_PLAYERS = {"-SHORT-"}
 
 
+def _turn_names(props):
+    """Yield (side, player) for every turn slot in a match, -SHORT- left out."""
+    for g in allstar.games(props):
+        for t in g["turns"]:
+            for side in ("home", "away"):
+                name = clean_name(t[side].get("name"))
+                if name and name not in SENTINEL_PLAYERS:
+                    yield side, name
+
+
 def _side_names(sided_recaps):
     """Yield (player, team) for every turn thrown, with teams already canonicalised."""
     for props, sides in sided_recaps:
-        for g in allstar.games(props):
-            for t in g["turns"]:
-                for side in ("home", "away"):
-                    name = clean_name(t[side].get("name"))
-                    if name and name not in SENTINEL_PLAYERS and sides.get(side):
-                        yield name, sides[side]
+        for side, name in _turn_names(props):
+            if sides.get(side):
+                yield name, sides[side]
+
+
+def throwers(props):
+    """Everyone who played in a match: every name in its turn records.
+
+    Every turn, not each leg's opening one. Partners alternate in doubles and triples, so a leg's
+    first turn names only one of them. Counting from the opener alone left 45 players a night or
+    more short by week 9 of Fall 2026, and 14 short of a night they had scored an all star on.
+    """
+    return {name for _side, name in _turn_names(props)}
+
+
+# Regular-season nights each team plays, per division, keyed by DartConnect season id. A league
+# fact: matches.json lists only nights already played. Confirmed by the owner on 2026-11-11, and
+# DartConnect's lineups feed agreed that day -- Division 1's seven teams play each other twice,
+# 12 nights over 14 weeks with two byes each; every team in Divisions 2-5 plays 15.
+# A season or division missing here gets GP but no playoff check mark: a guessed season length
+# would mark the wrong players. Moves to data/seasons.json with ROADMAP Step 3.
+SEASON_NIGHTS = {
+    25174: {"Division 1": 12, "Division 2": 15, "Division 3": 15,        # Fall 2026
+            "Division 4": 15, "Division 5": 15},
+}
+
+
+def playoff_minimum(nights):
+    """Nights a player must have played to be playoff eligible, in a season of `nights`.
+
+    Rulebook Fall 2025 section H.2: the largest whole number below half the season -- 10 nights
+    need 4, 14 need 6, 15 need 7. One game in a night counts as playing that night. The rulebook
+    also counts two bye weeks as one week of eligibility; SEASON_NIGHTS holds the nights a team
+    actually plays, so Division 1's 12 give 5 -- the rulebook's own answer for 14 weeks (6) less
+    one for two byes.
+    """
+    return (nights - 1) // 2
 
 
 def team_map(sided_recaps):
@@ -189,10 +230,8 @@ def form_stats(recaps):
     """
     acc = collections.defaultdict(lambda: collections.defaultdict(float))
     opponents_faced = collections.defaultdict(set)
-    matches_played  = collections.defaultdict(set)
 
     for props in recaps:
-        match_id = props["matchInfo"]["id"]
         for g in allstar.games(props):
             turns = g["turns"]
             if not turns:
@@ -208,12 +247,14 @@ def form_stats(recaps):
                 darts = _darts_thrown(g, side, turns)
                 won   = (g.get("winner_index") == (0 if side == "home" else 1))
 
-                # Activity counts cover every format the player appeared in.
+                # Activity counts cover every format the player appeared in -- but only for
+                # the leg's opener, so a doubles partner who threw second is missing from them
+                # (summary.md, follow-ups). Nights played come from throwers(), which reads
+                # every turn.
                 a = acc[name]
                 a["legs"] += 1
                 a["all_darts"] += darts
                 a["leg_wins"] += 1 if won else 0
-                matches_played[name].add(match_id)
                 opp_name = clean_name(turns[0][other].get("name"))
                 if opp_name:
                     opponents_faced[name].add(opp_name)
@@ -272,7 +313,6 @@ def form_stats(recaps):
             "checkout_pct":   round(a["co_hits"] / a["co_attempts"] * 100, 1) if a["co_attempts"] else None,
             "opp_three_dart": round(a["opp_points"] / a["opp_darts"] * 3, 2) if a["opp_darts"] else None,
             "singles_legs":   int(a["legs_01"] + a["legs_crk"]),
-            "matches":        len(matches_played[p]),
             "legs":           int(a["legs"]),
             "darts":          int(a["all_darts"]),
             "opponents":      len(opponents_faced[p]),

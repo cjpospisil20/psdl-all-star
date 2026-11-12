@@ -42,6 +42,7 @@ def icon(name, colour=None, size=20):
         "back":      '<path d="M14 6 L8 12 L14 18"></path>',
         "search":    '<circle cx="11" cy="11" r="7"></circle><path d="M16.5 16.5 L21 21"></path>',
         "chevron":   '<path d="M6 9 L12 15 L18 9"></path>',
+        "check":     '<path d="M4 12.5 L9.5 18 L20 6.5"></path>',
         "external":  '<path d="M14 4 H20 V10"></path><path d="M20 4 L11 13"></path>'
                      '<path d="M18 14.5 V19 A1.5 1.5 0 0 1 16.5 20.5 H5.5 '
                      'A1.5 1.5 0 0 1 4 19 V8 A1.5 1.5 0 0 1 5.5 6.5 H10"></path>',

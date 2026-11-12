@@ -44,7 +44,7 @@ docs/      rulebook, design brief, exports
 |---|---|
 | `scraper/fetch.py` | **The only module that touches the network.** Archives each recap to `data/recaps/` on first fetch; refreshes `matches.json`, `standings.json` and `fixtures.json` every run. |
 | `scraper/allstar.py` | Rules engine — Rulebook Section F applied to turn data. Emits individual hits. |
-| `scraper/players.py` | Player → team, form stats recomputed from turns, the per-division ranked table. |
+| `scraper/players.py` | Player → team, form stats recomputed from turns, the per-division ranked table, nights played (GP) and playoff eligibility (`SEASON_NIGHTS`, `playoff_minimum`). |
 | `scraper/awards.py` | Season-end award data — 171+ Club, Big Fish, largest checkout/check-in, division leaders. Pure functions over hits. |
 | `scraper/events.py` | `load_season()` — assembles the season from the archive. The single entry point `site/` uses. |
 | `scraper/fixtures.py` | Match nights still to come, from `data/fixtures.json` — the Schedule tab. Also New York time (`eastern_offset`, `league_today`). Pure, offline. |
@@ -121,7 +121,8 @@ open public/index.html
    it is DartConnect's own identity, and it raises rather than guessing.
    Fixtures resolve the same way (`fixtures.upcoming()`).
 8. **No bracketed placeholder may reach a real page.** `build.py` scans its own output and fails the
-   build if one does. If a value is unknown, omit the element — see `ALL_STAR_CUT = None`.
+   build if one does. If a value is unknown, omit the element — see `ALL_STAR_CUT = None`, and
+   `players.SEASON_NIGHTS`: a season it does not list shows GP with no playoff check marks.
 9. `summary.md` holds the rest of the hard-won specifics (`ending_marks` is points not marks;
    `darts_thrown` only exists for the checkout player; averages are singles-only). Read it before
    touching `players.py`.
@@ -164,8 +165,10 @@ The bottom tab bar is Standings · All-Stars · Schedule · Feed · Awards. The 
 come — home v away, division by division, with a division menu and team search — and gilds tonight's
 matches while they are on. There is no Teams tab or teams index any more (retired 2026-11-11): a team
 page is opened by tapping its row on Standings (or a team on the Schedule), and lists the whole
-roster — scorers first, then teammates with no all star hits yet — with each player's singles '01
-average and MPR. The Feed tab lists the season's notable moments, week by week.
+roster — scorers first, then teammates with no all star hits yet — with each player's GP (league
+nights played), singles '01 average and MPR, and a gold check mark beside every player who is playoff
+eligible (Rulebook §H.2; the season length per division is `players.SEASON_NIGHTS`, confirmed by the
+owner). The Feed tab lists the season's notable moments, week by week.
 
 GitHub Pages hosts the site; the domain is registered at Vercel, which serves its DNS and nothing
 else. The domain is a repo setting (Settings → Pages), not a file — do not add a `CNAME` file, which

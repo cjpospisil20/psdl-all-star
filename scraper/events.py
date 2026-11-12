@@ -39,7 +39,8 @@ def load_season():
 
     recaps, hits, busts = [], [], collections.Counter()
     sided_recaps = []
-    weeks_by_player = collections.defaultdict(set)
+    weeks_by_player = collections.defaultdict(set)     # nights with an all star hit
+    nights_by_player = collections.defaultdict(set)    # nights played at all -- GP
     matches = []
     missing = []
 
@@ -53,6 +54,8 @@ def load_season():
         recaps.append(props)
         sides = players.resolve_sides(props, m, canonical)
         sided_recaps.append((props, sides))
+        for name in players.throwers(props):
+            nights_by_player[name].add(date)
 
         match_hits, match_busts = allstar.score_match(props, date=date, week=week_of[date],
                                                       teams=sides)
@@ -95,6 +98,12 @@ def load_season():
         "latest_week": max(week_of.values()) if week_of else 0,
         "latest_date": dates[-1] if dates else None,
         "weeks_by_player": weeks_by_player,
+        # League nights each player has played (GP), and the nights each team plays this
+        # season per division -- empty for a season nobody has told us about. Together they
+        # decide playoff eligibility; see players.playoff_minimum.
+        "nights_by_player": nights_by_player,
+        "season_nights": players.SEASON_NIGHTS.get(
+            standings_props.get("leagueInfo", {}).get("season_id"), {}),
         "missing":    missing,
         # Match nights still to come, for the Schedule tab -- from the lineups feed, since
         # matches.json only ever lists matches that have started. See fixtures.py.

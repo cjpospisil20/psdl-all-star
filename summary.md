@@ -140,6 +140,10 @@ This discovery removed what had been the single largest piece of remaining build
   DartConnect supplies `mpr` per side directly. (Real bug, found and fixed.)
 - **`darts_thrown` is only recorded for the player who checked out.** The loser never finishes
   mid-turn, so their count is exactly 3 × turns taken.
+- **A leg's first turn names only one partner.** In doubles and triples the partners alternate
+  turns, so anything keyed off `turns[0]` sees only whoever threw first — by week 9 that left 45
+  players short of nights they had played. `players.throwers()` reads every turn; GP and the player
+  page's MATCHES come from it.
 - **Averages are singles-only, deliberately.** In doubles and triples the darts and the points belong
   to the side, so there is no honest way to split them between partners — crediting the side's figures
   to each player inflates everyone. DartConnect's own card is captioned "SINGLES 501 SIDO" for the
@@ -291,13 +295,20 @@ season, so it is a season-long landmark, not a weekly feature. Season to date: 2
    rule and its styling are already built and will appear.
 6. **Persistent storage** — still unnecessary. Everything recomputes from the archived recaps on each
    run, which at ~180 matches/season takes seconds. Revisit only if that stops being true.
+7. **Player-page LEGS, DARTS and LEG WINS credit only each leg's opener.** `form_stats` keys its
+   activity counts off `turns[0]`, so a doubles or triples partner who threw second is missing from
+   them, and the opener is credited with the whole side's darts. MATCHES had the same bug and now
+   comes from `nights_by_player` (see the 2026-11-11 GP entry); the other three were left alone.
 
 ### Open questions
 
-- Exact Fall 2026 season length (rulebook allows 10 / 14 / 16 weeks) — needed for PPW and for the
-  eligibility minimums in §G.2. **PPW currently divides points by the number of weeks in which the
-  player scored at least one hit** (`events.load_season` → `weeks_by_player`). That is a defensible
-  mid-season figure, but it is not the same as dividing by weeks played or by season length, and the
+- Fall 2026 season length: **answered by the owner (2026-11-11)** — Divisions 2–5 play 15 nights;
+  Division 1's seven teams play each other twice, 12 nights over 14 weeks with two byes each.
+  DartConnect's lineups feed agrees exactly. It is `players.SEASON_NIGHTS` and drives the
+  playoff-eligibility check marks (Rulebook §H.2 — earlier notes here said §G.2, which is wrong).
+  **PPW still divides points by the number of weeks in which the player scored at least one hit**
+  (`events.load_season` → `weeks_by_player`). That is a defensible mid-season figure, but it is not
+  the same as dividing by nights played (`nights_by_player` now exists) or by season length, and the
   season-end award basis needs deciding before anyone treats PPW as official.
 - **How many players per division make All Star** — still unanswered, still the one design placeholder
   the league has to fill. See item 5 above.
@@ -728,3 +739,48 @@ fixtures link HOME then AWAY or one BYE to team pages) all pass; the new fixture
 markup change mid-session. In headless Chrome with a faked clock: 7:29 PM nothing live; 8:15 PM the
 first night live; 12:30 AM it is gone (87 → 72 matches); `#division-3` → 18; "craic" → The Craic's
 5; a nonsense search → the empty-state line.
+
+### 2026-11-11 — GP and the playoff check mark on team pages
+
+At the owner's request (not a ROADMAP step). Every roster row on a team page now reads
+`GP 8 · ’01 51.24 · CRK 2.27`, and a gold check mark follows the name of every player who is playoff
+eligible.
+
+- **GP** is league nights played; one game in a night counts (Rulebook §H.2). `players.throwers()`
+  reads every turn of every game, and `events.load_season` collects `nights_by_player` (sets of
+  dates) beside `weeks_by_player` (nights with a hit).
+- **The rule**, `players.playoff_minimum`: the largest whole number below half the nights a team
+  plays. 10 → 4, 14 → 6, 15 → 7 are the rulebook's own examples, and `verify.py` asserts them. The
+  owner's version ("half the nights, minus one"; "less than 7.5 is 7") is the same rule.
+- **Season length**, `players.SEASON_NIGHTS`, keyed by season id. The owner confirmed 15 nights for
+  Divisions 2–5 and 12 for Division 1 (seven teams × twice, over 14 weeks with two byes). Counting the
+  nights a team *plays* gives Division 1 the rulebook's bye answer by itself: 14 weeks need 6, two
+  byes count as one week, so 5 — and 12 nights give 5. The lineups feed that landed the same day
+  agrees exactly: every Division 1 team has 12 fixtures and 2 byes, every other team 15. A season
+  missing from the table shows GP with no marks and the build prints a note. It never guesses.
+- **The mark** is an inline stroke SVG (check.py's emoji guard covers ✓), gold from the icon stroke,
+  with visually hidden ", playoff eligible" for screen readers. The caption states the rule with the
+  division's numbers. The UI says *eligible*, the rulebook's word: a player is eligible, but their
+  team still has to make the playoffs.
+- **Fixed: the player page's MATCHES undercounted 45 players.** `form_stats()["matches"]` counted
+  only a leg's opener, so partners lost nights. Gerry Hernandez played 9 and was shown 5; Isaac
+  Petroulis-Lessig played 5 and was shown 4; 3 players were not counted at all. MATCHES now reads
+  `nights_by_player`, the same number as GP, and `form_stats` no longer returns `matches`. LEGS, DARTS
+  and LEG WINS have the same bias and are left for later (What's next, item 7).
+
+Worth knowing: the three 2026-11-10 matches still at status `'A'` (DuckDown Darts v The Monro Pub,
+Commish 1 v Those Divas, Commish 2 v Bullseye Babes Double Trouble) are not archived yet, because of
+Step 2's guard. Their six teams' players are one night short until DartConnect finalises them.
+
+**Verified:** `verify.py` has a new §11: the rulebook examples hold, every rostered player has played
+at least one night, every night with a hit counts as a night played, nobody is credited with a night
+their team did not play, and the season length names exactly the standings divisions. `check.py`'s
+§11 adds four checks: all 262 roster rows show GP, every stated minimum is (nights − 1) // 2, a row
+is marked exactly when GP reaches it, and every mark is an SVG with words for screen readers. All
+pass, and the build is still 300 pages. Against the previous build, only `app.css`, the 31 team
+pages and the 36 player pages whose MATCHES was wrong changed. Six broken copies of the build were
+all caught. Opener-only GP and a misspelt division both fail `verify.py`. An unknown season builds
+clean with no marks. That Team marks CJ Pospisil (8), Chris Senior (9), Craig Hubler (8), Josh
+Hollenberg (9) and Joe Bentham (7), but not Matt Knowlton (4) or Isaac Petroulis-Lessig (5). Every
+Division 1 page states 5 of 12. In Chrome at phone width the mark sits after the name, and at 320px
+it wraps with the last word of a long name; no console errors.
