@@ -323,7 +323,7 @@ def form_stats(recaps):
 def division_table(hits, weeks_by_player=None):
     """Ranked all-star table per division. Ranking is ALWAYS within a division.
 
-    Division 1 scores roughly 2.5x Division 5, so a league-wide ranking would be meaningless
+    Division 1 scores far more than Division 5, so a league-wide ranking would be meaningless
     and actively misleading. See DESIGN-SPEC hard requirement 2. The one exception, approved by
     the owner, is the All-Stars ALL board -- see league_table(), which never touches these ranks.
     """
@@ -360,7 +360,7 @@ def league_table(table):
 
     An exception to "never rank across divisions" that the owner asked for (2026-11-11). The page
     that shows it carries no leader card and no gold top three, names each player's division, and
-    states the 2.5x gap. Rows are COPIES with an added `league_rank`: their division `rank` is what
+    says a league rank reflects the division. Rows are COPIES with an added `league_rank`: their division `rank` is what
     every other page shows, so it must not change. Same tie order as division_table.
     """
     rows = sorted((r for rows in table.values() for r in rows),

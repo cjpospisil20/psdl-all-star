@@ -22,6 +22,12 @@ ALL_STAR_CUT = None
 
 PREVIEW_ROWS = 10          # rows before "show all"
 
+# The logo assets the pages use. design/assets/ also holds the reversed wordmark, which only the
+# first-180 celebration screen used. That screen was retired on 2026-11-12 -- the Feed and Awards
+# celebrate 180s now -- so the wordmark stays in design/ but is not shipped: check.py fails a build
+# that ships an asset no page references.
+SHIPPED_ASSETS = ("psdl-mark.png",)
+
 
 def slug(text):
     return re.sub(r"[^a-z0-9]+", "-", str(text).lower()).strip("-")
@@ -42,7 +48,7 @@ def show_all_button(label):
             f'{icon("chevron", tokens.COLOURS["gold"], 15)}</button>\n')
 
 
-def build_all_stars(season, table, divisions, rare=None):
+def build_all_stars(season, table, divisions):
     def top(current):
         return [C.header("ALL STAR POINTS"),
                 C.statusbar(f"WEEK {season['latest_week']} · "
@@ -60,21 +66,6 @@ def build_all_stars(season, table, divisions, rare=None):
     <span class="note">RANKED WITHIN<br>DIVISION ONLY</span>
   </div>
 """)
-        # The season's standout moment gets a banner on its own division's board.
-        if rare and rare["division"] == division:
-            body.append(f"""  <a class="leader" href="rare-hit.html"
-     style="border-color:var(--gold); background:var(--surface);">
-    <span class="leader-top">
-      <span class="chip rare" style="font-size:15px; padding:8px 12px;">{esc(rare['display'])}</span>
-      <span class="leader-who">
-        <b class="name">{esc(rare['player'])}</b>
-        <span>First {esc(rare['display'])} of the season &middot; {esc(rare['detail'].lower())}</span>
-      </span>
-      {icon("chevron", tokens.COLOURS["gold"], 18)}
-    </span>
-  </a>
-""")
-
         body.append(find_box())
 
         for row in rows:
@@ -90,9 +81,8 @@ def build_all_stars(season, table, divisions, rare=None):
         if len(rows) > PREVIEW_ROWS:
             body.append(show_all_button(f"SHOW ALL {len(rows)} IN {esc(division.upper())}"))
 
-        body.append('  <p class="caption">Division 1 scores roughly 2.5&times; Division 5, so '
-                    'this board ranks players against their own division only. Tap any player to '
-                    'see the turns behind the number.</p>\n')
+        body.append('  <p class="caption">This board ranks players against their own division '
+                    'only. Tap any player to see the turns behind the number.</p>\n')
 
         page = C.page(f"PSDL All Star — {division}", "".join(body), "all-stars")
         write(f"{slug(division)}.html", page)
@@ -100,8 +90,8 @@ def build_all_stars(season, table, divisions, rare=None):
             write("index.html", page)
 
     # The ALL board: the one place players are ranked across divisions, because the owner asked
-    # for it. So it crowns nobody -- no leader card, no gold top three, no rare-hit banner -- and
-    # every row names its division, so a Division 1 total is never mistaken for a Division 5 one.
+    # for it. So it crowns nobody -- no leader card, no gold top three -- and every row names its
+    # division, so a Division 1 total is never mistaken for a Division 5 one.
     everyone = players.league_table(table)
     body = top(None)
     body.append(f"""  <div class="headline">
@@ -119,10 +109,9 @@ def build_all_stars(season, table, divisions, rare=None):
     if len(everyone) > PREVIEW_ROWS:
         body.append(show_all_button(f"SHOW ALL {len(everyone)} PLAYERS"))
     body.append('  <p class="caption">Every division on one board, highest points first. '
-                'Division 1 scores roughly 2.5&times; Division 5, so a league rank says as much '
-                'about a player&rsquo;s division as about the player &mdash; pick a division '
-                'above to compare like with like. Tap any player to see the turns behind the '
-                'number.</p>\n')
+                'A league rank says as much about a player&rsquo;s division as about the player '
+                '&mdash; pick a division above to compare like with like. Tap any player to see '
+                'the turns behind the number.</p>\n')
     write("all.html", C.page("PSDL All Star — All divisions", "".join(body), "all-stars"))
 
 
@@ -239,8 +228,7 @@ def player_page(name, row, hits, form, nights):
       <span class="stat"><b class="num">{row['ppw']:g}</b><small>PPW</small></span>
     </div>
     <p class="caption" style="margin:12px 0 0">{ordinal(row['rank'])} of {row['of']} in
-    {esc(row['division'])}. Ranked within division only &mdash; Division 1 scores roughly
-    2.5&times; Division 5.</p>
+    {esc(row['division'])}. Ranked within division only.</p>
   </div>
 """)
 
@@ -720,37 +708,6 @@ def build_feed(season, divisions):
     write("feed.html", C.page("PSDL All Star — Feed", "".join(body), "feed"))
 
 
-# ---------------------------------------------------------------- rare hit
-
-def build_rare_hit(season):
-    hit = events.first_rare_hit(season["hits"])
-    if not hit:
-        return None
-    gold = tokens.COLOURS["gold"]
-    body = f"""  <div style="flex-grow:1; display:flex; flex-direction:column;
-       align-items:center; justify-content:center; text-align:center; padding:48px 24px; gap:6px;">
-    <h1 class="eyebrow" style="letter-spacing:0.22em; margin:0;">FIRST {esc(hit['display'])} OF THE SEASON</h1>
-    <span class="display" style="font-size:104px; line-height:1; color:{gold};
-          font-variant-numeric:tabular-nums;">{esc(hit['display'])}</span>
-    <span style="font-size:11px; font-weight:700; letter-spacing:0.16em; color:var(--muted);">
-      {esc(hit['detail'].upper())}</span>
-    <b class="name" style="margin-top:22px; font-size:26px;">{esc(hit['player'])}</b>
-    <span class="name" style="font-size:13px; color:var(--text2);">{esc(hit['team'])} &middot; {esc(hit['division'])}</span>
-    <span style="margin-top:20px; font-size:11px; font-weight:700; letter-spacing:0.1em;
-          color:var(--muted);">{esc(events._pretty_date(hit['date']))} &middot;
-      {esc(hit['game'])} &middot; WEEK {hit['week']}</span>
-    <span class="chip rare" style="margin-top:22px; font-size:14px; padding:8px 14px;">
-      +{hit['points']} ALL STAR POINTS</span>
-    <a class="btn" style="margin-top:28px;" href="player/{slug(hit['player'])}.html">
-      SEE {esc(hit['player'].split()[0].upper())}&rsquo;S WEEK</a>
-    <img src="assets/psdl-wordmark-white.png" alt="Park Slope Dart League"
-         style="margin-top:40px; width:150px; max-width:60%; height:auto; opacity:0.75;">
-  </div>
-"""
-    write("rare-hit.html", C.page("PSDL All Star — Rare hit", body, "all-stars"))
-    return hit
-
-
 # ---------------------------------------------------------------- output
 
 _written = []
@@ -785,10 +742,11 @@ def main():
 
     (OUT / "app.css").write_text(tokens.stylesheet(), encoding="utf-8")
     shutil.copy(ROOT / "site" / "app.js", OUT / "app.js")
-    shutil.copytree(ROOT / "design" / "assets", OUT / "assets")
+    (OUT / "assets").mkdir()
+    for asset in SHIPPED_ASSETS:
+        shutil.copy(ROOT / "design" / "assets" / asset, OUT / "assets" / asset)
 
-    rare = build_rare_hit(season)
-    build_all_stars(season, table, divs, rare)
+    build_all_stars(season, table, divs)
     build_players(season, table, form)
     build_schedule(season, divs)
     build_teams(season, table, form)
@@ -817,8 +775,6 @@ def main():
           f"{len([r for r in _written if r.startswith('award/')])} awards")
     upcoming = [f for night in season["fixtures"] for f in night["fixtures"] if "bye" not in f]
     print(f"  schedule: {len(upcoming)} upcoming matches over {len(season['fixtures'])} nights")
-    if rare:
-        print(f"  rare-hit screen: {rare['player']}'s {rare['display']}")
     return 0
 
 

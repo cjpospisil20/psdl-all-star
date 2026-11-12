@@ -67,7 +67,8 @@ background knocked out. It is used **unaltered**. Because its outline and laurel
 it always sits on a **white circular plate** (42px in the main header, 32px elsewhere).
 
 `design/assets/psdl-wordmark-white.png` is the wordmark reversed to white for dark grounds —
-the original letterforms, colour flipped. Used once, at the foot of the rare-hit screen.
+the original letterforms, colour flipped. Its only page, the first-180 screen, was retired on
+2026-11-12, so it is kept here but not shipped (`build.SHIPPED_ASSETS`).
 
 ## Layout
 
@@ -127,17 +128,18 @@ red, no animation.
 1. **Never rebuild the 29-column spreadsheet.** Measured over one real week: 68 of 104 scoring
    players had hits in exactly **one** category; the most anyone reached was four. Show a
    player's actual hits as chips, never a row of zeroes.
-2. **Never compare players across divisions.** Division 1 scores ~2.5× Division 5. Rank within
-   division only. Say so on screen where it could be misread. **Exceptions:** the Largest Checkout
-   and Largest Check-In awards are league-wide by rule; the award pages note this explicitly. And
-   the All-Stars **ALL** board, added at the owner's request (2026-11-11), numbers every player
-   league-wide — with no leader card and no gold top three, each row naming its division, and the
-   2.5× gap stated on screen.
+2. **Never compare players across divisions.** Division 1 scores far more than Division 5. Rank
+   within division only. Say so on screen where it could be misread. **Exceptions:** the Largest
+   Checkout and Largest Check-In awards are league-wide by rule; the award pages note this
+   explicitly. And the All-Stars **ALL** board, added at the owner's request (2026-11-11), numbers
+   every player league-wide — with no leader card and no gold top three, each row naming its
+   division. Do not quote a ratio between divisions on screen: the old "2.5× Division 5" caption
+   was a week-1 figure and was removed at the owner's request (2026-11-12).
 3. **Every number is traceable.** Each hit links to the DartConnect recap of the exact turn
    behind it. This is what convinces a sceptical captain that an automated number is right.
    The mockups link to `https://recap.dartconnect.com/` as a stand-in.
-4. **Rare achievements should feel like achievements** — hence the gold chips and the
-   dedicated 180 screen.
+4. **Rare achievements should feel like achievements** — hence the gold chips, and the Feed and
+   Awards cards that celebrate them. (A dedicated first-180 screen did this until 2026-11-12.)
 5. **Names are long, quoted and inconsistently spaced** (`Anaelechi "Lay" Owunwanne`,
    `Colin  Ratner` with a double space). They come from DartConnect as-is. Never truncate to
    the point of ambiguity — wrap instead.
@@ -163,7 +165,7 @@ point — the old system's real failure was that nobody looked at it.
 | `design/player.html` | One player: DartConnect form stats, then all-star points and every hit. |
 | `design/match.html` | **Retired 2026-11-11.** One match night, both teams, every hit linking to its turn. The Match tab became the Schedule (upcoming home v away fixtures, no all-star points), which has no mockup; `site/build.py` `build_schedule()` is its reference. |
 | `design/team.html` | Captain's roll-up of their players. Opened by tapping a team on Standings; lists the whole roster with GP (league nights played) and singles averages, and a gold check mark (inline SVG, never a glyph) after the name of each playoff-eligible player. |
-| `design/rare-hit.html` | The celebration screen for a 180 / R9 / C6. |
+| `design/rare-hit.html` | **Retired 2026-11-12.** The celebration screen for the season's first 180 / R9 / C6. The owner removed it: the Feed and Awards celebrate those hits now. |
 
 ## Data in the mockups — what's real and what isn't
 

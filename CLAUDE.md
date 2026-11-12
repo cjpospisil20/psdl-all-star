@@ -74,13 +74,15 @@ open public/index.html
    **`site/tokens.py`** — never hardcode a hex in `build.py` or `components.py`.
 2. **The logo is used unaltered**, on a white circular plate (its outline is near-black and
    would vanish on the dark ground).
-3. **Never rank players across divisions.** Division 1 scores ~2.5× Division 5.
+3. **Never rank players across divisions.** Division 1 scores far more than Division 5.
    **Exceptions, both deliberate:** the Largest Checkout and Largest Check-In awards rank across
    divisions because the league awards them league-wide (the award pages say so); and the
    All-Stars **ALL** board (`all.html`, `players.league_table`) numbers every scoring player
    league-wide because the owner asked for it (2026-11-11). That board crowns nobody — no leader
-   card, no gold top three — names each player's division on every row, and states the 2.5× gap
-   on screen. Every other page still ranks within division only.
+   card, no gold top three — names each player's division on every row, and says a league rank
+   reflects the division as much as the player. Every other page still ranks within division only.
+   The old "Division 1 scores roughly 2.5× Division 5" caption is gone at the owner's request
+   (2026-11-12) — it was a week-1 figure — and `check.py` fails any page that brings it back.
 4. **Never render an empty stat column.** The median player has hits in exactly one category.
    Show the hits they actually have, as chips (`components.chips_for`).
 5. **Every number links to its DartConnect turn** (`components.recap_link`). Traceability is the
@@ -154,11 +156,12 @@ Out of scope: login/accounts, score entry, live in-match updates, historical sea
 ## Where things stand
 
 The site is **live** at <https://psdartleague.com/>, rebuilt weekly by
-`.github/workflows/build.yml`. `site/build.py` generates **300 pages** from 9 archived match nights —
+`.github/workflows/build.yml`. `site/build.py` generates **299 pages** from 9 archived match nights —
 244 player pages, 31 team pages, 5 division leaderboards + the ALL board, 5 standings pages,
-1 awards index, 7 award detail pages, the schedule, the feed, the rare-hit screen, and three
-aliases: `index.html` / `standings.html` (Division 1) and `matches.html` (the schedule, so links to
-the old Match tab still work) — and `scraper/verify.py` and `site/check.py` both pass.
+1 awards index, 7 award detail pages, the schedule, the feed, and three aliases: `index.html` /
+`standings.html` (Division 1) and `matches.html` (the schedule, so links to the old Match tab still
+work) — and `scraper/verify.py` and `site/check.py` both pass. The first-180 celebration screen
+(`rare-hit.html`) was retired on 2026-11-12: the Feed and Awards celebrate 180s now.
 
 The bottom tab bar is Standings · All-Stars · Schedule · Feed · Awards. The Schedule tab
 (2026-11-11) replaced the Match tab and its 131 per-match pages: it lists every match night still to
