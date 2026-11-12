@@ -1,7 +1,10 @@
 # PSDL All Star Points
 
 A static site that publishes **All Star Points** and the **league standings** for the
-Park Slope Dart League — a Brooklyn pub darts league that plays Tuesday nights.
+Park Slope Dart League — a Brooklyn pub darts league that plays two nights, Monday and
+Tuesday, each its own league on DartConnect. Standings and the schedule show one night at a
+time; the All-Stars boards go back through every season since Fall 2025, with an All Time list;
+Awards and the news feed cover both nights together.
 
 All Star Points reward throws of significance (95+ in 01, big cricket rounds, 180s,
 9-marks). Section F of the PSDL rulebook defines them; at season's end each division

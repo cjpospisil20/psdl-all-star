@@ -1,7 +1,7 @@
 name: Build and deploy
 
 # Three ways in:
-#   schedule          - the weekly refresh, after Tuesday-night matches
+#   schedule          - the morning after each league's match night (Monday and Tuesday)
 #   workflow_dispatch - a volunteer can force a rebuild from the Actions tab
 #   push              - republish straight away when code or archived data changes
 on:
@@ -19,6 +19,10 @@ on:
     # Either way: the small hours of Wednesday morning in Brooklyn. Hours after
     # the last dart, and finished long before anyone opens the site over coffee.
     - cron: "17 7 * * 3"
+    # The Monday league (2026-11-12): the same hour on Tuesday morning publishes Monday night's
+    # results the next day instead of waiting for Wednesday. Monday's last boards finish late
+    # evening New York time too, so 07:17 UTC is hours after the last dart.
+    - cron: "17 7 * * 2"
     # Catch-up pass, Thursday at the same hour. GitHub delays and sometimes
     # silently drops scheduled runs when its queues are busy, and fetch.py skips
     # every match it has already archived - so this second pass normally does
