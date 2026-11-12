@@ -147,17 +147,18 @@ def check_links(pages):
     check("every <img src> resolves to a file", not missing_img, str(missing_img[:3]))
     check("every <img> has non-empty alt text", not no_alt, str(no_alt[:3]))
 
-    # Every file shipped should be reachable. DESIGN-SPEC ("The logo") says the reversed
-    # wordmark is used once, at the foot of the rare-hit screen -- if it ships unreferenced,
-    # either that screen lost it or the asset should not be copied.
+    # Every file shipped should be reachable. The reversed wordmark lost its only page when the
+    # first-180 screen was retired (2026-11-12); build.SHIPPED_ASSETS stopped copying it, and
+    # this is what would notice if it came back unreferenced.
     everything = "".join(pages.values())
     orphans = [str(p.relative_to(OUT)) for p in OUT.rglob("*")
                if p.is_file() and p.suffix in (".png", ".jpg", ".svg", ".css", ".js")
                and p.name not in everything]
     check("no unreferenced asset shipped", not orphans, str(orphans))
-    if "rare-hit.html" in pages:
-        check("rare-hit screen shows the reversed wordmark (DESIGN-SPEC)",
-              "psdl-wordmark-white.png" in pages["rare-hit.html"], "not referenced")
+    # The owner retired the first-180 celebration screen: the Feed and Awards carry 180s now.
+    stale = [n for n, m in pages.items() if "rare-hit.html" in m]
+    check("the retired first-180 screen is gone and nothing links it",
+          "rare-hit.html" not in pages and not stale, str(stale[:3]))
 
 
 # ---------------------------------------------------------------- 2. placeholder leakage
@@ -293,8 +294,8 @@ def check_colour(pages, css):
         for bg in candidates:
             pairs.setdefault((fg, bg), []).append(f"{selector} on {where}")
 
-    # Inline colours in the markup (the rare-hit screen sets a few). They sit inside .app, so
-    # they are judged against the same arbitrary-content panels.
+    # Inline colours in the markup, should a page ever set one. They sit inside .app, so they are
+    # judged against the same arbitrary-content panels.
     for name, markup in pages.items():
         for style in re.findall(r'style="([^"]*)"', markup):
             for value in re.findall(r"(?<!-)color:\s*([^;\"]+)", style):
@@ -848,7 +849,8 @@ def check_navigation(pages):
               not re.search(r'class="row-rank[^"]*\btop\b', board))
         silent = [r[:60] for r in rows if not re.search(r'<small class="name">Division \d', r)]
         check("every ALL board row names its division", not silent, str(silent[:2]))
-        check("the ALL board states the Division 1 vs Division 5 gap", "2.5&times;" in board)
+        check("the ALL board warns that a league rank reflects the division",
+              "says as much about a player&rsquo;s division" in board)
         ranks = [int(n) for n in re.findall(r'<span class="row-rank[^"]*">(\d+)</span>', board)]
         check("the ALL board is numbered 1..N", ranks == list(range(1, len(rows) + 1)),
               f"{len(ranks)} ranks for {len(rows)} rows")
@@ -856,6 +858,10 @@ def check_navigation(pages):
                   re.findall(r'<span class="row-pts">\s*<b class="num">([\d,]+)</b>', board)]
         check("the ALL board runs highest points first",
               len(points) == len(rows) and points == sorted(points, reverse=True))
+    # The owner dropped the "Division 1 scores roughly 2.5x Division 5" caption (2026-11-12): it
+    # was a week-1 figure, and the season has drifted from it.
+    ratio = [n for n, m in site.items() if re.search(r"2\.5\s*(?:&times;|×|x\b)", m)]
+    check("no page quotes the retired 2.5x division gap", not ratio, str(ratio[:3]))
     boards = [n for n in site if re.fullmatch(r"index\.html|division-\d\.html", n)]
     no_chip = [n for n in boards if 'href="all.html"' not in site[n]]
     check("every division board offers the ALL chip", not no_chip, str(no_chip))

@@ -120,19 +120,6 @@ def divisions(season):
     return sorted(seen)
 
 
-def first_rare_hit(hits):
-    """The season's first genuinely rare moment -- a 180, a nine-mark round, a six-cork turn.
-
-    Drives the celebration screen. Ordered by date then by the order hits were scored, so
-    "first of the season" means what a player would mean by it.
-    """
-    headline = ("180", "R9", "C6")
-    candidates = [h for h in hits if h["display"] in headline]
-    if not candidates:
-        return None
-    return sorted(candidates, key=lambda h: (h["date"] or "", headline.index(h["display"])))[0]
-
-
 def team_table(season, team_name):
     """A captain's roll-up: who scored, with each player's rank inside their division."""
     table = players.division_table(season["hits"], season["weeks_by_player"])

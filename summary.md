@@ -3,10 +3,10 @@
 > **Living document.** Update this at the end of any working session. It is the handoff file for
 > future agent sessions — read it first, before exploring the code.
 
-**Last updated:** 2026-11-11
+**Last updated:** 2026-11-12
 **Owner:** cjpospisil20@gmail.com
 **Status:** Live at <https://psdartleague.com/>, rebuilt weekly by GitHub
-Actions — 300 static pages from 131 archived matches (9 match nights), plus the Schedule of every
+Actions — 299 static pages from 134 archived matches (9 match nights), plus the Schedule of every
 match night still to come. Not yet reconciled with the commissioners. ROADMAP Steps 1–2 complete;
 Step 15's domain and HTTPS done early; part of Step 10 (the Schedule) done early.
 
@@ -814,3 +814,28 @@ posts every R9 and no R8. Each was proved by letting the R8s back in on a scratc
 breaks were caught. `verify.py`, `build.py` (still 300 pages) and `check.py` all pass. Against the
 previous build only `awards.html` and `feed.html` changed, plus `award/r8-plus.html` → `award/r9.html`.
 Both pages were checked in headless Chrome at phone width.
+
+### 2026-11-12 — The first-180 screen and the 2.5× caption are retired
+
+At the owner's request, the first of four PRs from one planning session (the others: the
+season-scoped archive, the All-Stars season history, and both nights on Standings, Schedule,
+Awards and Feed — see the entries that follow).
+
+- **The first-180 screen is gone.** `rare-hit.html` celebrated the season's first 180 / R9 / C6 and
+  was reached only from a gold banner on that player's division board. The owner retired it: the
+  Feed and Awards celebrate those hits now. `build_rare_hit`, the banner and
+  `events.first_rare_hit` are deleted. The reversed wordmark was used only on that screen, so it
+  stays in `design/assets/` but is no longer shipped — `build.SHIPPED_ASSETS` lists what is, and
+  check.py's unreferenced-asset check would fail a build that shipped it unused.
+- **"Division 1 scores roughly 2.5× Division 5" is gone from every page** (the division boards,
+  the ALL board, every player page). It was a week-1 figure; by week 9 the season-to-date gap was
+  nearer 3.2× (mean points per scoring player, 1,543 v 487). The ALL board keeps a ratio-free
+  warning that a league rank reflects the division as much as the player.
+- check.py: the rare-hit wordmark check is replaced by one that the retired screen is gone and
+  nothing links it; the ALL board's `2.5&times;` check now asserts the ratio-free warning, and a
+  new site-wide check fails any page that quotes the 2.5× figure again.
+
+**Verified:** `verify.py`, `build.py` (299 pages) and `check.py` pass. Against the previous build
+only the five division boards (and `index.html`), `all.html` and the 244 player pages changed — each
+by exactly the caption, plus the banner on Division 3 — and `rare-hit.html` and the wordmark are
+gone.
