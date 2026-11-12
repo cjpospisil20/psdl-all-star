@@ -27,6 +27,23 @@ def clean_name(name):
     return re.sub(r'"{2,}', '"', name.strip())
 
 
+def identity(name):
+    """Who a DartConnect name is, for joining one player's seasons and nights together.
+
+    DartConnect keeps a separate player record per league, and eight players' Monday and Tuesday
+    records (or two seasons of one) differ only in spacing, punctuation or capitals:
+    'Johnny  Colonna' / 'Johnny Colonna', 'Jamell St Thomas' / 'Jamell  St. Thomas',
+    'Angelo Oddo' / 'Angelo Oddo |||', 'Zach Desantis-Salavarria' / 'Zach DeSantis-Salavarria'.
+    The owner decided (2026-11-12) that each is one player.
+
+    This is the whole rule: keep only letters and digits, and ignore case. It is NOT an alias map
+    and NOT fuzzy matching -- a name that differs in any letter (a nickname, a misspelling) stays
+    a separate player, as CLAUDE.md data rule 5 requires. Display is untouched: every season still
+    shows the name exactly as DartConnect has it there.
+    """
+    return re.sub(r"[\W_]+", "", name.casefold())
+
+
 def clean_team(name):
     """Team names as DartConnect stores them, minus surrounding whitespace.
 
@@ -362,9 +379,61 @@ def league_table(table):
 
     An exception to "never rank across divisions" that the owner asked for (2026-11-11). The page
     that shows it carries no leader card and no gold top three, names each player's division, and
-    says a league rank reflects the division. Rows are COPIES with an added `league_rank`: their division `rank` is what
-    every other page shows, so it must not change. Same tie order as division_table.
+    says a league rank reflects the division. Rows are COPIES with an added `league_rank`: their
+    division `rank` is what every other page shows, so it must not change. Same tie order as
+    division_table.
     """
     rows = sorted((r for rows in table.values() for r in rows),
                   key=lambda r: (-r["points"], r["player"]))
     return [{**row, "league_rank": i} for i, row in enumerate(rows, 1)]
+
+
+def career_table(seasons, tables):
+    """All Time: one row per player across every season of both nights, highest points first.
+
+    `seasons` in display order (events.load_all) and `tables` their division tables, keyed by
+    season key. The owner asked for it (2026-11-12) as the first option of the All-Stars season
+    picker; like the ALL board it ranks across divisions, so the page crowns nobody and names each
+    player's division.
+
+    Totals come from allstar.aggregate() over every hit -- never by adding up the season rows -- so
+    a career total cannot drift from the hits behind it (CLAUDE.md data rule 3). A player is an
+    identity(): Monday and Tuesday points add up when the two names differ only in spacing,
+    punctuation or capitals, and a name that differs in any letter is another player (data rule 5).
+    The name shown is the one from the player's first season in display order -- the current
+    Tuesday season when they are in it -- and so are the division and team. PPW divides by every
+    round with a hit, in every season; a week with a hit on both nights counts twice.
+    """
+    stats = allstar.aggregate([{**h, "player": identity(h["player"])}
+                               for s in seasons for h in s["hits"]])
+    first, weeks, played = {}, collections.Counter(), collections.defaultdict(list)
+    for s in seasons:
+        rows = {r["player"]: r for rs in tables[s["key"]].values() for r in rs}
+        for player, row in rows.items():
+            who = identity(player)
+            first.setdefault(who, (s, row))
+            if s["key"] not in played[who]:
+                played[who].append(s["key"])
+        for player, rounds in s["weeks_by_player"].items():
+            weeks[identity(player)] += len(rounds)
+
+    out = []
+    for who, counter in stats.items():
+        s, row = first[who]
+        out.append({
+            "player":   row["player"],
+            "identity": who,
+            "team":     row["team"],
+            "division": row["division"],
+            "night":    s["night"],
+            "points":   counter["PTS"],
+            "hits":     counter["AS"],
+            "ppw":      round(counter["PTS"] / weeks[who], 1) if weeks[who] else counter["PTS"],
+            "weeks":    weeks[who],
+            "seasons":  played[who],
+            "counts":   {c: counter[c] for c in allstar.COLUMNS if counter[c]},
+        })
+    out.sort(key=lambda r: (-r["points"], r["player"]))
+    for i, row in enumerate(out, 1):
+        row["league_rank"] = i
+    return out

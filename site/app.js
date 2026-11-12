@@ -7,6 +7,7 @@
      2. long leaderboards collapse to a preview until asked to expand
      3. back links use history.back() when the referrer matches
      4. the schedule: division and team filters, and gilding tonight's matches while they're on
+     5. the season and league pickers close on an outside tap or Escape
 
    Written against the markup build.py emits. No framework, no build step. */
 
@@ -189,5 +190,27 @@
 
     apply();
     remember();
+  }
+
+  /* ---- 5. pickers: close on an outside tap or Escape -------------------- */
+
+  // The season and league pickers are <details> menus of plain links, so they already work with
+  // JavaScript off. All this adds is the dropdown manners a native menu has.
+  var pickers = document.querySelectorAll("details.picker");
+  if (pickers.length) {
+    document.addEventListener("click", function (e) {
+      Array.prototype.forEach.call(pickers, function (p) {
+        if (p.open && !p.contains(e.target)) p.open = false;
+      });
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      Array.prototype.forEach.call(pickers, function (p) {
+        if (!p.open) return;
+        p.open = false;
+        var summary = p.querySelector("summary");
+        if (summary) summary.focus();
+      });
+    });
   }
 })();

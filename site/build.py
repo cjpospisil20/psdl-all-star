@@ -33,6 +33,108 @@ def slug(text):
     return re.sub(r"[^a-z0-9]+", "-", str(text).lower()).strip("-")
 
 
+# ---------------------------------------------------------------- seasons, boards and links
+#
+# The archive holds every season of both nights (events.load_all). The Tuesday league's current
+# season is the "home" season: it keeps the URLs the site has always had (index.html,
+# division-N.html, all.html). Every other season's boards are all-stars-<season key>[-division].html,
+# and All Time is all-stars-all-time.html. Every link and every write goes through these helpers,
+# so a link can never point at a page the build did not write.
+
+ALL_TIME = "all-time"
+
+# Each player's page is one page for every season they have scored in, keyed by players.identity()
+# -- so a player whose Monday and Tuesday names differ only in spacing, punctuation or capitals has
+# one page. Filled by plan_sections() before any page that links a player is built:
+#   SECTIONS  identity -> the season keys of the page's sections, in page order
+#   SPELLING  (identity, season key) -> the name exactly as DartConnect has it that season
+#   PAGE      identity -> the page's file name, from the name in its first section
+SECTIONS, SPELLING, PAGE = {}, {}, {}
+
+RECOMPUTED = (" A finished season is recomputed from DartConnect by this site&rsquo;s rules, so "
+              "its points may differ from what the league awarded at the time.")
+
+
+def is_home(season):
+    """The Tuesday league's current season -- the one the site has always shown."""
+    return bool(season) and season["primary"] and season["current"]
+
+
+def board_href(season, division=None, up=""):
+    """An All-Stars board. `season` None is All Time; `division` None is the season's ALL board,
+    or its only board when it has a single division."""
+    if season is None:
+        return f"{up}all-stars-all-time.html"
+    if is_home(season):
+        return f"{up}{slug(division)}.html" if division else f"{up}all.html"
+    if division is None or len(season["divisions"]) == 1:
+        return f"{up}all-stars-{season['key']}.html"
+    return f"{up}all-stars-{season['key']}-{slug(division)}.html"
+
+
+def player_href(name, key=None, up=""):
+    """A player's page, opened at the section for season `key`. The first section needs no
+    fragment, so every link from the home season stays exactly as it always was."""
+    who = players.identity(name)
+    sections = SECTIONS.get(who) or []
+    fragment = f"#{key}" if key and sections and key != sections[0] else ""
+    return f"{up}player/{PAGE.get(who, slug(name))}.html{fragment}"
+
+
+def season_name(season):
+    return f"{esc(season['label'])} &middot; {season['night']}"
+
+
+def season_status(season):
+    """The status bar: the latest week while a season is live, FINAL once DartConnect closes it."""
+    if season["active"]:
+        return f"WEEK {season['latest_week']} · {events._pretty_date(season['latest_date'])}"
+    return f"{season['label'].upper()} · {season['night'].upper()} · FINAL"
+
+
+def plan_sections(seasons):
+    """Which seasons each player's page has a section for, in display order, and what DartConnect
+    called them in each. One identity under two names in ONE season would be two people or one
+    person twice -- verify.py fails that, and the build refuses to guess which."""
+    SECTIONS.clear(), SPELLING.clear(), PAGE.clear()
+    for s in seasons:
+        for rows in s["table"].values():
+            for row in rows:
+                who = players.identity(row["player"])
+                if (who, s["key"]) in SPELLING:
+                    raise RuntimeError(f"{row['player']!r} and {SPELLING[(who, s['key'])]!r} are "
+                                       f"one player twice in {s['label']} {s['night']}")
+                SPELLING[(who, s["key"])] = row["player"]
+                SECTIONS.setdefault(who, []).append(s["key"])
+                PAGE.setdefault(who, slug(row["player"]))
+
+
+def picker_order(seasons):
+    """The season picker's order: All Time, then each night's seasons, newest first -- Tuesday's
+    first, as the primary league."""
+    league_rank = {league: i for i, (league, _night) in enumerate(events.fetch.LEAGUES)}
+    ordered = sorted(seasons, key=lambda s: s["id"])
+    ordered.sort(key=lambda s: s["start_date"] or "", reverse=True)
+    ordered.sort(key=lambda s: league_rank.get(s["league"], len(league_rank)))
+    return ordered
+
+
+def season_picker(seasons, here, division):
+    """The All-Stars season picker for a board showing `here` (None: All Time) and `division`
+    (None: an ALL board or All Time). Each option keeps the division when the other season has it,
+    and otherwise opens that season's ALL board (or its only board)."""
+    def target(season):
+        if season is here:
+            return board_href(here, division)
+        if season is not None and division in season["divisions"]:
+            return board_href(season, division)
+        return board_href(season)
+
+    options = [("All Time", target(None), here is None)]
+    options += [(season_name(s), target(s), s is here) for s in picker_order(seasons)]
+    return C.picker("SEASON", "Season", here["key"] if here else ALL_TIME, options)
+
+
 # ---------------------------------------------------------------- all-stars
 
 def find_box():
@@ -48,13 +150,29 @@ def show_all_button(label):
             f'{icon("chevron", tokens.COLOURS["gold"], 15)}</button>\n')
 
 
-def build_all_stars(season, table, divisions):
+def build_all_stars(seasons, career):
+    """Every season's boards, then All Time. The season picker on each links them all."""
+    for season in seasons:
+        build_season_boards(season, seasons)
+    build_all_time(seasons, career)
+
+
+def build_season_boards(season, seasons):
+    """One season's boards: one per division, ranked within it, and -- when there is more than
+    one division -- the ALL board. A one-division season (Monday's) is a single board."""
+    table, divisions = season["table"], season["divisions"]
+    several = len(divisions) > 1
+    when = "this week" if season["active"] else "this season"
+    recomputed = "" if season["active"] else RECOMPUTED
+    named = "" if is_home(season) else f", {season['label']} {season['night']}"
+
     def top(current):
-        return [C.header("ALL STAR POINTS"),
-                C.statusbar(f"WEEK {season['latest_week']} · "
-                            f"{events._pretty_date(season['latest_date'])}"),
-                C.division_nav(divisions, current, lambda d: f"{slug(d)}.html",
-                               all_href="all.html")]
+        parts = [C.header("ALL STAR POINTS"), C.statusbar(season_status(season)),
+                 season_picker(seasons, season, current)]
+        if several:
+            parts.append(C.division_nav(divisions, current, lambda d: board_href(season, d),
+                                        all_href=board_href(season)))
+        return parts
 
     for division in divisions:
         rows = table.get(division, [])
@@ -62,7 +180,7 @@ def build_all_stars(season, table, divisions):
 
         body.append(f"""  <div class="headline">
     <span><h1>{esc(division.upper())}</h1>
-    <p>{len(rows)} player{'s' if len(rows) != 1 else ''} on the board this week</p></span>
+    <p>{len(rows)} player{'s' if len(rows) != 1 else ''} on the board {when}</p></span>
     <span class="note">RANKED WITHIN<br>DIVISION ONLY</span>
   </div>
 """)
@@ -70,53 +188,93 @@ def build_all_stars(season, table, divisions):
 
         for row in rows:
             if row["rank"] == 1:
-                body.append(leader_card(row))
+                body.append(leader_card(row, key=season["key"]))
             else:
-                body.append(player_row(row, extra=row["rank"] > PREVIEW_ROWS))
+                body.append(player_row(row, extra=row["rank"] > PREVIEW_ROWS, key=season["key"]))
             if ALL_STAR_CUT and row["rank"] == ALL_STAR_CUT:
                 body.append('  <div class="cutline"><b>ALL STAR CUT LINE</b><i></i></div>\n')
 
         body.append('  <p class="caption" id="no-match" hidden>No player by that name on the '
-                    f'{esc(division)} board this week.</p>\n')
+                    f'{esc(division)} board {when}.</p>\n')
         if len(rows) > PREVIEW_ROWS:
             body.append(show_all_button(f"SHOW ALL {len(rows)} IN {esc(division.upper())}"))
 
-        body.append('  <p class="caption">This board ranks players against their own division '
-                    'only. Tap any player to see the turns behind the number.</p>\n')
+        ranked = ("This board ranks players against their own division only. " if several
+                  else "")
+        body.append(f'  <p class="caption">{ranked}Tap any player to see the turns behind the '
+                    f'number.{recomputed}</p>\n')
 
-        page = C.page(f"PSDL All Star — {division}", "".join(body), "all-stars")
-        write(f"{slug(division)}.html", page)
-        if division == divisions[0]:
+        page = C.page(f"PSDL All Star — {division}{named}", "".join(body), "all-stars")
+        write(board_href(season, division), page)
+        if is_home(season) and division == divisions[0]:
             write("index.html", page)
 
-    # The ALL board: the one place players are ranked across divisions, because the owner asked
-    # for it. So it crowns nobody -- no leader card, no gold top three -- and every row names its
-    # division, so a Division 1 total is never mistaken for a Division 5 one.
+    if not several:
+        return
+
+    # The ALL board: the one place a season's players are ranked across divisions, because the
+    # owner asked for it. So it crowns nobody -- no leader card, no gold top three -- and every
+    # row names its division, so a Division 1 total is never mistaken for a Division 5 one.
     everyone = players.league_table(table)
     body = top(None)
     body.append(f"""  <div class="headline">
     <span><h1>ALL DIVISIONS</h1>
-    <p>{len(everyone)} player{'s' if len(everyone) != 1 else ''} on the board this week</p></span>
+    <p>{len(everyone)} player{'s' if len(everyone) != 1 else ''} on the board {when}</p></span>
     <span class="note">RANKED ACROSS<br>ALL DIVISIONS</span>
   </div>
 """)
     body.append(find_box())
     for row in everyone:
         body.append(player_row(row, extra=row["league_rank"] > PREVIEW_ROWS,
-                               rank="league", division=True))
+                               rank="league", division=True, key=season["key"]))
     body.append('  <p class="caption" id="no-match" hidden>No player by that name on the '
-                'board this week.</p>\n')
+                f'board {when}.</p>\n')
     if len(everyone) > PREVIEW_ROWS:
         body.append(show_all_button(f"SHOW ALL {len(everyone)} PLAYERS"))
     body.append('  <p class="caption">Every division on one board, highest points first. '
                 'A league rank says as much about a player&rsquo;s division as about the player '
                 '&mdash; pick a division above to compare like with like. Tap any player to see '
-                'the turns behind the number.</p>\n')
-    write("all.html", C.page("PSDL All Star — All divisions", "".join(body), "all-stars"))
+                f'the turns behind the number.{recomputed}</p>\n')
+    write(board_href(season), C.page(f"PSDL All Star — All divisions{named}", "".join(body),
+                                     "all-stars"))
 
 
-def leader_card(row, up=""):
-    return f"""  <a class="leader" href="{up}player/{slug(row['player'])}.html"
+def build_all_time(seasons, career):
+    """All Time: every player's points from every season of both nights, on one list.
+
+    Asked for by the owner (2026-11-12) as the first option of the season picker. Like the ALL
+    board it ranks across divisions -- and across seasons and nights -- so it crowns nobody, names
+    each player's division, and says so. It has no division chips: divisions change from season
+    to season and players move between them, so "all-time Division 1" has no single meaning.
+    """
+    since = min(seasons, key=lambda s: (s["start_date"] or "", s["id"]))["label"]
+    body = [C.header("ALL STAR POINTS"),
+            C.statusbar(f"ALL TIME · SINCE {since.upper()}"),
+            season_picker(seasons, None, None),
+            f"""  <div class="headline">
+    <span><h1>ALL TIME</h1>
+    <p>{len(career)} player{'s' if len(career) != 1 else ''} since {esc(since)}, both nights</p></span>
+    <span class="note">ALL SEASONS<br>BOTH NIGHTS</span>
+  </div>
+""", find_box()]
+    for row in career:
+        body.append(player_row(row, extra=row["league_rank"] > PREVIEW_ROWS,
+                               rank="league", division=True))
+    body.append('  <p class="caption" id="no-match" hidden>No player by that name on the '
+                'All Time list.</p>\n')
+    if len(career) > PREVIEW_ROWS:
+        body.append(show_all_button(f"SHOW ALL {len(career)} PLAYERS"))
+    body.append(f'  <p class="caption">Every season since {esc(since)}, Monday and Tuesday nights '
+                'together, highest points first. A player&rsquo;s points from both nights count '
+                'together, under the name DartConnect has for them. A rank here says as much about '
+                'a player&rsquo;s division as about the player &mdash; pick a season above to '
+                f'compare a division like with like.{RECOMPUTED} Tap any player to see the turns '
+                'behind the number.</p>\n')
+    write(board_href(None), C.page("PSDL All Star — All Time", "".join(body), "all-stars"))
+
+
+def leader_card(row, up="", key=None):
+    return f"""  <a class="leader" href="{player_href(row['player'], key, up)}"
      data-row="{esc(row['player'])} {esc(row['team'])}">
     <span class="leader-top">
       <span class="leader-rank num">{row['rank']}</span>
@@ -134,13 +292,15 @@ def leader_card(row, up=""):
 """
 
 
-def player_row(row, extra=False, up="", rank="division", division=False):
+def player_row(row, extra=False, up="", rank="division", division=False, key=None):
     """One leaderboard row.
 
     rank      what fills the rank column: "division" (the default; the top three are gold),
-              "league" (the ALL board -- never gold, it crowns nobody league-wide), or None to
+              "league" (the ALL board and All Time -- never gold, they crown nobody), or None to
               drop the column (the Awards index, where every row is a division leader).
     division  name the division beside the team, on any list that mixes divisions.
+    key       the season the row is from, so the link opens that season's section of the
+              player's page. None (All Time) opens the top of it.
     """
     rank_html = ""
     if rank == "division":
@@ -150,7 +310,7 @@ def player_row(row, extra=False, up="", rank="division", division=False):
         rank_html = f'\n    <span class="row-rank num wide">{row["league_rank"]}</span>'
     where = (f"{esc(row['division'])} &middot; {esc(row['team'])}" if division
              else esc(row["team"]))
-    return f"""  <a class="row" href="{up}player/{slug(row['player'])}.html"
+    return f"""  <a class="row" href="{player_href(row['player'], key, up)}"
      data-row="{esc(row['player'])} {esc(row['team'])}"{' data-extra' if extra else ''}>{rank_html}
     <span class="row-main">
       <b class="name">{esc(row['player'])}</b>
@@ -167,23 +327,52 @@ def player_row(row, extra=False, up="", rank="division", division=False):
 
 # ---------------------------------------------------------------- player
 
-def build_players(season, table, form):
-    by_player = collections.defaultdict(list)
-    for h in season["hits"]:
-        by_player[h["player"]].append(h)
+def build_players(seasons, career):
+    """One page per player with an all star hit in any season of either night -- a player being
+    a players.identity(), so names that differ only in spacing, punctuation or capitals share it.
 
-    rows = {r["player"]: r for rs in table.values() for r in rs}
-    for name, row in rows.items():
-        hits = sorted(by_player[name], key=lambda h: -h["points"])
-        nights = len(season["nights_by_player"].get(name, ()))
-        write(f"player/{slug(name)}.html", player_page(name, row, hits, form.get(name, {}), nights))
+    The page has a section per season (plan_sections), in display order: the current Tuesday
+    season first when the player is in it, so every link from the home season needs no fragment.
+    """
+    rows = {s["key"]: {r["player"]: r for rs in s["table"].values() for r in rs} for s in seasons}
+    hits = collections.defaultdict(list)
+    for s in seasons:
+        for h in s["hits"]:
+            hits[(h["player"], s["key"])].append(h)
+    by_key = {s["key"]: s for s in seasons}
+    forms = {s["key"]: players.form_stats(s["recaps"]) for s in seasons}
+    totals = {r["identity"]: r for r in career}
+    since = min(seasons, key=lambda s: (s["start_date"] or "", s["id"]))["label"]
+
+    for who, keys in SECTIONS.items():
+        spelt = [SPELLING[(who, k)] for k in keys]
+        sections = [(by_key[k], rows[k][name], sorted(hits[(name, k)], key=lambda h: -h["points"]))
+                    for k, name in zip(keys, spelt)]
+        form = forms[keys[0]].get(spelt[0], {})
+        write(f"player/{PAGE[who]}.html",
+              player_page(spelt[0], sections, form, totals[who], since))
 
 
-def player_page(name, row, hits, form, nights):
-    """`nights` is league nights played -- the GP a team page shows, so the two always agree."""
+def player_page(name, sections, form, total, since):
+    """A player's page: every season they have scored in, one section each.
+
+    `sections` is [(season, division-table row, hits)] in display order. The first section opens
+    with the player's form for that season (singles averages, and MATCHES -- league nights played,
+    the GP a team page shows, so the two always agree). Each section after it has the season's
+    points and every hit behind them. A player with two or more seasons also gets an ALL TIME card.
+
+    A player whose only section is the current Tuesday season gets the page they always had.
+    """
+    season, row, _hits = sections[0]
+    named = len(sections) > 1 or not is_home(season)
     back_label = f"{row['division'].upper()} ALL-STARS"
-    back_href = f"../{slug(row['division'])}.html"
-    back_from = [f"{slug(row['division'])}.html", "index.html"]
+    back_href = board_href(season, row["division"], up="../")
+    # Every board that links here, so app.js can return to whichever the reader came from.
+    back_from = [board_href(season, row["division"]), "index.html"]
+    for s, r, _h in sections:
+        for page in (board_href(s, r["division"]), board_href(s), board_href(None)):
+            if page not in back_from:
+                back_from.append(page)
     body = [C.subheader(back_label, back_href, back_from, up="../"),
             f"""  <div class="headline"><span>
     <h1 class="name">{esc(name)}</h1>
@@ -191,13 +380,47 @@ def player_page(name, row, hits, form, nights):
   </span></div>
 """]
 
+    if len(sections) > 1:
+        body.append(f"""  <div class="card">
+    <h2>ALL TIME &middot; {len(sections)} SEASONS</h2>
+    <div class="statgrid three">
+      <span class="stat"><b class="num">{total['points']:,}</b><small>POINTS</small></span>
+      <span class="stat"><b class="num">{total['hits']}</b><small>HITS (AS)</small></span>
+      <span class="stat"><b class="num">{total['ppw']:g}</b><small>PPW</small></span>
+    </div>
+    <p class="caption" style="margin:12px 0 0">Monday and Tuesday nights together, every season
+    since {esc(since)}.</p>
+  </div>
+""")
+
+    for i, (season, row, hits) in enumerate(sections):
+        body.append(season_section(name, season, row, hits, form if i == 0 else None, named))
+    return C.page(f"PSDL All Star — {name}", "".join(body), "all-stars", depth=1)
+
+
+def season_section(name, season, row, hits, form, named):
+    """One season of a player's page. `form` only for the first section; `named` heads the
+    section with its season, which every page but a home-season-only one needs."""
+    body = []
+    if named:
+        # A season whose DartConnect name differs from the page's (spacing, punctuation, capitals)
+        # says so, because that season's board shows it under that name.
+        listed = (f" &middot; listed as {esc(row['player'])}" if row["player"] != name else "")
+        body.append(f"""  <div class="headline" id="{season['key']}"><span>
+    <h2 class="section">{esc(season['label'].upper())} &middot; {season['night'].upper()}</h2>
+    <p class="name">{esc(row['division'])} &middot; {esc(row['team'])}{listed}</p>
+  </span></div>
+""")
+    nights = len(season["nights_by_player"].get(name, ()))
     if form:
         def stat(label, value, suffix=""):
             shown = "&mdash;" if value is None else f"{value}{suffix}"
             return f'<span class="stat"><b class="num">{shown}</b><small>{label}</small></span>'
 
+        darts, days = (("THE DARTS &middot; SINGLES, SEASON TO DATE", "THIS SEASON")
+                       if season["active"] else ("THE DARTS &middot; SINGLES", "THE SEASON"))
         body.append(f"""  <div class="card">
-    <h2>THE DARTS &middot; SINGLES, SEASON TO DATE</h2>
+    <h2>{darts}</h2>
     <div class="statgrid">
       {stat("3-DART AVG", form.get("three_dart_avg"))}
       {stat("MARKS PER RD", form.get("mpr"))}
@@ -208,7 +431,7 @@ def player_page(name, row, hits, form, nights):
     </div>
   </div>
   <div class="card">
-    <h2>THIS SEASON</h2>
+    <h2>{days}</h2>
     <div class="statgrid three">
       {stat("MATCHES", nights)}
       {stat("LEGS", form.get("legs"))}
@@ -252,7 +475,7 @@ def player_page(name, row, hits, form, nights):
     <span class="hit-val num">{h['points']}</span>
   </div>
 """)
-    return C.page(f"PSDL All Star — {name}", "".join(body), "all-stars", depth=1)
+    return "".join(body)
 
 
 def ordinal(n):
@@ -382,7 +605,8 @@ def build_teams(season, table, form):
         zero = sorted(p for p in names if p not in scored)
         played = {p: len(season["nights_by_player"].get(p, ())) for p in names}
         write(team_href(team), team_page(team, c["division"], rows, zero, form, played,
-                                         season["season_nights"].get(c["division"])))
+                                         season["season_nights"].get(c["division"]),
+                                         season["key"]))
 
 
 def roster_stats(nights, form):
@@ -415,9 +639,10 @@ def eligible_mark(nights, need):
             f'<span class="vh">, playoff eligible</span></span>')
 
 
-def team_page(team, division, rows, zero, form, played, season_nights):
+def team_page(team, division, rows, zero, form, played, season_nights, key):
     """`played` maps each player on the roster to league nights played; `season_nights` is how
-    many nights each team in the division plays this season, or None if nobody has said."""
+    many nights each team in the division plays this season, or None if nobody has said; `key`
+    is the season, so each name opens that season's section of the player's page."""
     need = players.playoff_minimum(season_nights) if season_nights else None
     total = sum(r["points"] for r in rows)
     hits  = sum(r["hits"] for r in rows)
@@ -435,7 +660,7 @@ def team_page(team, division, rows, zero, form, played, season_nights):
   </div></div>
 """]
     for r in rows:
-        body.append(f"""  <a class="row" href="../player/{slug(r['player'])}.html">
+        body.append(f"""  <a class="row" href="{player_href(r['player'], key, '../')}">
     <span class="row-rank num ordinal">{ordinal(r['rank'])}</span>
     <span class="row-main"><b class="name">{esc(r['player'])}{eligible_mark(played[r['player']], need)}</b>{roster_stats(played[r['player']], form.get(r['player']))}
       <span class="chips">{C.chips_for(r['counts'], allstar.RARE)}</span>
@@ -531,7 +756,7 @@ def award_hit(h, up="", lead="", extra=False):
     """
     return f"""  <div class="hit"{' data-extra' if extra else ''}>{lead}
     <span class="hit-main">
-      <a href="{up}player/{slug(h['player'])}.html"><b class="name">{esc(h['player'])}</b></a>
+      <a href="{player_href(h['player'], h.get('season'), up)}"><b class="name">{esc(h['player'])}</b></a>
       <small class="name">{esc(h.get('team', ''))} &middot; {esc(h.get('division', ''))}</small>
       <small>{esc(h['game'])} &middot; {esc(events._pretty_date(h['date']))} &middot;
       {C.recap_link(h)}</small>
@@ -714,6 +939,10 @@ _written = []
 
 
 def write(relpath, content):
+    """Write one page. A path written twice means two pages collided -- two players or teams whose
+    names slug alike, or two seasons with one key -- and one would silently replace the other."""
+    if relpath in _written:
+        raise RuntimeError(f"{relpath} would be written twice -- two pages share a file name")
     path = OUT / relpath
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -727,18 +956,29 @@ def main():
 
     C.BUILD_DATE = datetime.date.today().isoformat()
 
-    season = events.load_season()
-    if season["missing"]:
-        print(f"  ! {len(season['missing'])} match recaps missing -- run scraper/fetch.py",
-              file=sys.stderr)
+    # Every season of both nights, the Tuesday league's current season first. That one is the
+    # home season: the Schedule, Standings, team pages, Awards and the Feed show it.
+    seasons = events.load_all()
+    season = seasons[0]
+    if not is_home(season):
+        raise RuntimeError(f"expected the Tuesday league's current season first, got "
+                           f"{season['label']} {season['night']}")
+    for s in seasons:
+        if s["missing"]:
+            print(f"  ! {len(s['missing'])} match recaps missing from {s['label']} "
+                  f"{s['night']} -- run scraper/fetch.py", file=sys.stderr)
+        s["table"] = players.division_table(s["hits"], s["weeks_by_player"])
+        s["divisions"] = events.divisions(s)
+    career = players.career_table(seasons, {s["key"]: s["table"] for s in seasons})
+    plan_sections(seasons)
 
     if not season["season_nights"]:
         print("  ! no season length for this season in players.SEASON_NIGHTS -- team pages "
               "show GP without playoff check marks", file=sys.stderr)
 
-    table = players.division_table(season["hits"], season["weeks_by_player"])
+    table = season["table"]
     form  = players.form_stats(season["recaps"])
-    divs  = events.divisions(season)
+    divs  = season["divisions"]
 
     (OUT / "app.css").write_text(tokens.stylesheet(), encoding="utf-8")
     shutil.copy(ROOT / "site" / "app.js", OUT / "app.js")
@@ -746,8 +986,8 @@ def main():
     for asset in SHIPPED_ASSETS:
         shutil.copy(ROOT / "design" / "assets" / asset, OUT / "assets" / asset)
 
-    build_all_stars(season, table, divs)
-    build_players(season, table, form)
+    build_all_stars(seasons, career)
+    build_players(seasons, career)
     build_schedule(season, divs)
     build_teams(season, table, form)
     build_standings(season, divs)
@@ -775,6 +1015,9 @@ def main():
           f"{len([r for r in _written if r.startswith('award/')])} awards")
     upcoming = [f for night in season["fixtures"] for f in night["fixtures"] if "bye" not in f]
     print(f"  schedule: {len(upcoming)} upcoming matches over {len(season['fixtures'])} nights")
+    print(f"  all-stars: {len(seasons)} seasons, "
+          f"{len([r for r in _written if r.startswith('all-stars-')])} past-season and All Time "
+          f"boards, {len(career)} players all time")
     return 0
 
 

@@ -483,18 +483,19 @@ def check_tap_targets(pages, css):
     # a new tappable class is picked up automatically instead of needing a hand-kept list.
     tappable = set()
     for markup in pages.values():
-        for tag in re.findall(r"<(?:a|button)\b[^>]*>", markup):
+        for tag in re.findall(r"<(?:a|button|summary)\b[^>]*>", markup):
             found = re.search(r'class="([^"]*)"', tag)
             if found:
                 tappable.update(found.group(1).split())
     check("found the tappable classes in the output", bool(tappable), "none found")
 
+    # <summary> is a control too: it opens the season and league pickers (2026-11-12).
     def targets_control(selector):
         parts = strip_pseudo(selector).split()
         if not parts:
             return False
         last = parts[-1]
-        if re.fullmatch(r"(a|button|input)(\[[^\]]*\])*", last):
+        if re.fullmatch(r"(a|button|input|summary)(\[[^\]]*\])*", last):
             return True
         return any(cls in tappable for cls in re.findall(r"\.([A-Za-z0-9_-]+)", last))
 
@@ -694,7 +695,8 @@ def check_spec_rules(pages, css):
           str(rules.get(".chip")))
 
     # Never rank across divisions: a leaderboard page must say so on screen.
-    boards = [n for n in pages if re.fullmatch(r"index\.html|division-\d\.html", n)]
+    # Every season's division boards, not only the current one's (season history, 2026-11-12).
+    boards = [n for n, kind in all_stars_boards(pages).items() if kind == "division"]
     check("found the leaderboard pages", len(boards) >= 2, str(boards))
     silent = [n for n in boards if "division" not in pages[n].lower()
               or "only" not in pages[n].lower()]
@@ -795,16 +797,24 @@ def check_navigation(pages):
     check("every team page's back link returns to its own division's standings", not wrong_back,
           str(wrong_back[:3]))
 
-    # The full roster: every player page is listed on exactly one team page, so nobody is left off
-    # a team and nobody is credited to two.
+    # The full roster: every player on the current season's boards is listed on exactly one of
+    # that season's team pages, so nobody is left off a team and nobody is credited to two. (A
+    # player page now covers every season, so a player from a past season alone has a page but
+    # no team page -- team pages are the current season's.)
     listed = collections.Counter()
     for name in teams:
-        listed.update(set(re.findall(r'href="\.\./(player/[^"]+\.html)"', site[name])))
-    player_pages = {n for n in site if n.startswith("player/")}
-    off_roster = sorted(player_pages - set(listed))
+        listed.update(set(re.findall(r'href="\.\./(player/[^"#]+\.html)', site[name])))
+    scorers = set()
+    for name, markup in site.items():
+        if re.fullmatch(r"division-\d+\.html", name):
+            scorers.update(re.findall(r'<a class="(?:row|leader)" href="(player/[^"#]+\.html)',
+                                      markup))
+    off_roster = sorted(scorers - set(listed))
     doubled = sorted(p for p, c in listed.items() if c > 1)
-    check(f"all {len(player_pages)} players appear on exactly one team page",
-          not off_roster and not doubled, f"missing {off_roster[:3]}, on two {doubled[:3]}")
+    strays = sorted(set(listed) - scorers)
+    check(f"all {len(scorers)} of this season's scorers appear on exactly one team page",
+          scorers and not off_roster and not doubled and not strays,
+          f"missing {off_roster[:3]}, on two {doubled[:3]}, not on a board {strays[:3]}")
 
     # ---- GP and the playoff check mark (2026-11-11) ----
     # The caption states the rule; every row must follow it. A page whose caption states no
@@ -865,12 +875,16 @@ def check_navigation(pages):
     boards = [n for n in site if re.fullmatch(r"index\.html|division-\d\.html", n)]
     no_chip = [n for n in boards if 'href="all.html"' not in site[n]]
     check("every division board offers the ALL chip", not no_chip, str(no_chip))
+    # Past seasons too: wherever there are division chips, ALL is one of them.
+    chipless = [n for n, kind in all_stars_boards(site).items()
+                if 'class="divnav"' in site[n] and '<b class="num">ALL</b>' not in site[n]]
+    check("every board with division chips offers ALL", not chipless, str(chipless[:3]))
 
     # ---- the awards index names who holds each award ----
     index = site.get("awards.html", "")
     missing = []
     for name in sorted(n for n in site if n.startswith("award/")):
-        first = re.search(r'href="\.\./(player/[^"]+\.html)"', site[name])
+        first = re.search(r'href="\.\./(player/[^"]+\.html(?:#[^"]*)?)"', site[name])
         if first and f'href="{first.group(1)}"' not in index:
             missing.append(f"{name}: {first.group(1)}")
     check("the awards index names the holder of every award that has one", not missing,
@@ -937,6 +951,147 @@ def check_schedule(pages):
           "in a known division", not wrong, str(wrong[:3]))
 
 
+# ---------------------------------------------------------------- 13. season history
+
+# Every All-Stars board: the current Tuesday season's (index.html is division 1's alias), every
+# other season's (all-stars-<season key>[-<division>].html), and All Time.
+ALL_STARS_BOARD = re.compile(r"index\.html|division-\d+\.html|all\.html|all-stars-[a-z0-9-]+\.html")
+
+
+def all_stars_boards(site):
+    """{page: kind} for every All-Stars board. kind is "division" (ranked within one division --
+    including a one-division season's only board), "all" (a season's ALL board) or "all-time"."""
+    out = {}
+    for name, markup in site.items():
+        if not ALL_STARS_BOARD.fullmatch(name):
+            continue
+        if name == "all-stars-all-time.html":
+            out[name] = "all-time"
+        elif "<h1>ALL DIVISIONS</h1>" in markup:
+            out[name] = "all"
+        else:
+            out[name] = "division"
+    return out
+
+
+def points_on_page(page, fragment=None, all_time=False):
+    """The total a player page shows for one season (the ALL STAR POINTS card at `fragment`, or the
+    first one), or for their career (the ALL TIME card, which only multi-season pages have)."""
+    if all_time and "<h2>ALL TIME" in page:
+        found = re.search(r'<h2>ALL TIME.*?<b class="num">([\d,]+)</b>', page, re.S)
+    else:
+        start = page.find(f'id="{fragment}"') if fragment else 0
+        if start < 0:
+            return None
+        found = re.search(r'<h2>ALL STAR POINTS</h2>.*?<b class="num">([\d,]+)</b>',
+                          page[start:], re.S)
+    return int(found.group(1).replace(",", "")) if found else None
+
+
+def check_season_history(pages):
+    """The All-Stars season picker (2026-11-12): every season of both nights, and All Time."""
+    print("\n13. All-Stars season history -- the picker, every season's boards, All Time")
+    site = {name.replace("\\", "/"): markup for name, markup in pages.items()}
+    boards = all_stars_boards(site)
+    check(f"found {len(boards)} All-Stars boards, All Time among them",
+          "all-stars-all-time.html" in boards and len(boards) > 7)
+
+    # ---- the picker: one per board, a real link per season, the current one the page itself ----
+    lists, wrong = set(), []
+    for name in sorted(boards):
+        markup = site[name]
+        pickers = re.findall(r'<details class="picker"[^>]*>(.*?)</details>', markup, re.S)
+        if len(pickers) != 1:
+            wrong.append(f"{name}: {len(pickers)} pickers")
+            continue
+        nav = re.search(r'<nav aria-label="Season">(.*?)</nav>', pickers[0], re.S)
+        shown = re.search(r"<summary><small>SEASON</small><b>(.*?)</b>", pickers[0])
+        options = re.findall(r'<a href="([^"]+)"( aria-current="page")?>(.*?)</a>',
+                             nav.group(1)) if nav else []
+        current = [(href, text) for href, mark, text in options if mark]
+        if not shown or len(current) != 1:
+            wrong.append(f"{name}: {len(current)} current options")
+            continue
+        href, text = current[0]
+        if site.get(href) != markup:
+            wrong.append(f"{name}: its current option opens {href}")
+        if shown.group(1) != text:
+            wrong.append(f"{name}: shows {shown.group(1)!r} but marks {text!r}")
+        lists.add(tuple(t for _h, _m, t in options))
+    check(f"all {len(boards)} boards have one season picker whose current option is the page",
+          not wrong, str(wrong[:3]))
+    seasons = next(iter(lists)) if len(lists) == 1 else ()
+    check("every board's picker lists the same seasons, All Time first",
+          len(lists) == 1 and len(seasons) >= 3 and seasons[0] == "All Time",
+          f"{len(lists)} different lists")
+    home = re.search(r'<a href="[^"]+" aria-current="page">(.*?)</a>', site.get("index.html", ""))
+    check("the home page shows the current Tuesday season, first after All Time",
+          bool(home) and len(seasons) > 1 and home.group(1) == seasons[1] and "Tuesday" in seasons[1],
+          home.group(1) if home else "no picker")
+
+    # ---- every board that ranks across divisions crowns nobody (CLAUDE.md non-negotiable 3) ----
+    known = {_html.unescape(re.search(r"<h1>(.*?)</h1>", site[n]).group(1)).lower()
+             for n, kind in boards.items() if kind == "division"}
+    for name, kind in sorted(boards.items()):
+        if kind == "division":
+            continue
+        board = site[name]
+        rows = re.findall(r'<a class="row".*?</a>', board, re.S)
+        problems = []
+        if not rows:
+            problems.append("no rows")
+        if 'class="leader"' in board or re.search(r'class="row-rank[^"]*\btop\b', board):
+            problems.append("crowns someone")
+        ranks = [int(n) for n in re.findall(r'<span class="row-rank[^"]*">(\d+)</span>', board)]
+        if ranks != list(range(1, len(rows) + 1)):
+            problems.append("not numbered 1..N")
+        points = [int(p.replace(",", "")) for p in
+                  re.findall(r'<span class="row-pts">\s*<b class="num">([\d,]+)</b>', board)]
+        if len(points) != len(rows) or points != sorted(points, reverse=True):
+            problems.append("not highest points first")
+        unnamed = [r for r in rows
+                   if not (where := re.search(r'<small class="name">(.*?) &middot; ', r))
+                   or _html.unescape(where.group(1)).lower() not in known]
+        if unnamed:
+            problems.append(f"{len(unnamed)} rows without a known division")
+        if "says as much about a player&rsquo;s division" not in board:
+            problems.append("no warning that a rank reflects the division")
+        check(f"{name} crowns nobody, runs 1..N highest first, names every row's division",
+              not problems, "; ".join(problems))
+
+    # ---- a link into a page section lands on it, and every number matches its page ----
+    unresolved = []
+    for name, markup in site.items():
+        here = (OUT / name).parent
+        for path, fragment in re.findall(r'href="([^"#:]+\.html)#([^"]+)"', markup):
+            target = (here / path).resolve().relative_to(OUT.resolve()).as_posix()
+            if f'id="{fragment}"' not in site.get(target, ""):
+                unresolved.append(f"{name} -> {path}#{fragment}")
+    check("every #fragment link lands on an element with that id", not unresolved,
+          str(unresolved[:3]))
+
+    mismatched, compared = [], 0
+    for name, kind in boards.items():
+        for href, shown in re.findall(r'<a class="(?:row|leader)" href="(player/[^"]+)"[^>]*>'
+                                      r'.*?<b class="num">([\d,]+)</b>', site[name], re.S):
+            path, _hash, fragment = href.partition("#")
+            got = points_on_page(site.get(path, ""), fragment or None, all_time=kind == "all-time")
+            compared += 1
+            if got != int(shown.replace(",", "")):
+                mismatched.append(f"{name}: {href} shows {shown}, the page says {got}")
+    check(f"all {compared} board rows show the same total as the player's own page",
+          compared and not mismatched, str(mismatched[:3]))
+
+    # ---- one page per player, every one of them on the All Time list exactly once ----
+    listed = collections.Counter(re.findall(r'<a class="row" href="(player/[^"#]+\.html)',
+                                            site.get("all-stars-all-time.html", "")))
+    player_pages = {n for n in site if n.startswith("player/")}
+    check(f"all {len(player_pages)} player pages are on the All Time list, each exactly once",
+          set(listed) == player_pages and all(c == 1 for c in listed.values()),
+          f"{len(player_pages - set(listed))} missing, "
+          f"{sum(1 for c in listed.values() if c > 1)} twice")
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -970,6 +1125,7 @@ def main():
     check_spec_rules(pages, css)
     check_navigation(pages)
     check_schedule(pages)
+    check_season_history(pages)
 
     print(f"\n{'ALL CHECKS PASSED' if not failures else str(len(failures)) + ' CHECK(S) FAILED'}")
     if failures:

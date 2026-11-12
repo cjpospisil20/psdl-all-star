@@ -166,6 +166,14 @@ def load_season(season_id=None):
     for h in hits:
         h["team"] = h["team"] or teams.get(h["player"])
 
+    # How far the season has got: its latest DartConnect round, and the night most of that round
+    # was played. Not the last date -- Monday's Fall 2026 played a round-7 make-up on Wednesday
+    # 11 Nov, after round 9, and "WEEK 10 · WED 11 NOV" would be wrong twice over.
+    rounds = [(m.get("round_seq") or week_of[date], date) for _div, date, m in entries]
+    latest_week = max((r for r, _date in rounds), default=0)
+    nights = collections.Counter(date for r, date in rounds if r == latest_week)
+    latest_date = max(nights, key=lambda d: (nights[d], d)) if nights else None
+
     # Fixtures exist only for a season DartConnect still calls active. For that season a missing
     # file is an error, as it always was; an archived season simply has none to come.
     fixtures_path = root / "fixtures.json"
@@ -195,8 +203,8 @@ def load_season(season_id=None):
         "teams":      teams,
         "dates":      dates,
         "week_of":    week_of,
-        "latest_week": max(week_of.values()) if week_of else 0,
-        "latest_date": dates[-1] if dates else None,
+        "latest_week": latest_week,
+        "latest_date": latest_date,
         "weeks_by_player": weeks_by_player,
         "hit_nights_by_player": hit_nights_by_player,
         # League nights each player has played (GP), and the nights each team plays this

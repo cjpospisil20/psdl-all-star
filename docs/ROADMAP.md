@@ -266,7 +266,9 @@ streaming guide · announcements · **beta/unofficial banner** · refreshed docs
 **Phase 2:** signup email notification + Turnstile spam protection (needs one small function or
 Cloudflare) · drift check with revision storage for `score_edits` · synthetic rule-test fixtures ·
 forfeit "awaiting credit" flags · replay links on match pages · Supabase Pro · All-Star cut line ·
-season selector + historical backfill (a commissioner decision) · **a commissioner-friendly admin
+~~season selector + historical backfill (a commissioner decision)~~ *(done early, 2026-11-12, at the
+owner's request: the All-Stars season picker with All Time, every season of both nights back to
+Fall 2025)* · **a commissioner-friendly admin
 surface** (§10) · per-venue pages · analytics.
 
 **Future (architected for, not built):** `venue_channels` + auto live-detection · multi-camera ·
