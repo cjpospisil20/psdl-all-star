@@ -41,9 +41,10 @@ AWARDS = [
         "kind":  "many",
     },
     {
-        "key":   "r8-plus",
-        "title": "R8+",
-        "blurb": "Throw 8 or more marks in a single turn of Cricket and you’re in the club.",
+        # Was R8+ until the owner narrowed it to perfect rounds (2026-11-11).
+        "key":   "r9",
+        "title": "R9 Club",
+        "blurb": "Throw a perfect 9 marks in a single turn of Cricket and you’re in the club.",
         "kind":  "many",
     },
     {
@@ -110,11 +111,11 @@ def largest_checkins(hits):
     return _best_per_player(hits, "S90")
 
 
-def club_r8(hits):
-    """Every round of 8+ marks in Cricket."""
+def club_r9(hits):
+    """Every perfect nine-mark round in Cricket. An R8 does not count."""
     return sorted(
-        [h for h in hits if h["code"] in ("R8", "R9")],
-        key=lambda h: (-h["turn_value"], h["date"] or ""),
+        [h for h in hits if h["code"] == "R9"],
+        key=lambda h: (h["date"] or "", h["player"]),
     )
 
 
@@ -134,6 +135,6 @@ def compute_all(hits, table):
         "big-fish":         big_fish(hits),
         "largest-checkout": largest_checkouts(hits),
         "largest-checkin":  largest_checkins(hits),
-        "r8-plus":          club_r8(hits),
+        "r9":               club_r9(hits),
         "c5-plus":          club_c5(hits),
     }

@@ -77,7 +77,7 @@ def generate_events(season):
 
 def _type_order(t):
     order = ["standings-leader", "allstar-leader", "checkin-record",
-             "checkout-record", "180", "171-plus", "r8-plus", "c5-plus", "big-fish"]
+             "checkout-record", "180", "171-plus", "r9", "c5-plus", "big-fish"]
     return order.index(t) if t in order else len(order)
 
 
@@ -116,10 +116,11 @@ def _achievement_events(week_hits, week, date):
                 week, date, division=h["division"], hit=h,
                 link_href=h["recap"], icon_type="chip", icon_name="F90"))
 
-        if h["code"] in ("R8", "R9"):
+        # Perfect rounds only: the feed follows the R9 Club award (owner, 2026-11-11).
+        if h["code"] == "R9":
             marks = h["turn_value"]
             out.append(_event(
-                "r8-plus",
+                "r9",
                 f"{h['player']} throws {marks} marks in a Cricket turn",
                 f"In {h['segment']} on {_pretty(h['date'])}, "
                 f"{h['player']} put up {marks} marks for "

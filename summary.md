@@ -784,3 +784,33 @@ clean with no marks. That Team marks CJ Pospisil (8), Chris Senior (9), Craig Hu
 Hollenberg (9) and Joe Bentham (7), but not Matt Knowlton (4) or Isaac Petroulis-Lessig (5). Every
 Division 1 page states 5 of 12. In Chrome at phone width the mark sits after the name, and at 320px
 it wraps with the last word of a long name; no console errors.
+
+
+### 2026-11-11 — The R8+ award becomes the R9 Club
+
+At the owner's request; not a ROADMAP step. The Awards page's **R8+** section listed every Cricket
+turn of 8 or more marks. It is now the **R9 Club**, for perfect nine-mark rounds only. Asked whether
+the Feed should follow the award, the owner said yes, so the Feed's cricket-round cards are R9-only too.
+
+- `awards.club_r9()` replaces `club_r8()` and keeps `code == "R9"` only, earliest first like the Big
+  Fish. Every entry is worth 9, so value order would mean nothing. The award key is `r9`, so the
+  detail page is now `award/r9.html`. `award/r8-plus.html` is gone, and nothing linked to it: the
+  index never links a club's detail page.
+- Six players leave the list: Dave Bundren, Nick Hudak, Daniel Montoya, Ismael Cruz, Danny Kot and
+  Lulu Bird. Each has an R8 and no R9. Four stay: Sam Masling, Josh Goldberg, Mack Diller and
+  Stuart McCarthy.
+- `feed._achievement_events()` posts R9s only (event type `r9`), so the Feed goes from 63 cards to 57.
+- An R8 is still an all star hit worth 160 points. Leaderboards, player pages and team pages are
+  unchanged.
+
+Gotchas for phone screenshots in headless Chrome. `sips` ignores `--cropOffset` and always crops from
+the centre, so centre the 390px iframe in the window and let the centre crop frame it. Calling
+`scrollIntoView()` inside the iframe also scrolls the parent page, so set the iframe's `scrollTop`
+instead. Wait for `document.fonts.ready` before scrolling, or the 8.5px tab labels sometimes don't
+render.
+
+**Verified:** `verify.py` §8 has two new checks: the R9 Club is exactly the R9 hits, and the feed
+posts every R9 and no R8. Each was proved by letting the R8s back in on a scratch copy, and both
+breaks were caught. `verify.py`, `build.py` (still 300 pages) and `check.py` all pass. Against the
+previous build only `awards.html` and `feed.html` changed, plus `award/r8-plus.html` → `award/r9.html`.
+Both pages were checked in headless Chrome at phone width.
