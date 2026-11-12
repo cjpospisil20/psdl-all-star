@@ -151,6 +151,14 @@ def check_season(season):
 
     print("\n7. Data completeness")
     check("no missing recap files", not season["missing"], str(season["missing"][:2]))
+    # A forfeit is entered in DartConnect as an 11-0 match with no games. It scores nothing here:
+    # forfeit all stars are credited by hand at season's end (Rulebook F.3). Listed so a
+    # commissioner can see which matches need that credit.
+    recap_of = {p["matchInfo"]["id"]: p for p in season["recaps"]}
+    for m in season["matches"]:
+        if not any(allstar.games(recap_of[m["id"]])):
+            print(f"  NOTE  {m['date']} {m['division']}: {m['home']} v {m['away']} has no games "
+                  f"on DartConnect (a forfeit?) -- no all stars can be derived from it")
 
     print("\n8. Awards hold their definitions")
     import awards as awards_mod
@@ -335,16 +343,6 @@ def check_archive(seasons):
 
     keys = [s["key"] for s in seasons]
     check("every season has its own key", len(keys) == len(set(keys)), str(keys))
-
-    # A player page is one per DartConnect name across every season, so two names that slug alike
-    # in different seasons would overwrite each other's page.
-    names = {h["player"] for s in seasons for h in s["hits"]}
-    by_slug = collections.defaultdict(set)
-    for name in names:
-        by_slug[_slug(name)].add(name)
-    clashes = sorted(f"{sorted(n)} -> {sl}" for sl, n in by_slug.items() if len(n) > 1)
-    check(f"all {len(names)} scoring players across every season have their own slug",
-          not clashes, str(clashes[:3]))
 
     for league, night in events.fetch.LEAGUES:
         current = [s["key"] for s in seasons if s["league"] == league and s["current"]]

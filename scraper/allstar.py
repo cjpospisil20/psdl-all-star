@@ -41,8 +41,15 @@ RECAP_URL = "https://recap.dartconnect.com/games/{match_id}"
 
 
 def games(props):
-    """Yield every game in a match recap."""
-    for _set, entries in props["segments"].items():
+    """Yield every game in a match recap.
+
+    `segments` is normally {set number: [games]}. A match recorded with no games at all -- a
+    forfeit entered as 11-0, like Lucky Bastards v Farrell's on 2025-09-30 -- has none, and PHP
+    serialises that empty map as an empty LIST, `[]`. It yields nothing, which is right: forfeit
+    all stars are credited by hand at season's end (Rulebook F.3), never derived.
+    """
+    segments = props.get("segments") or {}
+    for entries in (segments.values() if isinstance(segments, dict) else segments):
         for entry in entries:
             yield from (entry if isinstance(entry, list) else [entry])
 
