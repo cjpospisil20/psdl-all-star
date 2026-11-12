@@ -126,6 +126,31 @@ a:hover {{ color: var(--white); }}
 .statusbar b {{ font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: var(--white); }}
 .statusbar span {{ font-size: 10px; font-weight: 600; letter-spacing: 0.08em; color: var(--gold); }}
 
+/* ---------- picker: the season and league dropdowns ----------
+   A <details> disclosure of real links, so it works with JavaScript off. It opens in the page
+   flow, pushing what is below it down, so nothing ever sits on top of the page. */
+.picker {{ margin: 14px 16px 0; }}
+.picker summary {{
+  list-style: none; display: flex; align-items: center; gap: 9px; min-height: 46px;
+  padding: 0 12px; border-radius: 9px; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--hairline); color: var(--white);
+}}
+.picker summary::-webkit-details-marker {{ display: none; }}
+.picker summary small {{ font-size: 9px; font-weight: 700; letter-spacing: 0.14em;
+                        color: var(--muted); }}
+.picker summary b {{ flex-grow: 1; min-width: 0; font-size: 15px; font-weight: 600;
+                    color: var(--white); }}
+.picker[open] summary svg {{ transform: rotate(180deg); }}
+.picker nav {{ margin-top: 6px; border-radius: 9px; background: var(--surface);
+              border: 1px solid var(--hairline); overflow: hidden; }}
+.picker nav a {{
+  display: flex; align-items: center; min-height: 44px; padding: 0 12px;
+  border-top: 1px solid var(--rule); font-size: 14px; font-weight: 500; color: var(--white);
+}}
+.picker nav a:first-child {{ border-top: 0; }}
+.picker nav a[aria-current] {{ color: var(--gold); font-weight: 700; }}
+.picker + .headline {{ margin-top: 14px; }}
+
 /* ---------- division switcher ---------- */
 .divnav {{ display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
           gap: 6px; padding: 14px 16px 10px; }}

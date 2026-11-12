@@ -153,8 +153,8 @@ The non-negotiables, in short:
 2. The logo is used **unaltered**, on a white circular plate.
 3. **Never rank players across divisions.** Division 1 scores far more than Division 5.
    (Exceptions: the Largest Checkout and Largest Check-In awards are league-wide by rule, and the
-   All-Stars ALL board lists everyone at the owner's request — no leader card, division on every
-   row.)
+   All-Stars ALL boards and All Time list everyone at the owner's request — no leader card,
+   division on every row.)
 4. **Never render an empty stat column.** The median player has hits in exactly one
    category; show the hits they actually have, as chips.
 5. **Every number links to its DartConnect turn.**

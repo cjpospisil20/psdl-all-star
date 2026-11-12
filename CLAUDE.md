@@ -45,7 +45,7 @@ docs/      rulebook, design brief, exports
 |---|---|
 | `scraper/fetch.py` | **The only module that touches the network.** Both leagues (`LEAGUES`: Tuesday `ParkSDL`, Monday `ParkSlopeDLM`). Discovers each league's seasons into `data/seasons.json`; archives each recap to `data/seasons/<id>/recaps/` on first fetch; refreshes a season's `matches.json`, `standings.json` and `fixtures.json` while it is active. |
 | `scraper/allstar.py` | Rules engine — Rulebook Section F applied to turn data. Emits individual hits. |
-| `scraper/players.py` | Player → team, form stats recomputed from turns, the per-division ranked table, nights played (GP) and playoff eligibility (`SEASON_NIGHTS`, `playoff_minimum`). |
+| `scraper/players.py` | Player → team, form stats recomputed from turns, the per-division ranked table, the All Time table (`career_table`), who a name is across seasons (`identity`), nights played (GP) and playoff eligibility (`SEASON_NIGHTS`, `playoff_minimum`). |
 | `scraper/awards.py` | Season-end award data — 171+ Club, Big Fish, largest checkout/check-in, division leaders. Pure functions over hits. |
 | `scraper/events.py` | `load_season(id)` — assembles one season from the archive (no id: the Tuesday league's current season); `load_all()`, `registry()`, `current_id(league)`. The single entry point `site/` uses. |
 | `scraper/fixtures.py` | Match nights still to come, from a season's `fixtures.json` — the Schedule tab. Also New York time (`eastern_offset`, `league_today`). Pure, offline. |
@@ -53,9 +53,9 @@ docs/      rulebook, design brief, exports
 | `scraper/verify.py` | Assertion suite. Run before publishing. |
 | `scraper/standings.py` | Terminal view of the same data the site renders. Debugging aid. |
 | `site/tokens.py` | The palette and type from DESIGN-SPEC, in one place, emitted as `public/app.css`. |
-| `site/components.py` | Shared fragments: page shell, header, sub-header (back links), status bar, division nav, chips, icons, recap links. |
-| `site/app.js` | Progressive enhancement only — search filter, long-table collapse, back-link history, the schedule's filters and live night. |
-| `site/build.py` | Renders all pages into `public/`: leaderboards (five divisions + ALL), players, the schedule, standings, team pages (reached from standings), awards, the feed. |
+| `site/components.py` | Shared fragments: page shell, header, sub-header (back links), status bar, the season/league picker, division nav, chips, icons, recap links. |
+| `site/app.js` | Progressive enhancement only — search filter, long-table collapse, back-link history, the schedule's filters and live night, closing a picker on an outside tap or Escape. |
+| `site/build.py` | Renders all pages into `public/`: every season's All-Stars boards (with the season picker) and All Time, one career page per player, the schedule, standings, team pages (reached from standings), awards, the feed. Every link and write goes through `board_href` / `player_href` / `team_href`. |
 
 Run it:
 
@@ -81,7 +81,10 @@ open public/index.html
    All-Stars **ALL** board (`all.html`, `players.league_table`) numbers every scoring player
    league-wide because the owner asked for it (2026-11-11). That board crowns nobody — no leader
    card, no gold top three — names each player's division on every row, and says a league rank
-   reflects the division as much as the player. Every other page still ranks within division only.
+   reflects the division as much as the player. The same holds for every past season's ALL board,
+   and for **All Time** (`all-stars-all-time.html`, `players.career_table`, 2026-11-12): every
+   season of both nights on one list, with no division chips at all, because divisions change
+   between seasons. Every other page still ranks within division only.
    The old "Division 1 scores roughly 2.5× Division 5" caption is gone at the owner's request
    (2026-11-12) — it was a week-1 figure — and `check.py` fails any page that brings it back.
 4. **Never render an empty stat column.** The median player has hits in exactly one category.
@@ -112,7 +115,13 @@ open public/index.html
 5. **DartConnect names are authoritative as-is.** No alias maps, no fuzzy matching against legacy
    names. Normalise display artifacts only (`players.clean_name`), and note that `Colin  Ratner`'s
    double space is real — preserve it, escape it for display (`components.esc`), wrap rather than
-   truncate a long name.
+   truncate a long name. **One exception, by the owner (2026-11-12):** across seasons and nights, two
+   names that differ only in spacing, punctuation or capitals are one player
+   (`players.identity` — letters and digits, case ignored). DartConnect keeps a separate record per
+   league, and eight people's Monday and Tuesday records differ that way (`Johnny  Colonna` /
+   `Johnny Colonna`, `Angelo Oddo` / `Angelo Oddo |||`). Every page still *shows* each season's
+   name as DartConnect has it; only the player page and All Time join them. A name that differs in
+   any letter — a nickname, a misspelling — stays a separate player.
 6. **Source the team list from standings competitors** (31 teams on Tuesday), never
    `schedule['teams']` (35, the filter dropdown) and never from played matches (30 with only Week 1
    archived — Division 1 has 7 teams, so someone has a bye). Likewise divisions: from standings
@@ -164,17 +173,25 @@ and lets a successful JSON parse decide — **never infer the shape from the hos
 the `data-page` attribute holds the payload** (on the new form it holds the literal string `"app"`,
 so a regex on it still matches and then fails to parse).
 
-Out of scope: login/accounts, score entry, live in-match updates, historical seasons.
+Out of scope: login/accounts, score entry, live in-match updates. Historical seasons came into
+scope on 2026-11-12 — as far back as DartConnect goes (Fall 2025), and no further.
 
 ## Where things stand
 
 The site is **live** at <https://psdartleague.com/>, rebuilt weekly by
-`.github/workflows/build.yml`. `site/build.py` generates **299 pages** from 9 archived match nights —
-244 player pages, 31 team pages, 5 division leaderboards + the ALL board, 5 standings pages,
-1 awards index, 7 award detail pages, the schedule, the feed, and three aliases: `index.html` /
-`standings.html` (Division 1) and `matches.html` (the schedule, so links to the old Match tab still
-work) — and `scraper/verify.py` and `site/check.py` both pass. The first-180 celebration screen
-(`rare-hit.html`) was retired on 2026-11-12: the Feed and Awards celebrate 180s now.
+`.github/workflows/build.yml`. `site/build.py` generates **419 pages** from 519 archived matches
+across six seasons of both nights — 347 player pages (one per player, every season they have
+scored in), 31 team pages, the current Tuesday season's 5 division leaderboards + the ALL board,
+17 boards for the other five seasons and All Time, 5 standings pages, 1 awards index, 7 award detail
+pages, the schedule, the feed, and three aliases: `index.html` / `standings.html` (Division 1) and
+`matches.html` (the schedule, so links to the old Match tab still work) — and `scraper/verify.py`
+and `site/check.py` both pass. The first-180 celebration screen (`rare-hit.html`) was retired on
+2026-11-12: the Feed and Awards celebrate 180s now.
+
+The All-Stars tab has a **season picker** (2026-11-12) above the division chips: All Time, then
+every season of both nights. The home page is still the current Tuesday season's Division 1. A
+past season's boards say FINAL and that they are recomputed by this site's rules; a player page
+covers every season, and a season's board opens that season's section of it.
 
 The bottom tab bar is Standings · All-Stars · Schedule · Feed · Awards. The Schedule tab
 (2026-11-11) replaced the Match tab and its 131 per-match pages: it lists every match night still to

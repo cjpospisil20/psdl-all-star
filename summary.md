@@ -911,3 +911,61 @@ Gotchas, each found by the backfill or by probing DartConnect, each handled:
 **Verified:** `verify.py` passes on all six seasons, the week-1 baseline unchanged. `build.py` and
 `check.py` pass, and the build is byte-identical to the one before this PR — the five older
 seasons cannot leak into today's pages.
+
+### 2026-11-12 — All-Stars season history: the season picker, All Time, career player pages
+
+The third PR, at the owner's request.
+
+- **The season picker** sits above the division chips on every All-Stars board: **All Time**, then
+  Tuesday's seasons, then Monday's, newest first. It is a `<details>` menu of plain links
+  (`components.picker`), so it works with JavaScript off; `app.js` only closes it on an outside tap
+  or Escape and hands focus back. Switching season keeps the division where the other season has
+  one (DIV 3 → Fall 2025's DIV 3), and otherwise opens that season's ALL board or its only board.
+- **Every season has its boards.** The current Tuesday season keeps the URLs it always had
+  (`index.html`, `division-N.html`, `all.html`); the others are `all-stars-<season key>.html` (the
+  ALL board, or the only board of a one-division season like Monday's) and
+  `all-stars-<key>-<division>.html`. `build.board_href` makes every one of those links and writes.
+  A finished season's status bar says `FALL 2025 · TUESDAY · FINAL`, its boards say "this season",
+  and a caption says the points are recomputed by this site's rules (forfeit credits are not in
+  DartConnect). Monday Stage 2's `Monday D1`/`D2` get chips DIV 1 / DIV 2.
+- **All Time** (`all-stars-all-time.html`, `players.career_table`): every player's points from every
+  season of both nights, from `allstar.aggregate()` over the hits (never by adding season rows). One
+  list, no division chips — divisions change between seasons — crowning nobody, each row naming the
+  player's division, as the ALL board does. 347 players since Fall 2025.
+- **Player pages span seasons.** One page per player: an ALL TIME card when they have two or more
+  seasons, then a section per season — the current Tuesday season first, then newest first — each
+  with its points, its rank in its division, and every hit linked to its turn. A past season's board
+  links to its section (`player/x.html#tuesday-fall-2025`); the current Tuesday season's links need no
+  fragment and are unchanged. The 53 current players with no other season kept their page exactly.
+- **One player, spelt two ways.** DartConnect keeps a record per league, and eight people's Monday
+  and Tuesday records (or two seasons of one) differ only in spacing, punctuation or capitals —
+  `Johnny  Colonna` / `Johnny Colonna`, `Angelo Oddo` / `Angelo Oddo |||`, `Jamell St Thomas` /
+  `Jamell  St. Thomas`. The build's new duplicate-write guard caught the first (`morgan-sendek.html`
+  written twice). **The owner decided they are one player each**: `players.identity()` keeps only
+  letters and digits, case ignored. Each season still shows its own spelling, and a player page says
+  "listed as …" where a season's differs. A name that differs in any letter stays separate — there
+  are still pairs like `Cam Green` (Fall 2025) and `Cam "Jiminy" Green` (now).
+- **The status bar counts rounds.** Monday's Fall 2026 played a round-7 make-up on Wednesday 11 Nov,
+  after round 9, so the last *date* gave "WEEK 10 · WED 11 NOV". `latest_week` is now the latest
+  round and `latest_date` the night most of it was played: "WEEK 9 · MON 9 NOV". Tuesday is 1:1, so
+  nothing there changed.
+- `build.write()` now refuses to write a path twice, so a slug collision can never silently
+  replace a page.
+
+Checks. `check.py` §13: every board has exactly one picker whose current option is the page itself
+(byte-compared, which handles the `index.html` alias), the same option list everywhere, All Time
+first, the home page on the current Tuesday season; every board that ranks across divisions crowns
+nobody, runs 1..N, names a known division on every row and carries the warning; every `#fragment`
+lands on an id; **all 1,949 board rows show the same total as the player page's own section**; all
+347 player pages are on All Time exactly once. `<summary>` counts as a tap target; "within division
+only" covers every season's division boards; the roster check is scoped to the current season's
+scorers. `verify.py`: no two names in one season are one player; no two players share a page; All
+Time totals equal their hits and their seasons' totals; the merged spellings are listed as NOTEs.
+
+**Verified:** `verify.py`, `build.py` (419 pages) and `check.py` pass. Against PR 2's build: the
+current Tuesday boards differ only by the inserted picker; `schedule.html`, standings, team pages,
+awards and the feed are byte-identical; 53 player pages differ only in `data-back`. Five deliberate
+breakages — a picker removed, a board total altered, a section id renamed, All Time gilded, a
+player dropped from All Time — were each caught by `check.py`. In Chrome at phone width: DIV 3 →
+Fall 2025 opens Fall 2025's DIV 3; a row opens the player's Fall 2025 section; the picker closes on
+an outside tap and on Escape and returns focus; no console errors.

@@ -137,6 +137,13 @@ def check_season(season):
         player_slugs[s] = r["player"]
     check(f"all {len(player_slugs)} player slugs are unique", not collisions,
           f"{len(collisions)} collision(s): {collisions[:3]}")
+    # Within one season, two names that are one players.identity() would be one person twice
+    # (or two people the site cannot tell apart) -- never something to merge silently.
+    same = collections.defaultdict(set)
+    for r in rows:
+        same[players.identity(r["player"])].add(r["player"])
+    twice = sorted(str(sorted(n)) for n in same.values() if len(n) > 1)
+    check("no two names in this season are one player", not twice, str(twice[:3]))
     team_slugs = {}
     team_collisions = []
     for r in rows:
@@ -343,6 +350,45 @@ def check_archive(seasons):
 
     keys = [s["key"] for s in seasons]
     check("every season has its own key", len(keys) == len(set(keys)), str(keys))
+
+    # A player page spans every season, one per players.identity() (owner, 2026-11-12): names that
+    # differ only in spacing, punctuation or capitals are one player. Two DIFFERENT identities that
+    # slug alike (José / Jose) would overwrite each other's page.
+    names = {h["player"] for s in seasons for h in s["hits"]}
+    spellings = collections.defaultdict(set)
+    for name in names:
+        spellings[players.identity(name)].add(name)
+    pages = collections.defaultdict(set)
+    for who, spelt in spellings.items():
+        pages[_slug(sorted(spelt)[0])].add(who)
+    clashes = sorted(f"{sorted(w)} -> {page}" for page, w in pages.items() if len(w) > 1)
+    check(f"all {len(spellings)} players across every season have a page of their own",
+          not clashes, str(clashes[:3]))
+    for who, spelt in sorted(spellings.items()):
+        if len(spelt) > 1:
+            print(f"  NOTE  one player, spelt {len(spelt)} ways on DartConnect: "
+                  f"{' / '.join(repr(n) for n in sorted(spelt))}")
+
+    # All Time comes from the hits themselves (data rule 3), never from adding up season rows --
+    # but the two must agree.
+    tables = {s["key"]: players.division_table(s["hits"], s["weeks_by_player"]) for s in seasons}
+    career = players.career_table(seasons, tables)
+    season_sum = collections.Counter()
+    for t in tables.values():
+        for rows in t.values():
+            for r in rows:
+                season_sum[players.identity(r["player"])] += r["points"]
+    hit_sum = collections.Counter()
+    for s in seasons:
+        for h in s["hits"]:
+            hit_sum[players.identity(h["player"])] += h["points"]
+    off = [r["player"] for r in career
+           if not r["points"] == season_sum[r["identity"]] == hit_sum[r["identity"]]]
+    check(f"all {len(career)} All Time totals equal their hits, and their seasons' totals",
+          not off and len(career) == len(spellings), f"{len(off)} wrong: {off[:3]}")
+    check("All Time is numbered 1..N, highest points first",
+          [r["league_rank"] for r in career] == list(range(1, len(career) + 1))
+          and all(career[i]["points"] >= career[i + 1]["points"] for i in range(len(career) - 1)))
 
     for league, night in events.fetch.LEAGUES:
         current = [s["key"] for s in seasons if s["league"] == league and s["current"]]

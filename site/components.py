@@ -3,6 +3,7 @@
 Icons are inline stroke SVG, copied from the mockups -- no icon font, no emoji (DESIGN-SPEC).
 """
 import html as _html
+import re
 
 import tokens
 
@@ -102,17 +103,56 @@ def statusbar(left, right="SYNCED FROM DARTCONNECT"):
     return f'  <div class="statusbar"><b>{esc(left)}</b><span>{esc(right)}</span></div>\n'
 
 
+def division_number(division):
+    """The number a division chip shows: "Division 3" -> "3", and Monday's "Monday D1" -> "1".
+
+    A name with no number (Monday's single "PS Monday") is returned whole -- but a one-division
+    league never gets chips at all, so that is only a fallback.
+    """
+    found = re.search(r"(?:Division\s*|\bD)(\d+)$", division)
+    return found.group(1) if found else division
+
+
 def division_nav(divisions, current, url_for, all_href=None):
     out = ['  <nav aria-label="Division" class="divnav">']
     if all_href is not None:
         cur = ' aria-current="page"' if current is None else ""
         out.append(f'    <a href="{all_href}"{cur}><small>&nbsp;</small><b class="num">ALL</b></a>')
     for d in divisions:
-        number = d.replace("Division", "").strip()
         cur = ' aria-current="page"' if d == current else ""
-        out.append(f'    <a href="{url_for(d)}"{cur}><small>DIV</small><b class="num">{esc(number)}</b></a>')
+        out.append(f'    <a href="{url_for(d)}"{cur}><small>DIV</small>'
+                   f'<b class="num">{esc(division_number(d))}</b></a>')
     out.append("  </nav>")
     return "\n".join(out) + "\n"
+
+
+def picker(label, aria_label, scope, options):
+    """A dropdown of real links: the All-Stars season picker, and the league picker on Standings
+    and the Schedule.
+
+    A <details> disclosure, not a <select>, so it works with JavaScript off (non-negotiable #8):
+    the summary opens it, and every option is an ordinary link to a page that already exists.
+    app.js only closes it on an outside tap or Escape.
+
+    options    [(text, href, current)] -- text already escaped. Exactly one is current, and it
+               links to the page it sits on.
+    scope      what the page shows (a season key, "all-time", or a night) -- data-scope lets
+               check.py group pages without re-deriving the data.
+    """
+    shown = next(text for text, _href, current in options if current)
+
+    def link(text, href, current):
+        mark = ' aria-current="page"' if current else ""
+        return f'      <a href="{href}"{mark}>{text}</a>'
+
+    links = "\n".join(link(*option) for option in options)
+    return f"""  <details class="picker" data-scope="{esc(scope)}">
+    <summary><small>{label}</small><b>{shown}</b>{icon("chevron", MUTED, 16)}</summary>
+    <nav aria-label="{aria_label}">
+{links}
+    </nav>
+  </details>
+"""
 
 
 def chip(code, count=1, rare=False):

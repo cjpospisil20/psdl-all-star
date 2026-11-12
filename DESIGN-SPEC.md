@@ -79,7 +79,14 @@ the original letterforms, colour flipped. Its only page, the first-180 screen, w
   same day, with a calendar icon.)
 - Every tappable target is **≥44px**.
 - Icons are inline stroke SVG. No icon fonts, no emoji.
-- Controls are real elements — `<a href>`, `<button>`, `<input>` + `<label>`. Keep it that way.
+- Controls are real elements — `<a href>`, `<button>`, `<input>` + `<label>`, `<details>` +
+  `<summary>`. Keep it that way.
+- **Pickers** (2026-11-12): the All-Stars **season** picker, under the status bar and above the
+  division chips — All Time, then each night's seasons, newest first. It is a `<details>` menu of
+  plain links styled like the search box (46px summary, surface fill, hairline border, a muted
+  chevron that turns over when open; 44px options, the current one in gold). It opens in the page
+  flow rather than over it, and works with JavaScript off; `app.js` only closes it on an outside
+  tap or Escape. Switching season keeps the division where the other season has it.
 
 ---
 
@@ -133,8 +140,13 @@ red, no animation.
    Checkout and Largest Check-In awards are league-wide by rule; the award pages note this
    explicitly. And the All-Stars **ALL** board, added at the owner's request (2026-11-11), numbers
    every player league-wide — with no leader card and no gold top three, each row naming its
-   division. Do not quote a ratio between divisions on screen: the old "2.5× Division 5" caption
-   was a week-1 figure and was removed at the owner's request (2026-11-12).
+   division. The same goes for each past season's ALL board and for **All Time** (2026-11-12, the
+   first option of the season picker), which adds up every season of both nights: no leader card,
+   no gold top three, every row naming a division, and a line saying that a rank there reflects the
+   division as much as the player. All Time has no division chips — divisions change between
+   seasons and players move between them. Do not quote a ratio between divisions on screen: the
+   old "2.5× Division 5" caption was a week-1 figure and was removed at the owner's request
+   (2026-11-12).
 3. **Every number is traceable.** Each hit links to the DartConnect recap of the exact turn
    behind it. This is what convinces a sceptical captain that an automated number is right.
    The mockups link to `https://recap.dartconnect.com/` as a stand-in.
@@ -146,8 +158,10 @@ red, no animation.
 
 ## Out of scope
 
-Login/accounts, score entry (DartConnect handles that at the board), live in-match updates,
-historical seasons. (The Schedule marks tonight's matches live from the clock; it shows no scores.)
+Login/accounts, score entry (DartConnect handles that at the board), live in-match updates.
+(The Schedule marks tonight's matches live from the clock; it shows no scores.) Historical
+seasons came into scope on 2026-11-12, at the owner's request, as far back as DartConnect goes —
+Fall 2025 — and no further: nothing is imported from anywhere else.
 
 ## Tone
 
@@ -161,8 +175,8 @@ point — the old system's real failure was that nobody looked at it.
 | File | What it is |
 |---|---|
 | `design/standings.html` | League standings, straight from DartConnect. Division switcher, one division at a time. |
-| `design/all-stars.html` | All-star points leaderboard by division. The heart of the app. |
-| `design/player.html` | One player: DartConnect form stats, then all-star points and every hit. |
+| `design/all-stars.html` | All-star points leaderboard by division. The heart of the app. Since 2026-11-12 a season picker sits above the division chips (All Time, then every season of both nights); the mockup predates it. |
+| `design/player.html` | One player: DartConnect form stats, then all-star points and every hit. Since 2026-11-12 one page covers every season the player has scored in — an ALL TIME card, then a section per season, newest first — and a past season's board opens its section. |
 | `design/match.html` | **Retired 2026-11-11.** One match night, both teams, every hit linking to its turn. The Match tab became the Schedule (upcoming home v away fixtures, no all-star points), which has no mockup; `site/build.py` `build_schedule()` is its reference. |
 | `design/team.html` | Captain's roll-up of their players. Opened by tapping a team on Standings; lists the whole roster with GP (league nights played) and singles averages, and a gold check mark (inline SVG, never a glyph) after the name of each playoff-eligible player. |
 | `design/rare-hit.html` | **Retired 2026-11-12.** The celebration screen for the season's first 180 / R9 / C6. The owner removed it: the Feed and Awards celebrate those hits now. |
