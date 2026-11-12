@@ -156,6 +156,20 @@ def main():
           len(club) == len(expected_171),
           f"club has {len(club)}, hits have {len(expected_171)}")
 
+    # The R9 Club was R8+ until 2026-11-11; the owner narrowed it, and the feed with it.
+    r9 = award_data["r9"]
+    expected_r9 = [h for h in hits if h["code"] == "R9"]
+    check("R9 Club equals the R9 hits -- no R8",
+          len(r9) == len(expected_r9) and all(h["code"] == "R9" for h in r9),
+          f"club has {len(r9)} {sorted({h['code'] for h in r9})}, hits have {len(expected_r9)}")
+    import feed as feed_mod
+    cricket_cards = [e["hit"]["code"] for e in feed_mod.generate_events(season)
+                     if e["hit"] and e["hit"]["code"] in ("R8", "R9")]
+    check("the feed posts every R9 and no R8",
+          cricket_cards.count("R9") == len(expected_r9) and "R8" not in cricket_cards,
+          f"{cricket_cards.count('R9')} R9 and {cricket_cards.count('R8')} R8 cards, "
+          f"{len(expected_r9)} R9 hits")
+
     fish = award_data["big-fish"]
     bad_fish = [h for h in fish if h["code"] != "F90" or h["turn_value"] != 170]
     check("every Big Fish entry is an F90 of exactly 170", not bad_fish,
