@@ -770,8 +770,8 @@ def check_navigation(pages):
     stale = [n for n, m in site.items() if re.search(r'href="[^"]*teams(-division-\d)?\.html"', m)]
     check("nothing links the retired Teams index", not stale, str(stale[:3]))
 
-    # ---- Standings -> team pages ----
-    standings = {n: m for n, m in site.items() if re.fullmatch(r"standings(-division-\d)?\.html", n)}
+    # ---- Standings -> team pages, both nights (2026-11-12) ----
+    standings = standings_pages(site)
     check("found the standings pages", len(standings) >= 2, str(sorted(standings)))
     unlinked, reached = [], set()
     for name, markup in standings.items():
@@ -788,33 +788,46 @@ def check_navigation(pages):
           teams == reached,
           f"unlinked {sorted(teams - reached)[:3]}, linked but unbuilt {sorted(reached - teams)[:3]}")
 
-    wrong_back = []
+    # A team page's back link opens its own league's standings, at its own division.
+    wrong_back, league_of = [], {}
     for name in sorted(teams):
-        back = re.search(r'<a class="back" href="\.\./standings-division-(\d)\.html"', site[name])
-        division = re.search(r"<p>Division (\d) &middot; captain", site[name])
-        if not back or not division or back.group(1) != division.group(1):
+        back = re.search(r'<a class="back" href="\.\./(standings[^"]*\.html)"', site[name])
+        division = re.search(r"<p>(.*?) &middot; captain", site[name])
+        target = standings.get(back.group(1)) if back else None
+        heading = re.search(r"<h1>(.*?)</h1>", target) if target else None
+        # A standings page with no league picker has no night; that is a failure here, not a
+        # crash further down (section 14 then names the page).
+        if not division or not heading or heading.group(1) != division.group(1).upper() \
+                or not night_of(target):
             wrong_back.append(name)
+        else:
+            league_of[name] = night_of(target)
     check("every team page's back link returns to its own division's standings", not wrong_back,
           str(wrong_back[:3]))
 
-    # The full roster: every player on the current season's boards is listed on exactly one of
-    # that season's team pages, so nobody is left off a team and nobody is credited to two. (A
-    # player page now covers every season, so a player from a past season alone has a page but
-    # no team page -- team pages are the current season's.)
-    listed = collections.Counter()
-    for name in teams:
-        listed.update(set(re.findall(r'href="\.\./(player/[^"#]+\.html)', site[name])))
-    scorers = set()
-    for name, markup in site.items():
-        if re.fullmatch(r"division-\d+\.html", name):
-            scorers.update(re.findall(r'<a class="(?:row|leader)" href="(player/[^"#]+\.html)',
-                                      markup))
-    off_roster = sorted(scorers - set(listed))
-    doubled = sorted(p for p, c in listed.items() if c > 1)
-    strays = sorted(set(listed) - scorers)
-    check(f"all {len(scorers)} of this season's scorers appear on exactly one team page",
-          scorers and not off_roster and not doubled and not strays,
-          f"missing {off_roster[:3]}, on two {doubled[:3]}, not on a board {strays[:3]}")
+    # The full roster, per night: every player on a league's current-season boards is listed on
+    # exactly one of that league's team pages, so nobody is left off a team and nobody is credited
+    # to two. (A player page covers every season, so a player from a past season alone has a page
+    # but no team page -- team pages are the current season's. A player on both nights is on one
+    # team page of each.)
+    boards = all_stars_boards(site)
+    for night in sorted(set(league_of.values())):
+        key = current_season_key(standings, night)
+        listed = collections.Counter()
+        for name in (n for n, league in league_of.items() if league == night):
+            listed.update(set(re.findall(r'href="\.\./(player/[^"#]+\.html)', site[name])))
+        scorers = set()
+        for name, kind in boards.items():
+            if kind == "division" and season_scope(site[name]) == key:
+                scorers.update(re.findall(r'<a class="(?:row|leader)" href="(player/[^"#]+\.html)',
+                                          site[name]))
+        off_roster = sorted(scorers - set(listed))
+        doubled = sorted(p for p, c in listed.items() if c > 1)
+        strays = sorted(set(listed) - scorers)
+        check(f"all {len(scorers)} of {night.capitalize()}'s scorers appear on exactly one "
+              f"{night.capitalize()} team page",
+              scorers and not off_roster and not doubled and not strays,
+              f"missing {off_roster[:3]}, on two {doubled[:3]}, not on a board {strays[:3]}")
 
     # ---- GP and the playoff check mark (2026-11-11) ----
     # The caption states the rule; every row must follow it. A page whose caption states no
@@ -914,41 +927,50 @@ def check_schedule(pages):
              if re.search(r'href="[^"]*(?:match/[^"]*|matches-division-\d\.html)"', m)]
     check("nothing links a retired match page or match-night list", not stale, str(stale[:3]))
 
-    # Live is decided by the clock in the browser, never baked in: a static page that said LIVE
-    # would still be saying it on Wednesday.
-    check("no night ships as live",
-          not re.search(r'class="night live"', page)
-          and all(" hidden" in tag for tag in re.findall(r"<span[^>]*live-tag[^>]*>", page)))
+    # Each night's Schedule (2026-11-12): Tuesday's schedule.html, Monday's schedule-monday.html.
+    standings = standings_pages(site)
+    pages_ = {n: m for n, m in schedule_pages(site).items() if n != "matches.html"}
+    check("every night with standings has a Schedule",
+          {night_of(m) for m in standings.values()} == {night_of(m) for m in pages_.values()},
+          str(sorted(pages_)))
+    for name, page in sorted(pages_.items()):
+        night = night_of(page)
+        # Live is decided by the clock in the browser, never baked in: a static page that said
+        # LIVE would still be saying it on Wednesday.
+        check(f"{name}: no night ships as live",
+              not re.search(r'class="night live"', page)
+              and all(" hidden" in tag for tag in re.findall(r"<span[^>]*live-tag[^>]*>", page)))
 
-    starts = re.findall(r'<section class="night" data-start="([^"]*)">', page)
-    malformed = [s for s in starts
-                 if not re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:00[-+]\d\d:\d\d", s)]
-    check(f"all {len(starts)} nights carry a first-darts time with its UTC offset",
-          not malformed, str(malformed[:3]))
-    # app.js gilds the FIRST live night in place, so tonight must come first: nights ascend.
-    check("nights run in date order", starts == sorted(starts), str(starts))
+        starts = re.findall(r'<section class="night" data-start="([^"]*)">', page)
+        malformed = [s for s in starts
+                     if not re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:00[-+]\d\d:\d\d", s)]
+        check(f"{name}: all {len(starts)} nights carry a first-darts time with its UTC offset",
+              not malformed, str(malformed[:3]))
+        # app.js gilds the FIRST live night in place, so tonight must come first: nights ascend.
+        check(f"{name}: nights run in date order", starts == sorted(starts), str(starts))
 
-    standings = {m.group(1) for n in site
-                 if (m := re.fullmatch(r"standings-(division-\d)\.html", n))}
-    select = re.search(r'<select id="division">(.*?)</select>', page, re.S)
-    options = re.findall(r'<option value="([^"]*)">', select.group(1)) if select else []
-    if starts:
-        check("the division menu is All plus every standings division",
-              options[:1] == [""] and sorted(options[1:]) == sorted(standings),
-              f"options {options}, standings {sorted(standings)}")
+        # The league's own divisions, from the h1 of each of its standings pages.
+        divisions = {re.sub(r"[^a-z0-9]+", "-", re.search(r"<h1>(.*?)</h1>", m).group(1).lower())
+                     .strip("-") for m in standings.values() if night_of(m) == night}
+        select = re.search(r'<select id="division"[^>]*>(.*?)</select>', page, re.S)
+        options = re.findall(r'<option value="([^"]*)">', select.group(1)) if select else []
+        if starts:
+            check(f"{name}: the division menu is All plus every {night} standings division",
+                  options[:1] == [""] and sorted(options[1:]) == sorted(divisions),
+                  f"options {options}, standings {sorted(divisions)}")
 
-    wrong = []
-    for cls, attrs, inner in re.findall(
-            r'<div class="(fixture(?: bye)?)"([^>]*)>(.*?)\n  </div>', page, re.S):
-        division = re.search(r'data-division="([^"]*)"', attrs)
-        labels = re.findall(r'<a class="fx-team(?: away)?" href="team/[^"]+\.html">'
-                            r'<b class="name">[^<]+</b><small>([A-Z]+)</small>', inner)
-        expected = ["BYE"] if cls == "fixture bye" else ["HOME", "AWAY"]
-        if labels != expected or not division or division.group(1) not in standings:
-            wrong.append(f"{cls}: {labels} {division.group(1) if division else None}")
-    fixtures = len(re.findall(r'<div class="fixture', page))
-    check(f"all {fixtures} fixtures link HOME then AWAY (or one BYE) to team pages, "
-          "in a known division", not wrong, str(wrong[:3]))
+        wrong = []
+        for cls, attrs, inner in re.findall(
+                r'<div class="(fixture(?: bye)?)"([^>]*)>(.*?)\n  </div>', page, re.S):
+            division = re.search(r'data-division="([^"]*)"', attrs)
+            labels = re.findall(r'<a class="fx-team(?: away)?" href="team/[^"]+\.html">'
+                                r'<b class="name">[^<]+</b><small>([A-Z]+)</small>', inner)
+            expected = ["BYE"] if cls == "fixture bye" else ["HOME", "AWAY"]
+            if labels != expected or not division or division.group(1) not in divisions:
+                wrong.append(f"{cls}: {labels} {division.group(1) if division else None}")
+        fixtures = len(re.findall(r'<div class="fixture', page))
+        check(f"{name}: all {fixtures} fixtures link HOME then AWAY (or one BYE) to team pages, "
+              "in a known division", not wrong, str(wrong[:3]))
 
 
 # ---------------------------------------------------------------- 13. season history
@@ -972,6 +994,43 @@ def all_stars_boards(site):
         else:
             out[name] = "division"
     return out
+
+
+def standings_pages(site):
+    """Every standings page, both nights: standings.html, standings-division-N.html and
+    another night's standings-<night>[-<division>].html."""
+    return {n: m for n, m in site.items() if re.fullmatch(r"standings(-[a-z0-9-]+)?\.html", n)}
+
+
+def schedule_pages(site):
+    """Every Schedule page: schedule.html (and its matches.html alias), schedule-<night>.html."""
+    return {n: m for n, m in site.items()
+            if re.fullmatch(r"schedule(-[a-z0-9-]+)?\.html|matches\.html", n)}
+
+
+def night_of(markup):
+    """The night a Standings or Schedule page shows -- its league picker's scope, e.g. 'tuesday'."""
+    found = re.search(r'<details class="picker" data-scope="([^"]+)">\s*<summary><small>LEAGUE',
+                      markup)
+    return found.group(1) if found else None
+
+
+def season_scope(markup):
+    """The season an All-Stars board shows -- its season picker's scope, e.g. 'monday-fall-2026'."""
+    found = re.search(r'<details class="picker" data-scope="([^"]+)">\s*<summary><small>SEASON',
+                      markup)
+    return found.group(1) if found else None
+
+
+def current_season_key(standings, night):
+    """The season key of a night's current season, read off its standings' status bar
+    ('FALL 2026 · MONDAY' -> 'monday-fall-2026'), so boards and team pages can be matched up."""
+    for markup in standings.values():
+        if night_of(markup) == night:
+            bar = re.search(r'<div class="statusbar"><b>(.*?) · ', markup)
+            if bar:
+                return re.sub(r"[^a-z0-9]+", "-", f"{night} {bar.group(1)}".lower()).strip("-")
+    return None
 
 
 def points_on_page(page, fragment=None, all_time=False):
@@ -1092,6 +1151,98 @@ def check_season_history(pages):
           f"{sum(1 for c in listed.values() if c > 1)} twice")
 
 
+# ---------------------------------------------------------------- 14. both nights
+
+def check_both_nights(pages):
+    """Standings and the Schedule per night, with a league picker; Awards and the Feed for both
+    nights, every entry naming its night (owner, 2026-11-12)."""
+    print("\n14. Both nights -- the league picker, and Awards and the Feed naming each night")
+    site = {name.replace("\\", "/"): markup for name, markup in pages.items()}
+    standings, schedules = standings_pages(site), schedule_pages(site)
+    chosen = {**standings, **schedules}
+
+    # ---- the league picker: one per page, the current option the page itself ----
+    lists, wrong = set(), []
+    for name, page in sorted(chosen.items()):
+        pickers = re.findall(r'<details class="picker"[^>]*>(.*?)</details>', page, re.S)
+        if len(pickers) != 1:
+            wrong.append(f"{name}: {len(pickers)} pickers")
+            continue
+        nav = re.search(r'<nav aria-label="League">(.*?)</nav>', pickers[0], re.S)
+        shown = re.search(r"<summary><small>LEAGUE</small><b>(.*?)</b>", pickers[0])
+        options = re.findall(r'<a href="([^"]+)"( aria-current="page")?>(.*?)</a>',
+                             nav.group(1)) if nav else []
+        current = [(href, text) for href, mark, text in options if mark]
+        if not shown or len(current) != 1:
+            wrong.append(f"{name}: {len(current)} current options")
+            continue
+        href, text = current[0]
+        if site.get(href) != page:
+            wrong.append(f"{name}: its current option opens {href}")
+        if shown.group(1) != text or text.lower() != f"{night_of(page)} night":
+            wrong.append(f"{name}: shows {shown.group(1)!r}, marks {text!r}")
+        lists.add(tuple(t for _h, _m, t in options))
+    check(f"all {len(chosen)} Standings and Schedule pages have one league picker whose current "
+          "option is the page", not wrong, str(wrong[:3]))
+    nights = next(iter(lists)) if len(lists) == 1 else ()
+    check("every league picker offers the same nights, Tuesday first",
+          len(lists) == 1 and len(nights) >= 2 and nights[0] == "Tuesday night", str(lists))
+    check("the Standings and Schedule tabs open Tuesday's",
+          night_of(site.get("standings.html", "")) == "tuesday"
+          and night_of(site.get("schedule.html", "")) == "tuesday")
+
+    # ---- a night's Standings and Schedule only ever link that night's teams ----
+    team_night = {}
+    for name in (n for n in site if n.startswith("team/")):
+        back = re.search(r'<a class="back" href="\.\./(standings[^"]*\.html)"', site[name])
+        team_night[name] = night_of(standings.get(back.group(1), "")) if back else None
+    crossed = [f"{name} -> {href}" for name, page in chosen.items()
+               for href in re.findall(r'href="(team/[^"]+\.html)"', page)
+               if team_night.get(href) != night_of(page)]
+    check("every team a Standings or Schedule page links plays on that page's night",
+          not crossed, str(crossed[:3]))
+
+    # ---- Awards and the Feed: the league at large, every entry naming its night ----
+    unnamed, named = [], collections.Counter()
+    award_pages = ["awards.html"] + sorted(n for n in site if n.startswith("award/"))
+    for name in award_pages + ["feed.html"]:
+        markup = site.get(name, "")
+        entries = (re.findall(r'<div class="hit".*?</div>', markup, re.S)
+                   + re.findall(r'<a class="(?:row|feed-card)".*?</a>', markup, re.S))
+        if name.startswith("award/") and "LEADER" in markup:
+            entries = re.findall(r'<div class="hit".*?</div>', markup, re.S)  # leader rows sit
+            # under a section that names the night; see the next check
+        for entry in entries:
+            night = re.search(r"&middot; (Monday|Tuesday)</small>", entry)
+            if night:
+                named[night.group(1)] += 1
+            else:
+                text = re.sub(r"<[^>]+>|\s+", " ", entry)
+                unnamed.append(f"{name}: {text[:60]}")
+    check(f"all {sum(named.values())} Awards entries and Feed cards name their night",
+          not unnamed and named, str(unnamed[:3]))
+    check("Awards and the Feed carry both nights",
+          named["Monday"] > 0 and named["Tuesday"] > 0, str(dict(named)))
+    detail = site.get("award/points-leader.html", "")
+    sections = re.findall(r'<h2 class="section">[^<]*</h2><p>([^<]*)</p>', detail)
+    check("every points-leader section names its night",
+          bool(sections) and all(s in ("Monday night", "Tuesday night") for s in sections),
+          str(sections))
+
+    # Division leaders are listed Tuesday's divisions first, in order, then Monday's -- never by
+    # points, which would rank them across divisions.
+    index = site.get("awards.html", "")
+    section = re.search(r"ALL STAR POINTS LEADER</h2>(.*?)<h2", index, re.S)
+    rows = [t.split(" &middot; ") for t in
+            re.findall(r'<small class="name">(.*?)</small>', section.group(1))] if section else []
+    nights_order = [r[-1] for r in rows]
+    tuesday = [int(m.group(1)) for r in rows if r[-1] == "Tuesday"
+               and (m := re.fullmatch(r"Division (\d+)", r[0]))]
+    check("the points leaders run Tuesday's divisions in order, then Monday's",
+          bool(rows) and nights_order == sorted(nights_order, key=lambda n: n != "Tuesday")
+          and tuesday == sorted(tuesday), str(rows[:8]))
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -1126,6 +1277,7 @@ def main():
     check_navigation(pages)
     check_schedule(pages)
     check_season_history(pages)
+    check_both_nights(pages)
 
     print(f"\n{'ALL CHECKS PASSED' if not failures else str(len(failures)) + ' CHECK(S) FAILED'}")
     if failures:

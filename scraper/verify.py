@@ -183,14 +183,6 @@ def check_season(season):
     check("R9 Club equals the R9 hits -- no R8",
           len(r9) == len(expected_r9) and all(h["code"] == "R9" for h in r9),
           f"club has {len(r9)} {sorted({h['code'] for h in r9})}, hits have {len(expected_r9)}")
-    if season["primary"] and season["current"]:          # the season the Feed shows
-        import feed as feed_mod
-        cricket_cards = [e["hit"]["code"] for e in feed_mod.generate_events(season)
-                         if e["hit"] and e["hit"]["code"] in ("R8", "R9")]
-        check("the feed posts every R9 and no R8",
-              cricket_cards.count("R9") == len(expected_r9) and "R8" not in cricket_cards,
-              f"{cricket_cards.count('R9')} R9 and {cricket_cards.count('R8')} R8 cards, "
-              f"{len(expected_r9)} R9 hits")
 
     fish = award_data["big-fish"]
     bad_fish = [h for h in fish if h["code"] != "F90" or h["turn_value"] != 170]
@@ -292,6 +284,61 @@ def check_season(season):
 # Every game format the rules engine knows how to score. A new one (a 301, say) would be scored as
 # whatever it superficially resembles, so it must stop the build until someone looks.
 KNOWN_FORMATS = {("P", "501 SIDO"), ("P", "501 DIDO"), ("P", "701 DIDO"), ("M", "Cricket")}
+
+
+def check_both_nights(seasons):
+    """Section 13: Awards and the Feed are the league at large -- the current season of both
+    nights (owner, 2026-11-12). The awards hold their definitions across both, and the Feed's
+    record cards always agree with the Awards page."""
+    print("\n13. Awards and the Feed, both nights")
+    import awards as awards_mod, feed as feed_mod
+    leagues = [s for s in seasons if s["current"]]
+    check("both nights have a current season",
+          sorted(s["night"] for s in leagues) == sorted(n for _l, n in events.fetch.LEAGUES),
+          str([s["key"] for s in leagues]))
+    hits = [h for s in leagues for h in s["hits"]]
+    check("every current hit names its night",
+          all(h.get("night") in ("Monday", "Tuesday") for h in hits))
+    data = awards_mod.compute_all(hits, {})
+
+    for key, code in (("largest-checkout", "F90"), ("largest-checkin", "S90")):
+        rows = data[key]
+        who = [players.identity(h["player"]) for h in rows]
+        check(f"{key}: one row per player across both nights, highest first",
+              len(who) == len(set(who))
+              and all(rows[i]["turn_value"] >= rows[i + 1]["turn_value"]
+                      for i in range(len(rows) - 1)),
+              f"{len(rows)} rows, {len(set(who))} players")
+        best = max((h["turn_value"] for h in hits if h["code"] == code), default=None)
+        check(f"{key}: rank 1 is the best on either night",
+              not rows or (rows[0]["rank"] == 1 and rows[0]["turn_value"] == best),
+              f"{rows[0]['turn_value'] if rows else None} v {best}")
+    expected = [h for h in hits if h["display"] in ("171+", "180")]
+    check("the 171+ Club holds every 171+ and 180 of both nights",
+          len(data["171-plus"]) == len(expected), f"{len(data['171-plus'])} v {len(expected)}")
+    check("the R9 Club holds every R9 of both nights, and no R8",
+          len(data["r9"]) == sum(1 for h in hits if h["code"] == "R9")
+          and all(h["code"] == "R9" for h in data["r9"]))
+
+    feed_events = feed_mod.generate_events(leagues)
+    check(f"all {len(feed_events)} Feed cards name their night",
+          feed_events and all(e["night"] in ("Monday", "Tuesday") for e in feed_events))
+    cards = [e["hit"]["code"] for e in feed_events if e["hit"] and e["hit"]["code"] in ("R8", "R9")]
+    check("the Feed posts every R9 of both nights and no R8",
+          cards.count("R9") == sum(1 for h in hits if h["code"] == "R9") and "R8" not in cards,
+          f"{cards.count('R9')} R9 and {cards.count('R8')} R8 cards")
+    dates = [e["date"] for e in feed_events]
+    check("the Feed runs newest night first", dates == sorted(dates, reverse=True))
+    # The newest record card names the record the Awards page shows -- one walk, both nights.
+    for kind, key in (("checkin", "largest-checkin"), ("checkout", "largest-checkout")):
+        latest = next((e for e in feed_events if e["type"] == f"{kind}-record"), None)
+        holder = data[key][0] if data[key] else None
+        check(f"the Feed's latest {kind} record is the Awards holder",
+              (latest is None and holder is None)
+              or (latest and holder and latest["hit"]["player"] == holder["player"]
+                  and latest["hit"]["turn_value"] == holder["turn_value"]),
+              f"feed {latest and (latest['hit']['player'], latest['hit']['turn_value'])}, "
+              f"awards {holder and (holder['player'], holder['turn_value'])}")
 
 
 def check_archive(seasons):
@@ -437,6 +484,7 @@ def main():
               f"{' -- current' if season['current'] else ''} =====")
         check_season(season)
 
+    check_both_nights(seasons)
     check_archive(seasons)
 
     print(f"\n{'ALL CHECKS PASSED' if not failures else str(len(failures)) + ' CHECK(S) FAILED'}")

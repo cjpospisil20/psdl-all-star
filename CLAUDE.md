@@ -46,10 +46,10 @@ docs/      rulebook, design brief, exports
 | `scraper/fetch.py` | **The only module that touches the network.** Both leagues (`LEAGUES`: Tuesday `ParkSDL`, Monday `ParkSlopeDLM`). Discovers each league's seasons into `data/seasons.json`; archives each recap to `data/seasons/<id>/recaps/` on first fetch; refreshes a season's `matches.json`, `standings.json` and `fixtures.json` while it is active. |
 | `scraper/allstar.py` | Rules engine — Rulebook Section F applied to turn data. Emits individual hits. |
 | `scraper/players.py` | Player → team, form stats recomputed from turns, the per-division ranked table, the All Time table (`career_table`), who a name is across seasons (`identity`), nights played (GP) and playoff eligibility (`SEASON_NIGHTS`, `playoff_minimum`). |
-| `scraper/awards.py` | Season-end award data — 171+ Club, Big Fish, largest checkout/check-in, division leaders. Pure functions over hits. |
+| `scraper/awards.py` | Season-end award data — 171+ Club, Big Fish, R9 Club, C5+, largest checkout/check-in, division leaders. Pure functions over hits; build.py passes both nights' hits. |
 | `scraper/events.py` | `load_season(id)` — assembles one season from the archive (no id: the Tuesday league's current season); `load_all()`, `registry()`, `current_id(league)`. The single entry point `site/` uses. |
 | `scraper/fixtures.py` | Match nights still to come, from a season's `fixtures.json` — the Schedule tab. Also New York time (`eastern_offset`, `league_today`). Pure, offline. |
-| `scraper/feed.py` | News feed events, generated week by week from the archived season. |
+| `scraper/feed.py` | News feed events for both nights' current seasons, night by night; the check-in and checkout records from one walk over both nights' hits, so they always match Awards. |
 | `scraper/verify.py` | Assertion suite. Run before publishing. |
 | `scraper/standings.py` | Terminal view of the same data the site renders. Debugging aid. |
 | `site/tokens.py` | The palette and type from DESIGN-SPEC, in one place, emitted as `public/app.css`. |
@@ -178,20 +178,26 @@ scope on 2026-11-12 — as far back as DartConnect goes (Fall 2025), and no furt
 
 ## Where things stand
 
-The site is **live** at <https://psdartleague.com/>, rebuilt weekly by
-`.github/workflows/build.yml`. `site/build.py` generates **419 pages** from 519 archived matches
+The site is **live** at <https://psdartleague.com/>, rebuilt the morning after each match night by
+`.github/workflows/build.yml`. `site/build.py` generates **428 pages** from 519 archived matches
 across six seasons of both nights — 347 player pages (one per player, every season they have
-scored in), 31 team pages, the current Tuesday season's 5 division leaderboards + the ALL board,
-17 boards for the other five seasons and All Time, 5 standings pages, 1 awards index, 7 award detail
-pages, the schedule, the feed, and three aliases: `index.html` / `standings.html` (Division 1) and
+scored in), 38 team pages (31 Tuesday, 7 Monday), the current Tuesday season's 5 division
+leaderboards + the ALL board, 17 boards for the other five seasons and All Time, 6 standings pages
+(Tuesday's five, Monday's one), 1 awards index, 7 award detail pages, two schedules (Tuesday,
+Monday), the feed, and three aliases: `index.html` / `standings.html` (Division 1) and
 `matches.html` (the schedule, so links to the old Match tab still work) — and `scraper/verify.py`
 and `site/check.py` both pass. The first-180 celebration screen (`rare-hit.html`) was retired on
 2026-11-12: the Feed and Awards celebrate 180s now.
 
-The All-Stars tab has a **season picker** (2026-11-12) above the division chips: All Time, then
-every season of both nights. The home page is still the current Tuesday season's Division 1. A
-past season's boards say FINAL and that they are recomputed by this site's rules; a player page
-covers every season, and a season's board opens that season's section of it.
+**PSDL plays two nights** (2026-11-12): Tuesday (`ParkSDL`, five divisions) and Monday
+(`ParkSlopeDLM`, one division, "PS Monday"); most teams play both. Standings and the Schedule have a
+**league picker** — Tuesday night first, as the tabs open — and each night's team pages are its own
+(Monday's are `team/monday-…`). Awards and the Feed are **the league at large**: both nights'
+current seasons, every entry naming the night it happened. The All-Stars tab has a **season picker**
+above the division chips: All Time, then every season of both nights. The home page is still the
+current Tuesday season's Division 1. A past season's boards say FINAL and that they are recomputed
+by this site's rules; a player page covers every season, and a season's board opens that season's
+section of it.
 
 The bottom tab bar is Standings · All-Stars · Schedule · Feed · Awards. The Schedule tab
 (2026-11-11) replaced the Match tab and its 131 per-match pages: it lists every match night still to
@@ -201,7 +207,8 @@ page is opened by tapping its row on Standings (or a team on the Schedule), and 
 roster — scorers first, then teammates with no all star hits yet — with each player's GP (league
 nights played), singles '01 average and MPR, and a gold check mark beside every player who is playoff
 eligible (Rulebook §H.2; the season length per division is `players.SEASON_NIGHTS`, confirmed by the
-owner). The Feed tab lists the season's notable moments, week by week.
+owner for Tuesday — Monday's is not known yet, so Monday team pages show GP with no ticks). The Feed
+tab lists both nights' notable moments, newest night first.
 
 GitHub Pages hosts the site; the domain is registered at Vercel, which serves its DNS and nothing
 else. The domain is a repo setting (Settings → Pages), not a file — do not add a `CNAME` file, which
@@ -213,12 +220,12 @@ published pages freeze on the last good build. Check `gh run list`, not the site
 what happened from 2026-09-21 to 2026-10-02; see `summary.md`'s session log.
 
 Not done: **commissioner reconciliation** (the gate before the numbers become official), forfeit
-exception handling, and `docs/ROADMAP.md` Steps 3–16 (season-scoped archive and the wider league
-website). Step 2 (pipeline hardening) is complete.
+exception handling, and `docs/ROADMAP.md` Steps 4–16 (the wider league website). Steps 2 (pipeline
+hardening) and 3 (season-scoped archive) are complete.
 
-`fetch.py` still aborts the whole run on the first match it cannot parse, so one bad recap stops
-the rest being archived that night. The archive-before-verify commit means nothing fetched is lost,
-but it is worth making the loop resilient — ROADMAP Step 2.
+`fetch.py` carries on past a recap it cannot fetch or parse and reports it at the end (ROADMAP
+Step 2); the next run picks it up. The 2026-11-12 backfill showed why: DartConnect's recap server
+timed out on 7 of 384 requests, and a second run fetched all 7 in seconds.
 
 One design placeholder is still open and genuinely needs the league: **how many players per division
 make All Star** (`ALL_STAR_CUT`). Team rosters and MPR, both previously listed as blockers, were

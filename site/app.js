@@ -111,7 +111,9 @@
   var division = document.getElementById("division");
   if (division) {
     var LIVE_MS = 4.5 * 60 * 60 * 1000;          // 7:30 PM first darts -> midnight
-    var STORE = "psdl-schedule-division";
+    // Each league's Schedule remembers its own choice: Monday's page names its own key, so
+    // opening it never clears the division a phone picked on Tuesday's.
+    var STORE = division.getAttribute("data-store") || "psdl-schedule-division";
     var controls = document.querySelector(".sched-controls");
     var teamFind = document.getElementById("team-find");
     var nights = document.querySelectorAll(".night");

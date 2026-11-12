@@ -86,7 +86,12 @@ the original letterforms, colour flipped. Its only page, the first-180 screen, w
   plain links styled like the search box (46px summary, surface fill, hairline border, a muted
   chevron that turns over when open; 44px options, the current one in gold). It opens in the page
   flow rather than over it, and works with JavaScript off; `app.js` only closes it on an outside
-  tap or Escape. Switching season keeps the division where the other season has it.
+  tap or Escape. Switching season keeps the division where the other season has it. The same
+  component is the **league** picker at the top of Standings and the Schedule — "Tuesday night",
+  "Monday night" — one league at a time, Tuesday first.
+- **Two nights.** Awards and the Feed show both nights together, so every entry names its night
+  ("Westbury Inn · Division 1 · Tuesday"). A one-division league (Monday's "PS Monday") shows no
+  division chips.
 
 ---
 
@@ -174,7 +179,7 @@ point — the old system's real failure was that nobody looked at it.
 
 | File | What it is |
 |---|---|
-| `design/standings.html` | League standings, straight from DartConnect. Division switcher, one division at a time. |
+| `design/standings.html` | League standings, straight from DartConnect. Division switcher, one division at a time. Since 2026-11-12 a league picker above it switches between the Tuesday and Monday leagues; the mockup predates it. |
 | `design/all-stars.html` | All-star points leaderboard by division. The heart of the app. Since 2026-11-12 a season picker sits above the division chips (All Time, then every season of both nights); the mockup predates it. |
 | `design/player.html` | One player: DartConnect form stats, then all-star points and every hit. Since 2026-11-12 one page covers every season the player has scored in — an ALL TIME card, then a section per season, newest first — and a past season's board opens its section. |
 | `design/match.html` | **Retired 2026-11-11.** One match night, both teams, every hit linking to its turn. The Match tab became the Schedule (upcoming home v away fixtures, no all-star points), which has no mockup; `site/build.py` `build_schedule()` is its reference. |

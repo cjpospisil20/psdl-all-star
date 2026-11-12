@@ -5,27 +5,35 @@ carries its DartConnect recap link and never drifts from the numbers on screen.
 
 The two "largest" awards rank across divisions. The league awards them league-wide, so
 this is a deliberate exception to the "never compare across divisions" rule.
+
+Awards are for the league at large: the current season of BOTH nights (owner, 2026-11-12 --
+most teams play both). build.py passes both nights' hits, and every entry on the page names the
+night it happened. Points leaders stay per division, and each night has its own divisions.
 """
+import pathlib, sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import players
 
 # In the order the Awards page shows them -- the owner's order (2026-11-11).
 AWARDS = [
     {
         "key":   "points-leader",
         "title": "All Star Points Leader",
-        "blurb": "The top scorer in each division at season’s end.",
+        "blurb": "The top scorer in each division at season’s end, Monday and Tuesday.",
         "kind":  "division",
     },
     {
         "key":   "largest-checkin",
         "title": "Largest Check-In",
         "blurb": "The highest score on the turn a side gets on the board, across the entire "
-                 "league this season.",
+                 "league this season, both nights.",
         "kind":  "one",
     },
     {
         "key":   "largest-checkout",
         "title": "Largest Checkout",
-        "blurb": "The highest checkout across the entire league this season.",
+        "blurb": "The highest checkout across the entire league this season, both nights.",
         "kind":  "one",
     },
     {
@@ -81,19 +89,22 @@ def big_fish(hits):
 
 
 def _best_per_player(hits, code):
-    """Best single hit of the given code per player, league-wide.
+    """Best single hit of the given code per player, league-wide -- both nights.
 
     Competition ranking: ties share a place (1, 1, 3). On equal values the earliest hit wins.
+    A player is a players.identity(), so someone whose Monday and Tuesday names differ only in
+    spacing, punctuation or capitals holds one row, not two.
     """
     best = {}
     for h in hits:
         if h["code"] != code:
             continue
-        prev = best.get(h["player"])
+        who = players.identity(h["player"])
+        prev = best.get(who)
         if prev is None or h["turn_value"] > prev["turn_value"] \
                 or (h["turn_value"] == prev["turn_value"]
                     and (h["date"] or "") < (prev["date"] or "")):
-            best[h["player"]] = h
+            best[who] = h
     rows = sorted(best.values(), key=lambda h: (-h["turn_value"], h["date"] or ""))
     ranked = []
     for i, row in enumerate(rows):

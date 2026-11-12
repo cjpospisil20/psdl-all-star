@@ -5,10 +5,11 @@
 
 **Last updated:** 2026-11-12
 **Owner:** cjpospisil20@gmail.com
-**Status:** Live at <https://psdartleague.com/>, rebuilt weekly by GitHub
-Actions — 299 static pages from 134 archived matches (9 match nights), plus the Schedule of every
-match night still to come. Not yet reconciled with the commissioners. ROADMAP Steps 1–2 complete;
-Step 15's domain and HTTPS done early; part of Step 10 (the Schedule) done early.
+**Status:** Live at <https://psdartleague.com/>, rebuilt by GitHub Actions the morning after each
+match night — 428 static pages from 519 archived matches across six seasons of both nights (Monday
+and Tuesday leagues, back to Fall 2025), plus each night's Schedule of match nights still to come.
+Not yet reconciled with the commissioners. ROADMAP Steps 1–3 complete; Step 15's domain and HTTPS
+done early; part of Step 10 (the Schedule) and the Phase 2 season selector done early.
 
 ---
 
@@ -969,3 +970,56 @@ breakages — a picker removed, a board total altered, a section id renamed, All
 player dropped from All Time — were each caught by `check.py`. In Chrome at phone width: DIV 3 →
 Fall 2025 opens Fall 2025's DIV 3; a row opens the player's Fall 2025 section; the picker closes on
 an outside tap and on Escape and returns focus; no console errors.
+
+### 2026-11-12 — Both nights: league pickers, Monday's pages, Awards and the Feed for the league
+
+The fourth PR, at the owner's request: "awards should be for the league at large and should say
+whether the player did it in monday or tuesday because most teams are in both"; the Feed likewise;
+Standings and the Schedule one league at a time, Tuesday first, with a dropdown.
+
+- **League picker** on Standings and the Schedule — the same `components.picker` as the season
+  picker — "Tuesday night" / "Monday night". Tuesday keeps every URL; Monday is
+  `standings-monday.html` and `schedule-monday.html` (`build.standings_href` / `schedule_href`).
+  Monday has one division, PS Monday, so no division chips. Its Schedule keeps the division menu
+  (All / PS Monday) because `app.js`'s filters and live-night gilding hang on `#division`, and the
+  menu names its own `data-store`, so opening Monday's page never clears Tuesday's saved choice.
+- **Monday team pages**: `team/monday-<slug>.html`, back to Monday standings, roster and GP from
+  Monday's season. No playoff ticks until Monday's season length is in `players.SEASON_NIGHTS`.
+  Player links open the player's Monday section.
+- **Awards for the league at large.** Both nights' current seasons: points leaders per division
+  (Tuesday's five, then PS Monday), largest check-in and checkout across both nights — one row per
+  person (`players.identity`), so nobody holds two rows under two spellings — and the clubs as the
+  union. **Every entry names its night.** The checkout record moved: Angelo Oddo's 148 on a Monday
+  now beats Tuesday's best (a 115 tie).
+- **The Feed for both nights.** Achievement, All Star leader and standings-leader cards per night;
+  the check-in and checkout records from **one walk over both nights' hits in date order**, so a
+  record card can never disagree with Awards. Every card names its night. The walk is now by match
+  night rather than by week index: Monday played a round-7 make-up on Wednesday 11 Nov after round 9,
+  so standings add up matches by the night they were played (the old round-equals-week shortcut
+  would have counted it a fortnight early) and each night is labelled with its round. With
+  Tuesday's season alone, the new walk reproduces all 57 old cards exactly.
+- **Workflow**: a Tuesday 07:17 UTC run, so Monday's results publish the next morning.
+
+Checks. `check.py` §14: every Standings and Schedule page has one league picker whose current
+option is the page, Tuesday first on every one; a night's pages only link that night's teams; every
+Awards entry and Feed card names its night, with both nights present; the points leaders run
+Tuesday's divisions in order, then Monday's. §11 and §12 cover both nights: every team page reached
+from its night's standings, back links to its own league's division, each night's scorers on exactly
+one of that night's team pages, both Schedules' fixtures in their own league's divisions. A team page
+whose standings lost its picker used to crash §11 — it now fails it. `verify.py` §13: both nights
+have a current season; one row per person in the league-wide tables; the clubs hold every hit of
+both nights; every Feed card names its night; the Feed's latest check-in and checkout records name
+the Awards holders.
+
+**Verified:** `verify.py`, `build.py` (428 pages) and `check.py` pass. Against PR 3's build:
+Tuesday's standings and schedule pages differ only by the inserted picker; every board, player page
+and Tuesday team page is byte-identical; Awards and the Feed carry the both-nights content. Five
+deliberate breakages — a picker removed, a Monday row pointed at a Tuesday team, an award or a Feed
+card stripped of its night, a Monday team page backed onto Tuesday's standings — were each caught. In
+Chrome: Standings → Monday night → Johnny Pumps → Ron Belfon opens his Monday section; Awards and
+the Feed show both nights; no console errors. **With scripts blocked** (a sandboxed iframe), a board's
+season picker still opened and its link still navigated to Fall 2025's Division 3.
+
+Open, for the owner: Monday's season length per division (for playoff ticks). And a rollover note: a
+league's "current" season is its latest with an archived recap, so between seasons the Schedule
+keeps showing the finished season until the new one's first match is archived.
