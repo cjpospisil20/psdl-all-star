@@ -46,10 +46,10 @@ docs/      rulebook, design brief, exports
 | `scraper/fetch.py` | **The only module that touches the network.** Both leagues (`LEAGUES`: Tuesday `ParkSDL`, Monday `ParkSlopeDLM`). Discovers each league's seasons into `data/seasons.json`; archives each recap to `data/seasons/<id>/recaps/` on first fetch; refreshes a season's `matches.json`, `standings.json` and `fixtures.json` while it is active. |
 | `scraper/allstar.py` | Rules engine — Rulebook Section F applied to turn data. Emits individual hits. |
 | `scraper/players.py` | Player → team, form stats recomputed from turns, the per-division ranked table, the All Time table (`career_table`), who a name is across seasons (`identity`), nights played (GP) and playoff eligibility (`SEASON_NIGHTS`, `playoff_minimum`). |
-| `scraper/awards.py` | Season-end award data — 171+ Club, Big Fish, R9 Club, C5+, largest checkout/check-in, division leaders. Pure functions over hits; build.py passes both nights' hits. |
+| `scraper/awards.py` | Season-end award data — 171+ Club, Big Fish, R9 Club, C5+, largest checkout/check-in, division leaders. Pure functions over hits; build.py passes one night's hits (awards are per night, owner 2026-11-12). |
 | `scraper/events.py` | `load_season(id)` — assembles one season from the archive (no id: the Tuesday league's current season); `load_all()`, `registry()`, `current_id(league)`. The single entry point `site/` uses. |
 | `scraper/fixtures.py` | Match nights still to come, from a season's `fixtures.json` — the Schedule tab. Also New York time (`eastern_offset`, `league_today`). Pure, offline. |
-| `scraper/feed.py` | News feed events for both nights' current seasons, night by night; the check-in and checkout records from one walk over both nights' hits, so they always match Awards. |
+| `scraper/feed.py` | News feed events for both nights' current seasons, night by night; check-in and checkout records per night (matching Awards). Also `standings_by_night(season)` — cumulative standings from each side's own `points` field, used by verify. |
 | `scraper/verify.py` | Assertion suite. Run before publishing. |
 | `scraper/standings.py` | Terminal view of the same data the site renders. Debugging aid. |
 | `site/tokens.py` | The palette and type from DESIGN-SPEC, in one place, emitted as `public/app.css`. |
@@ -158,6 +158,12 @@ open public/index.html
     nights gave Fall 2025 23 dates over 15 rounds. A league's **current** season is its latest with
     an archived recap (`events.current_id`) — not DartConnect's `active` flag, which a new season
     gets weeks before its first match night.
+12. **`home_league_points` / `away_league_points` belong to the recorded home side, not to
+    `left`.** A match's `left` is the side DartConnect lists first; `home` is the side recorded as
+    home on match night, and that is `left` only about half the time. Use `left.points` /
+    `right.points` — each side's own points field. `feed.standings_by_night()` and verify §14
+    confirm this reproduces DartConnect's `league_points` and `matches` exactly across all six
+    seasons.
 
 ## Data source
 
@@ -179,21 +185,23 @@ scope on 2026-11-12 — as far back as DartConnect goes (Fall 2025), and no furt
 ## Where things stand
 
 The site is **live** at <https://psdartleague.com/>, rebuilt the morning after each match night by
-`.github/workflows/build.yml`. `site/build.py` generates **428 pages** from 519 archived matches
+`.github/workflows/build.yml`. `site/build.py` generates **436 pages** from 519 archived matches
 across six seasons of both nights — 347 player pages (one per player, every season they have
 scored in), 38 team pages (31 Tuesday, 7 Monday), the current Tuesday season's 5 division
 leaderboards + the ALL board, 17 boards for the other five seasons and All Time, 6 standings pages
-(Tuesday's five, Monday's one), 1 awards index, 7 award detail pages, two schedules (Tuesday,
-Monday), the feed, and three aliases: `index.html` / `standings.html` (Division 1) and
-`matches.html` (the schedule, so links to the old Match tab still work) — and `scraper/verify.py`
-and `site/check.py` both pass. The first-180 celebration screen (`rare-hit.html`) was retired on
-2026-11-12: the Feed and Awards celebrate 180s now.
+(Tuesday's five, Monday's one), 2 awards indexes (one per night) and 14 award detail pages (7 per
+night), two schedules (Tuesday, Monday), the feed, and three aliases: `index.html` /
+`standings.html` (Division 1) and `matches.html` (the schedule, so links to the old Match tab
+still work) — and `scraper/verify.py` and `site/check.py` both pass.
 
 **PSDL plays two nights** (2026-11-12): Tuesday (`ParkSDL`, five divisions) and Monday
 (`ParkSlopeDLM`, one division, "PS Monday"); most teams play both. Standings and the Schedule have a
 **league picker** — Tuesday night first, as the tabs open — and each night's team pages are its own
-(Monday's are `team/monday-…`). Awards and the Feed are **the league at large**: both nights'
-current seasons, every entry naming the night it happened. The All-Stars tab has a **season picker**
+(Monday's are `team/monday-…`). Awards are **per night** behind the LEAGUE picker (owner,
+2026-11-12): `awards.html` for Tuesday, `awards-monday.html` for Monday, with award detail pages
+at `award/<key>.html` and `award/monday-<key>.html`; Largest Check-In and Largest Checkout are
+awarded separately for each night. The Feed is **the league at large**: both nights' current
+seasons, grouped by night heading. The All-Stars tab has a **season picker**
 above the division chips: All Time, then every season of both nights. The home page is still the
 current Tuesday season's Division 1. A past season's boards say FINAL and that they are recomputed
 by this site's rules; a player page covers every season, and a season's board opens that season's

@@ -4,44 +4,86 @@ Walks each season night by night, comparing the state after each match night to 
 Every event is generated at a night's end -- never mid-night -- so that the feed stays stable when
 the app eventually reads real-time scores during a match night.
 
-The Feed covers the current season of BOTH nights (owner, 2026-11-12: most teams play both), and
-every event names its night. Achievements, All Star leaders and standings leaders are per night,
-because divisions are. The check-in and checkout records are league-wide, exactly as the Awards
-page holds them, so they come from one walk over both nights' hits in date order -- a record card
-can never disagree with Awards.
+The Feed covers the current season of BOTH nights (owner, 2026-11-12: most teams play both),
+grouped by night. Achievements, All Star leaders, standings leaders and records are per night,
+because divisions are and because the league awards check-in and checkout records per night
+(owner, 2026-11-12). A night heading separates each date's cards.
 
 A night is a match date, labelled with DartConnect's round: a make-up on an off night is the
 round it made up (Monday's Fall 2026 played round 7 on Wednesday 11 Nov). Standings add up the
 matches actually played by each night, not by round, so a make-up counts on the night it was
-played.
+played. Each side's own `points` field (`left.points`, `right.points`) is the source of truth --
+NOT `home_league_points` / `away_league_points`, which belong to the recorded home side and that
+is `left` only about half the time.
 
 The single public entry point is generate_events(seasons).
 """
-import collections, pathlib, re, sys
+import collections, datetime, pathlib, re, sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import allstar, awards, fetch, players
 
 
-def generate_events(seasons, board_href=None, standings_href=None):
+def generate_events(seasons, board_href=None, standings_href=None, award_href=None):
     """All feed events for these seasons (the current one of each night), newest first.
 
-    board_href(season, division) and standings_href(season, division) say where a leader card
-    links; the site's own helpers are passed in so the Feed can never link a page that the build
-    did not write. The defaults are the home season's names.
+    board_href(season, division), standings_href(season, division) and award_href(season, key)
+    say where leader and record cards link; the site's own helpers are passed in so the Feed can
+    never link a page that the build did not write.
     """
     board_href = board_href or (lambda _season, division: f"{_slug(division)}.html")
     standings_href = standings_href or (lambda _season, division:
                                         f"standings-{_slug(division)}.html")
+    award_href = award_href or (lambda _season, _key: "awards.html")
+
+    league_rank = {league: i for i, (league, _night) in enumerate(fetch.LEAGUES)}
     all_events = []
     for season in seasons:
-        all_events.extend(_season_events(season, board_href, standings_href))
-    all_events.extend(_league_records(seasons))
+        all_events.extend(_season_events(season, board_href, standings_href, award_href))
 
-    # Newest night first; within a night, the usual order of card types, then division.
     all_events.sort(key=lambda e: (_type_order(e["type"]), e.get("division") or ""))
+    all_events.sort(key=lambda e: league_rank.get(
+        next((l for l, n in fetch.LEAGUES if n == e["night"]), ""), len(league_rank)))
     all_events.sort(key=lambda e: e["date"], reverse=True)
     return all_events
+
+
+def standings_by_night(season):
+    """Cumulative league standings after each match night, from each side's own points.
+
+    Returns [(date, {division: {team_id: pts}}, {team_id: matches_played})] in date order.
+    Each side carries its own `points` (`left.points`, `right.points`). Summed per team, those
+    reproduce DartConnect's `league_points` and `matches` exactly: verified across all six
+    seasons (26, 28, 8, 8, 31, 7 teams).
+    """
+    team_div = {c["id"]: c["division"] for c in season["standings"]["competitors"]}
+    pts = collections.defaultdict(lambda: collections.defaultdict(int))
+    played = collections.defaultdict(int)
+    result = []
+    for date in season["dates"]:
+        changed = False
+        for _div_name, by_date in season["schedule"].get("reg", {}).items():
+            for match_date, matches in by_date.items():
+                if match_date != date:
+                    continue
+                for m in matches:
+                    if m.get("status") != "C":
+                        continue
+                    changed = True
+                    left = m.get("left") or {}
+                    right = m.get("right") or {}
+                    for side in (left, right):
+                        tid = side.get("id")
+                        side_pts = side.get("points")
+                        if tid and side_pts is not None:
+                            div = team_div.get(tid)
+                            if div:
+                                pts[div][tid] += int(side_pts)
+                            played[tid] += 1
+        if changed:
+            snapshot = {div: dict(teams) for div, teams in pts.items()}
+            result.append((date, snapshot, dict(played)))
+    return result
 
 
 def _rounds_by_night(season):
@@ -52,8 +94,8 @@ def _rounds_by_night(season):
     return {date: c.most_common(1)[0][0] for date, c in counts.items()}
 
 
-def _season_events(season, board_href, standings_href):
-    """One night's league: achievements, All Star leaders and standings leaders, night by night."""
+def _season_events(season, board_href, standings_href, award_href):
+    """One night's league: achievements, All Star leaders, standings leaders and records."""
     if not season["dates"]:
         return []
     round_of = _rounds_by_night(season)
@@ -61,9 +103,11 @@ def _season_events(season, board_href, standings_href):
     canonical = players.canonical_teams(season["standings"])
     team_div = {c["id"]: c["division"] for c in season["standings"]["competitors"]}
 
-    prev_div_leaders, prev_standings = {}, {}
+    prev_div_leaders = {}
+    prev_standings = {}
     standings_pts = collections.defaultdict(lambda: collections.defaultdict(int))
     cum_hits, cum_weeks = [], collections.defaultdict(set)
+    prev_checkin = prev_checkout = None
     out = []
 
     for date in season["dates"]:
@@ -78,7 +122,11 @@ def _season_events(season, board_href, standings_href):
         table = players.division_table(cum_hits, dict(cum_weeks))
         out.extend(_allstar_leader_events(table, prev_div_leaders, week, date, night,
                                           lambda d: board_href(season, d)))
-        prev_div_leaders = {d: rows[0]["player"] for d, rows in table.items() if rows}
+        for d, rows in table.items():
+            if rows:
+                top_pts = rows[0]["points"]
+                prev_div_leaders[d] = frozenset(
+                    r["player"] for r in rows if r["points"] == top_pts)
 
         _accumulate_standings(season["schedule"], date, standings_pts, team_div)
         out.extend(_standings_events(standings_pts, prev_standings, canonical, team_div,
@@ -86,31 +134,20 @@ def _season_events(season, board_href, standings_href):
         for div in set(team_div.values()):
             div_teams = standings_pts.get(div, {})
             if div_teams:
-                prev_standings[div] = max(div_teams, key=lambda t: div_teams[t])
-    return out
-
-
-def _league_records(seasons):
-    """The league-wide check-in and checkout records, over both nights' hits in date order --
-    the same records the Awards page shows (awards.largest_checkins / largest_checkouts)."""
-    round_of = {s["key"]: _rounds_by_night(s) for s in seasons}
-    hits_by_date = collections.defaultdict(list)
-    for s in seasons:
-        for h in s["hits"]:
-            hits_by_date[h["date"]].append(h)
-
-    cum_hits, out = [], []
-    prev_checkin = prev_checkout = None
-    for date in sorted(hits_by_date):
-        cum_hits.extend(hits_by_date[date])
+                prev_standings[div] = _leader_set(div_teams)
 
         checkins = awards.largest_checkins(cum_hits)
-        out.extend(_record_events(checkins, prev_checkin, "checkin", round_of, date))
-        prev_checkin = (checkins[0]["player"], checkins[0]["turn_value"]) if checkins else None
+        record_evts, prev_checkin = _record_events(
+            checkins, prev_checkin, "checkin", week, date, night,
+            award_href(season, "largest-checkin"))
+        out.extend(record_evts)
 
         checkouts = awards.largest_checkouts(cum_hits)
-        out.extend(_record_events(checkouts, prev_checkout, "checkout", round_of, date))
-        prev_checkout = (checkouts[0]["player"], checkouts[0]["turn_value"]) if checkouts else None
+        record_evts, prev_checkout = _record_events(
+            checkouts, prev_checkout, "checkout", week, date, night,
+            award_href(season, "largest-checkout"))
+        out.extend(record_evts)
+
     return out
 
 
@@ -155,7 +192,6 @@ def _achievement_events(week_hits, week, date, night):
                 week, date, division=h["division"], hit=h,
                 link_href=h["recap"], icon_type="chip", icon_name="F90"))
 
-        # Perfect rounds only: the feed follows the R9 Club award (owner, 2026-11-11).
         if h["code"] == "R9":
             marks = h["turn_value"]
             out.append(_event(
@@ -184,46 +220,97 @@ def _achievement_events(week_hits, week, date, night):
 
 # ---------------------------------------------------------------- leader changes
 
+def _leader_set(scores):
+    """Frozenset of keys tied at the highest value."""
+    if not scores:
+        return frozenset()
+    top = max(scores.values())
+    return frozenset(k for k, v in scores.items() if v == top)
+
+
+def _names(named, canonical=None):
+    """'A', 'A and B', 'A, B and C'. If canonical maps ids to names, resolve first."""
+    if canonical:
+        names = sorted(canonical.get(n, str(n)) for n in named)
+    else:
+        names = sorted(named)
+    if len(names) <= 2:
+        return " and ".join(names)
+    return ", ".join(names[:-1]) + " and " + names[-1]
+
+
 def _allstar_leader_events(table, prev, week, date, night, href):
     out = []
     for div, rows in sorted(table.items()):
         if not rows:
             continue
-        leader = rows[0]["player"]
-        pts = rows[0]["points"]
+        top_pts = rows[0]["points"]
+        current = frozenset(r["player"] for r in rows if r["points"] == top_pts)
         old = prev.get(div)
+
         if old is None:
-            out.append(_event(
-                "allstar-leader",
-                f"{leader} leads {_short_div(div)} in All Star Points",
-                f"After Week {week}, {leader} ({pts:,} pts) is the first "
-                f"{div} all-star points leader of the season.",
-                week, date, division=div,
-                link_href=href(div),
-                icon_type="svg", icon_name="star"))
-        elif old != leader:
-            out.append(_event(
-                "allstar-leader",
-                f"{leader} takes the {_short_div(div)} all-star lead",
-                f"After Week {week}, {leader} ({pts:,} pts) overtakes "
-                f"{old} to lead {div} in All Star Points.",
-                week, date, division=div,
-                link_href=href(div),
-                icon_type="svg", icon_name="star"))
+            if len(current) == 1:
+                leader = next(iter(current))
+                out.append(_event(
+                    "allstar-leader",
+                    f"{leader} leads {_short_div(div)} in All Star Points",
+                    f"After Week {week}, {leader} ({top_pts:,} pts) is the first "
+                    f"{div} all-star points leader of the season.",
+                    week, date, division=div,
+                    link_href=href(div),
+                    icon_type="svg", icon_name="star"))
+            else:
+                out.append(_event(
+                    "allstar-leader",
+                    f"{_names(current)} share the {_short_div(div)} all-star lead",
+                    f"After Week {week}, {_names(current)} are level on {top_pts:,} pts "
+                    f"at the top of {div}.",
+                    week, date, division=div,
+                    link_href=href(div),
+                    icon_type="svg", icon_name="star"))
+        elif current != old:
+            if len(current) == 1:
+                leader = next(iter(current))
+                if len(old) > 1:
+                    out.append(_event(
+                        "allstar-leader",
+                        f"{leader} pulls clear at the top of {_short_div(div)}",
+                        f"After Week {week}, {leader} ({top_pts:,} pts) breaks away "
+                        f"from the shared lead in {div} All Star Points.",
+                        week, date, division=div,
+                        link_href=href(div),
+                        icon_type="svg", icon_name="star"))
+                else:
+                    old_name = next(iter(old))
+                    out.append(_event(
+                        "allstar-leader",
+                        f"{leader} takes the {_short_div(div)} all-star lead",
+                        f"After Week {week}, {leader} ({top_pts:,} pts) overtakes "
+                        f"{old_name} to lead {div} in All Star Points.",
+                        week, date, division=div,
+                        link_href=href(div),
+                        icon_type="svg", icon_name="star"))
+            else:
+                out.append(_event(
+                    "allstar-leader",
+                    f"{_names(current)} share the {_short_div(div)} all-star lead",
+                    f"After Week {week}, {_names(current)} are level on {top_pts:,} pts "
+                    f"at the top of {div}.",
+                    week, date, division=div,
+                    link_href=href(div),
+                    icon_type="svg", icon_name="star"))
     for e in out:
         e["night"] = night
     return out
 
 
-def _record_events(entries, prev, record_type, round_of, date):
-    """A record card when the league-wide best changes hands or rises. `round_of` maps each
-    season key to {date: round}, so the card carries the week of the night the record was set."""
+def _record_events(entries, prev, record_type, week, date, night, link_href):
+    """A record card when this night's best changes hands or rises. Returns (events, new_prev)."""
     if not entries:
-        return []
+        return [], prev
     best = entries[0]
     player, value = best["player"], best["turn_value"]
     hit = best
-    week = round_of[hit["season"]][hit["date"]]
 
     if record_type == "checkin":
         label = "check-in"
@@ -231,7 +318,8 @@ def _record_events(entries, prev, record_type, round_of, date):
     else:
         label = "checkout"
         verb_new, verb_open = "raises the checkout record to", "opens the checkout record at"
-    award_page = "awards.html"
+
+    new_prev = (player, value)
 
     if prev is None:
         event = _event(
@@ -241,12 +329,34 @@ def _record_events(entries, prev, record_type, round_of, date):
             f"{player} hit a {value} {label} for "
             f"{hit['team']} in {hit['division']}.",
             week, date, division=hit["division"], hit=hit,
-            link_href=award_page, icon_type="svg", icon_name="award")
-        event["night"] = hit["night"]
-        return [event]
+            link_href=link_href, icon_type="svg", icon_name="award")
+        event["night"] = night
+        return [event], new_prev
 
     old_player, old_value = prev
-    if value > old_value or (value == old_value and player != old_player):
+    if value > old_value:
+        if player == old_player:
+            event = _event(
+                f"{record_type}-record",
+                f"{player} {verb_new} {value}",
+                f"In the {hit['segment']} on {_pretty(hit['date'])}, "
+                f"{player} hit a {value} {label} for {hit['team']} "
+                f"in {hit['division']}, beating their own {old_value}.",
+                week, date, division=hit["division"], hit=hit,
+                link_href=link_href, icon_type="svg", icon_name="award")
+        else:
+            event = _event(
+                f"{record_type}-record",
+                f"{player} {verb_new} {value}",
+                f"In the {hit['segment']} on {_pretty(hit['date'])}, "
+                f"{player} hit a {value} {label} for {hit['team']} "
+                f"in {hit['division']}, overtaking {old_player}'s {old_value}.",
+                week, date, division=hit["division"], hit=hit,
+                link_href=link_href, icon_type="svg", icon_name="award")
+        event["night"] = night
+        return [event], new_prev
+
+    if value == old_value and player != old_player:
         event = _event(
             f"{record_type}-record",
             f"{player} {verb_new} {value}",
@@ -254,17 +364,23 @@ def _record_events(entries, prev, record_type, round_of, date):
             f"{player} hit a {value} {label} for {hit['team']} "
             f"in {hit['division']}, overtaking {old_player}'s {old_value}.",
             week, date, division=hit["division"], hit=hit,
-            link_href=award_page, icon_type="svg", icon_name="award")
-        event["night"] = hit["night"]
-        return [event]
-    return []
+            link_href=link_href, icon_type="svg", icon_name="award")
+        event["night"] = night
+        return [event], new_prev
+
+    return [], new_prev
 
 
 # ---------------------------------------------------------------- standings changes
 
 def _accumulate_standings(schedule, night, accum, team_div):
-    """Add the league points of every match completed on `night` (a date). By date rather than
-    by round, so a make-up counts on the night it was actually played."""
+    """Add the league points of every match completed on `night` (a date).
+
+    Uses each side's own `points` field -- NOT `home_league_points` / `away_league_points`,
+    which belong to the side recorded as home on match night, and that is `left` only about
+    half the time. Summed per team, `left.points` and `right.points` reproduce DartConnect's
+    `league_points` and `matches` exactly across all six seasons.
+    """
     for _div_name, by_date in schedule.get("reg", {}).items():
         for date, matches in by_date.items():
             if date != night:
@@ -274,10 +390,9 @@ def _accumulate_standings(schedule, night, accum, team_div):
                     continue
                 left = m.get("left") or {}
                 right = m.get("right") or {}
-                for side, pts_key in ((left, "home_league_points"),
-                                       (right, "away_league_points")):
+                for side in (left, right):
                     tid = side.get("id")
-                    pts = m.get(pts_key)
+                    pts = side.get("points")
                     if tid and pts is not None:
                         div = team_div.get(tid)
                         if div:
@@ -290,30 +405,65 @@ def _standings_events(standings_pts, prev, canonical, team_div, week, date, nigh
         div_teams = standings_pts.get(div, {})
         if not div_teams:
             continue
-        leader_id = max(div_teams, key=lambda t: div_teams[t])
-        leader_pts = div_teams[leader_id]
-        leader_name = canonical.get(leader_id, f"Team {leader_id}")
-        old_id = prev.get(div)
+        current = _leader_set(div_teams)
+        top_pts = max(div_teams.values())
+        old = prev.get(div)
 
-        if old_id is None:
-            out.append(_event(
-                "standings-leader",
-                f"{leader_name} leads {_short_div(div)} after Week {week}",
-                f"{leader_name} ({leader_pts} league pts) is the first "
-                f"{div} standings leader of the season.",
-                week, date, division=div,
-                link_href=href(div),
-                icon_type="svg", icon_name="standings"))
-        elif old_id != leader_id:
-            old_name = canonical.get(old_id, f"Team {old_id}")
-            out.append(_event(
-                "standings-leader",
-                f"{leader_name} takes first in {_short_div(div)}",
-                f"After Week {week}, {leader_name} ({leader_pts} league pts) "
-                f"moves past {old_name} to the top of {div}.",
-                week, date, division=div,
-                link_href=href(div),
-                icon_type="svg", icon_name="standings"))
+        if old is None:
+            if len(current) == 1:
+                leader_id = next(iter(current))
+                leader_name = canonical.get(leader_id, f"Team {leader_id}")
+                out.append(_event(
+                    "standings-leader",
+                    f"{leader_name} leads {_short_div(div)} after Week {week}",
+                    f"{leader_name} ({top_pts} league pts) is the first "
+                    f"{div} standings leader of the season.",
+                    week, date, division=div,
+                    link_href=href(div),
+                    icon_type="svg", icon_name="standings"))
+            else:
+                out.append(_event(
+                    "standings-leader",
+                    f"{_names(current, canonical)} share the {_short_div(div)} lead "
+                    f"after Week {week}",
+                    f"{_names(current, canonical)} are level on {top_pts} league pts "
+                    f"at the top of {div} after the first night.",
+                    week, date, division=div,
+                    link_href=href(div),
+                    icon_type="svg", icon_name="standings"))
+        elif current != old:
+            if len(current) == 1:
+                leader_id = next(iter(current))
+                leader_name = canonical.get(leader_id, f"Team {leader_id}")
+                if len(old) > 1:
+                    out.append(_event(
+                        "standings-leader",
+                        f"{leader_name} pulls clear at the top of {_short_div(div)}",
+                        f"After Week {week}, {leader_name} ({top_pts} league pts) "
+                        f"breaks away from the shared lead in {div}.",
+                        week, date, division=div,
+                        link_href=href(div),
+                        icon_type="svg", icon_name="standings"))
+                else:
+                    old_id = next(iter(old))
+                    old_name = canonical.get(old_id, f"Team {old_id}")
+                    out.append(_event(
+                        "standings-leader",
+                        f"{leader_name} takes first in {_short_div(div)}",
+                        f"After Week {week}, {leader_name} ({top_pts} league pts) "
+                        f"moves past {old_name} to the top of {div}.",
+                        week, date, division=div,
+                        link_href=href(div),
+                        icon_type="svg", icon_name="standings"))
+            else:
+                out.append(_event(
+                    "standings-leader",
+                    f"{_names(current, canonical)} share first in {_short_div(div)}",
+                    f"After Week {week}, {_names(current, canonical)} are level on "
+                    f"{top_pts} league pts at the top of {div}.",
+                    week, date, division=div,
+                    link_href=href(div),
+                    icon_type="svg", icon_name="standings"))
     for e in out:
         e["night"] = night
     return out
@@ -323,15 +473,24 @@ def _standings_events(standings_pts, prev, canonical, team_div, week, date, nigh
 
 _DAYS   = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 _MONTHS = ("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")
+_WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
 
 def _pretty(iso):
-    import datetime
     try:
         d = datetime.date.fromisoformat(iso)
     except (TypeError, ValueError):
         return iso
     return f"{_DAYS[d.weekday()]} {d.day} {_MONTHS[d.month - 1]}"
+
+
+def weekday_name(iso):
+    """Full weekday name for a date string -- used by the site to detect off-night games."""
+    try:
+        d = datetime.date.fromisoformat(iso)
+    except (TypeError, ValueError):
+        return None
+    return _WEEKDAYS[d.weekday()]
 
 
 def _slug(text):
@@ -353,7 +512,7 @@ def _event(type, headline, body, week, date, division=None, hit=None,
         "body":       body,
         "week":       week,
         "date":       date,
-        "night":      None,           # set by each event builder -- every card names its night
+        "night":      None,
         "division":   division,
         "hit":        hit,
         "link_href":  link_href,
