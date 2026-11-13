@@ -79,7 +79,7 @@ def check_baseline(season):
 def check_season(season):
     """Sections 1b-11, for one season. Every season in the archive gets all of them."""
     hits   = season["hits"]
-    table  = players.division_table(hits, season["weeks_by_player"])
+    table  = players.division_table(hits, season["legs_by_player"])
     rows   = [r for rs in table.values() for r in rs]
 
     print(f"\n1b. Season to date: {len(rows)} players, "
@@ -249,7 +249,7 @@ def check_season(season):
     check("every fixture is in a standings division, between standings teams",
           not wrong, str(wrong[:2]))
 
-    print("\n11. Nights played (GP) and playoff eligibility")
+    print("\n11. Nights played (GP), legs played (PPL), and playoff eligibility")
     check("the rulebook's examples hold: 10 nights need 4, 14 need 6, 15 need 7",
           [players.playoff_minimum(n) for n in (10, 14, 15)] == [4, 6, 7])
     played = season["nights_by_player"]
@@ -269,6 +269,23 @@ def check_season(season):
     stray = sorted(p for p, dates in played.items()
                    if not dates <= team_nights[season["teams"].get(p)])
     check("nobody is credited with a night their team did not play", not stray, str(stray[:3]))
+    # Legs played: what PPL, points per leg, divides by (players.legs_played).
+    legs = season["legs_by_player"]
+    legless = sorted(r["player"] for r in rows if r["ppl"] is None)
+    check(f"all {len(rows)} scorers have played at least one leg, so every PPL is defined",
+          not legless, str(legless[:3]))
+    short = sorted(p for p, dates in played.items() if legs.get(p, 0) < len(dates))
+    check("nobody has played fewer legs than nights", not short, str(short[:3]))
+    # What catches legs regressing to each leg's opener, as the check above does for nights: a
+    # doubles partner who hit an all star in a leg they never opened. DartConnect's set and game
+    # numbers repeat in two archived matches (players.legs_played), which can only make the legs
+    # counted here fewer -- so this check can pass too easily, but never fail falsely.
+    hit_legs = collections.defaultdict(set)
+    for h in hits:
+        hit_legs[h["player"]].add((h["match_id"], h["set_index"], h["game_number"]))
+    over = sorted(p for p, ids in hit_legs.items() if len(ids) > legs.get(p, 0))
+    check("nobody hit an all star in more legs than they are credited with", not over,
+          str(over[:3]))
     lengths = season["season_nights"]
     if lengths:
         # A typo'd division would silently drop its check marks.
@@ -474,7 +491,7 @@ def check_archive(seasons):
 
     # All Time comes from the hits themselves (data rule 3), never from adding up season rows --
     # but the two must agree.
-    tables = {s["key"]: players.division_table(s["hits"], s["weeks_by_player"]) for s in seasons}
+    tables = {s["key"]: players.division_table(s["hits"], s["legs_by_player"]) for s in seasons}
     career = players.career_table(seasons, tables)
     season_sum = collections.Counter()
     for t in tables.values():
@@ -492,6 +509,9 @@ def check_archive(seasons):
     check("All Time is numbered 1..N, highest points first",
           [r["league_rank"] for r in career] == list(range(1, len(career) + 1))
           and all(career[i]["points"] >= career[i + 1]["points"] for i in range(len(career) - 1)))
+    legless = [r["player"] for r in career if r["ppl"] is None]
+    check(f"all {len(career)} All Time rows have legs to divide by, so every PPL is defined",
+          not legless, str(legless[:3]))
 
     # A player page's All Time singles averages (owner, 2026-11-12) add up the raw sums of the
     # seasons the page shows and divide once (players.combined_form) -- never an average of season
@@ -525,7 +545,8 @@ def check_archive(seasons):
             check(f"the {night} league has exactly one current season", len(current) == 1,
                   str(current))
 
-    # Informational: why PPW counts rounds, not dates.
+    # Informational: why a week is a DartConnect round, not a date -- the WEEK N labels count
+    # rounds, because make-up nights put more dates than rounds into a season.
     for s in seasons:
         dates = len({m["date"] for m in s["matches"]})
         rounds = len({m.get("round_seq") for _d, _date, m in events.fetch.iter_matches(s["schedule"])})

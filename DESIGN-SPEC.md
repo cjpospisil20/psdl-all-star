@@ -147,8 +147,12 @@ Players talk in codes. Use their words, never database column names.
 | `R8` | 8 marks | 160 | | `C6` | 6 — extremely rare | 180 |
 | `R9` | 9 marks (perfect turn) | 180 | | | | |
 
-**AS** = count of all-star hits. **PPW** = points per week (the average — season awards
-effectively hinge on this, because it normalises for players who miss weeks).
+**AS** = count of all-star hits. **PPL** = points per leg played: a player's all star points
+divided by every leg they threw a turn in — singles, doubles and triples, '01 and cricket alike
+(`players.legs_played`). It replaced **PPW**, points per week, on 2026-11-13 at the owner's request;
+PPW divided by the weeks a player had hit an all star in. Every page that shows PPL says once what
+it is, and `check.py` fails any page that shows PPW. The rulebook still says PPW for forfeit credit
+(§F.3), which stays a commissioner's calculation.
 
 ### Chip styling — the one rule that carries the design
 
@@ -208,8 +212,8 @@ point — the old system's real failure was that nobody looked at it.
 | File | What it is |
 |---|---|
 | `design/standings.html` | League standings, straight from DartConnect. Division switcher, one division at a time. Since 2026-11-12 a league picker above it switches between the Tuesday and Monday leagues; the mockup predates it. |
-| `design/all-stars.html` | All-star points leaderboard by division. The heart of the app. Since 2026-11-12 a season picker sits above the division chips (All Time, then every season of both nights); the mockup predates it. |
-| `design/player.html` | One player: DartConnect form stats, then all-star points and every hit. Since 2026-11-12 one page covers every season the player has scored in, and a past season's board opens its section. A player with two or more seasons gets an ALL TIME section first: the singles averages and the points over exactly the seasons below, the averages divided once from those seasons' added-up darts and points. Then each season, newest first, has its own singles averages, its points and rank, and its top three hits, with the rest folded behind "N MORE HITS". The mockup's activity strip (MATCHES, LEGS, DARTS) is not built: the owner removed it on 2026-11-12. |
+| `design/all-stars.html` | All-star points leaderboard by division. The heart of the app. Since 2026-11-12 a season picker sits above the division chips (All Time, then every season of both nights); the mockup predates it. The mockup's PPW is PPL on the site since 2026-11-13 (see the stat vocabulary); its week-1 figures are not relabelled, because 835 points is not 835 per leg. |
+| `design/player.html` | One player: DartConnect form stats, then all-star points and every hit. Since 2026-11-12 one page covers every season the player has scored in, and a past season's board opens its section. A player with two or more seasons gets an ALL TIME section first: the singles averages and the points over exactly the seasons below, the averages divided once from those seasons' added-up darts and points. Then each season, newest first, has its own singles averages, its points and rank, and its top three hits, with the rest folded behind "N MORE HITS". The mockup's activity strip (MATCHES, LEGS, DARTS) is not built: the owner removed it on 2026-11-12. The mockup's PPW is PPL on the site since 2026-11-13. The All Time PPL divides by the legs of the seasons below, as the averages do. |
 | `design/match.html` | **Retired 2026-11-11.** One match night, both teams, every hit linking to its turn. The Match tab became the Schedule (upcoming home v away fixtures, no all-star points), which has no mockup; `site/build.py` `build_schedule()` is its reference. |
 | `design/team.html` | Captain's roll-up of their players. Opened by tapping a team on Standings; lists the whole roster with GP (league nights played) and singles averages, and a gold check mark (inline SVG, never a glyph) after the name of each playoff-eligible player. |
 | `design/rare-hit.html` | **Retired 2026-11-12.** The celebration screen for the season's first 180 / R9 / C6. The owner removed it: the Feed and Awards celebrate those hits now. |

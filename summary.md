@@ -183,8 +183,9 @@ This discovery removed what had been the single largest piece of remaining build
 | R9 | 180 | | |
 
 **Exclusions:** busts are void (§F.1). Forfeit credits are **not derivable** from DartConnect —
-players on a signed forfeit sheet are credited at season end from their PPW average (§F.3). That
-stays a manual commissioner input, forever.
+players on a signed forfeit sheet are credited at season end from their PPW average (§F.3) — the
+rulebook's points per *week*. That stays a manual commissioner input, forever. The site has shown
+points per *leg* (PPL) instead since 2026-11-13, so it no longer offers a weekly figure to work from.
 
 ---
 
@@ -200,7 +201,8 @@ scraper/fetch.py       THE ONLY networked module. Season schedule + standings, a
 scraper/allstar.py     rules engine — Section F applied to turn data. Emits INDIVIDUAL HITS;
                        totals are derived from them by aggregate(), never accumulated.
 scraper/players.py     player → team from recaps; form stats recomputed from turns;
-                       division_table() — the ranked all-star table, per division only.
+                       division_table() — the ranked all-star table, per division only,
+                       with PPL: points per leg played, the legs from legs_played().
 scraper/events.py      season assembly — load_season(): one pass over the archive, attaches
                        week/date, scores everything. The single entry point the site uses.
 scraper/verify.py      assertion suite. Run before publishing. All checks passing.
@@ -318,10 +320,10 @@ season, so it is a season-long landmark, not a weekly feature. Season to date: 2
   Division 1's seven teams play each other twice, 12 nights over 14 weeks with two byes each.
   DartConnect's lineups feed agrees exactly. It is `players.SEASON_NIGHTS` and drives the
   playoff-eligibility check marks (Rulebook §H.2 — earlier notes here said §G.2, which is wrong).
-  **PPW still divides points by the number of weeks in which the player scored at least one hit**
-  (`events.load_season` → `weeks_by_player`). That is a defensible mid-season figure, but it is not
-  the same as dividing by nights played (`nights_by_player` now exists) or by season length, and the
-  season-end award basis needs deciding before anyone treats PPW as official.
+  **PPW is answered too: it is gone (owner, 2026-11-13).** It divided points by the weeks in which
+  the player had hit an all star, which was neither nights played nor the season's length. The site
+  now shows **PPL, points per leg played**: points ÷ every leg the player threw a turn in, in any
+  format (`players.legs_played` → `legs_by_player`). See the 2026-11-13 PPL entry below.
 - **How many players per division make All Star** — still unanswered, still the one design placeholder
   the league has to fill. See item 5 above.
 - Whether `S90` should apply to 701 Triples: **answered — yes**, and implemented.
@@ -1171,3 +1173,70 @@ Checks.
   - The Schedule's live styling reads well two across.
 - **With scripts blocked** (a sandboxed iframe): the desktop grid, the paired cards, the two-across
   fixtures, and a MORE HITS fold that opens.
+
+### 2026-11-13 — PPW becomes PPL: all star points per leg played
+
+The owner asked to swap "points per week" for "points per leg" everywhere. Asked whether that meant
+the label or the number, they chose the number: a weekly figure such as 757.9 relabelled "per leg"
+would have been false.
+
+- **PPL = all star points ÷ legs played.** A leg counts for every player who threw at least one turn
+  in it, in any format: singles, doubles and triples, '01 and cricket. The legs come from
+  `players.legs_played(props)`, and `events.load_season` sums them into `legs_by_player`.
+  `weeks_by_player` and the `(stage, round)` keying in `merge_stages` are gone, because nothing
+  else read them. Week numbers still count DartConnect rounds.
+- **Two gotchas, both in `legs_played`'s docstring:**
+  - **Count every turn, not each leg's opener.** Openers alone would give 226 of Fall 2026's 244
+    scorers the wrong count, for the reason GP once had (doubles partners alternate).
+    `form_sums` still counts openers for LEG WINS (follow-up 7).
+  - **DartConnect's `(set_index, set_game_number)` is not a unique leg id.** `68eedeb5…` (Fall 2025)
+    has a 501 singles set with two "game 1"s, and `69b0b45c…` (Spring 2026) has two different
+    cricket singles games both "set 6, game 1". A set of those ids lost 2 of Fall 2025's 7,332 legs.
+    Legs are therefore counted by their place in the match, as a per-player tally.
+- **All Time PPL** (`career_table`) divides by the legs of exactly the seasons the player has a row
+  in. Those are the seasons their page lists under its ALL TIME card, matching the pooled averages.
+  A season with no all star hit stays out.
+- **Without legs, PPL is `None`, never points.** `division_table(hits)` with no legs is only for the
+  Feed, which ranks by points alone. The old fallback showed raw points as PPW.
+- **What it looks like:**
+  - Medians: Fall 2026 Tuesday 34.0, Fall 2025 34.4, Spring 2026 Tuesday 35.5. Monday's are
+    about 45: Fall 2026 45.1, and Spring 2026 45.4 with its stages merged.
+  - Jeff Jean-Louis leads Division 1 with 6,063 points over 39 legs: PPL 155.5 (PPW was 757.9).
+  - Fall 2026's highest is Anaelechi "Lay" Owunwanne, 160.1 over 28 legs.
+- **The site says what PPL is**, once per page that shows it, the way a team page explains GP:
+  "PPL is points per leg played — singles, doubles and triples alike." (`build.PPL_NOTE`)
+  - It sits on every All-Stars board's caption and on both Awards indexes and both All Star Points
+    Leader pages.
+  - On a player page it goes on the first ALL STAR POINTS card: the ALL TIME card, otherwise the
+    first season's.
+- **Deliberately unchanged:**
+  - The rulebook still says PPW for forfeit credit (§F.3), a commissioner's calculation, so the
+    rulebook text, the design brief, the BRD, `docs/legacy/` and `data/allstar-standings.csv` are
+    as they were.
+  - The `design/` mockups too: their week-1 "PPW 835" is not 835 per leg. DESIGN-SPEC says the
+    site shows PPL.
+  - `standings.py` prints PPL, and its CSV's `WP, PPW` columns are now `LEGS, PPL`.
+
+**New checks.**
+- `verify.py` §11, for every season:
+  - every scorer has a leg, so every PPL is defined
+  - nobody has fewer legs than nights
+  - nobody hit an all star in more legs than they are credited with, the guard against counting
+    openers only
+- `verify.py`, All Time: every row has legs.
+- `check.py`:
+  - no page shows PPW
+  - all 2,914 rows, leader cards and points cards show a numeric PPL
+  - all 372 pages that show PPL say what it is exactly once
+
+Deliberate breakages were caught:
+- Opener-only legs, in memory: the legs-vs-nights check failed in all six seasons, and the hit-legs
+  check in five.
+- A `None` PPL, a missing note and a returning PPW each failed their check.
+
+**Verified:** `verify.py`, `build.py` (433 pages) and `check.py` pass.
+- Against main's build, 372 pages changed: every All-Stars board, all 347 player pages, both Awards
+  indexes and both All Star Points Leader pages. The only differences are PPW → PPL (label and
+  figure) and the note. Nothing else moved.
+- A four-season page (Ayodele Amao) reproduces: 3,299 points over its seasons' 14 + 17 + 17 + 44 =
+  92 legs gives the ALL TIME card's 35.9.

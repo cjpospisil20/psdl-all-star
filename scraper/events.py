@@ -110,7 +110,7 @@ def merge_stages(parts):
     key = re.sub(r"[^a-z0-9]+", "-", f"{first['night']} {label}".lower()).strip("-")
 
     all_hits, all_matches, all_recaps, all_sided = [], [], [], []
-    weeks_by_player = collections.defaultdict(set)
+    legs_by_player = collections.Counter()
     hit_nights_by_player = collections.defaultdict(set)
     nights_by_player = collections.defaultdict(set)
     all_dates = set()
@@ -118,7 +118,6 @@ def merge_stages(parts):
     division = first["divisions"][0] if first.get("divisions") else divisions(first)[0]
 
     for stage in loaded:
-        stage_id = stage["id"]
         for h in stage["hits"]:
             copy = dict(h)
             copy["season"] = key
@@ -133,9 +132,7 @@ def merge_stages(parts):
         all_sided.extend(stage["sided_recaps"])
         all_dates.update(stage["dates"])
         week_of.update(stage["week_of"])
-        for player, rounds in stage["weeks_by_player"].items():
-            for r in rounds:
-                weeks_by_player[player].add((stage_id, r))
+        legs_by_player.update(stage["legs_by_player"])     # different matches, so legs add
         for player, nights in stage["hit_nights_by_player"].items():
             hit_nights_by_player[player].update(nights)
         for player, nights in stage["nights_by_player"].items():
@@ -170,7 +167,7 @@ def merge_stages(parts):
         "latest_week": max((s["latest_week"] for s in loaded), default=0),
         "latest_date": max((s["latest_date"] for s in loaded if s["latest_date"]),
                            default=None),
-        "weeks_by_player": dict(weeks_by_player),
+        "legs_by_player": dict(legs_by_player),
         "hit_nights_by_player": dict(hit_nights_by_player),
         "nights_by_player": dict(nights_by_player),
         "season_nights": {},
@@ -257,11 +254,9 @@ def load_season(season_id=None):
 
     recaps, hits, busts = [], [], collections.Counter()
     sided_recaps = []
-    # Weeks a player hit an all star in -- what PPW divides by. A week is DartConnect's round
-    # (`round_seq`), not a date: a make-up night is a different date in the same round. Fall 2025
-    # had 23 match dates over 15 rounds. (In Fall 2026 every round is one date, so it makes no
-    # difference there.)
-    weeks_by_player = collections.defaultdict(set)
+    # Legs each player threw in, every format -- what PPL (points per leg) divides by. See
+    # players.legs_played.
+    legs_by_player = collections.Counter()
     hit_nights_by_player = collections.defaultdict(set)   # dates with an all star hit
     nights_by_player = collections.defaultdict(set)       # nights played at all -- GP
     matches = []
@@ -279,17 +274,16 @@ def load_season(season_id=None):
         sided_recaps.append((props, sides))
         for name in players.throwers(props):
             nights_by_player[name].add(date)
+        legs_by_player.update(players.legs_played(props))
 
         # The division comes from the schedule, which names it as standings does -- see
         # allstar.score_match on Monday's "Division: PS Monday".
         match_hits, match_busts = allstar.score_match(props, date=date, week=week_of[date],
                                                       teams=sides, division=division)
-        round_no = m.get("round_seq") or week_of[date]
         for h in match_hits:
             h["player"] = players.clean_name(h["player"])
             h["season"] = key
             h["night"] = entry["night"]
-            weeks_by_player[h["player"]].add(round_no)
             hit_nights_by_player[h["player"]].add(date)
         hits.extend(match_hits)
         busts.update(match_busts)
@@ -353,7 +347,7 @@ def load_season(season_id=None):
         "week_of":    week_of,
         "latest_week": latest_week,
         "latest_date": latest_date,
-        "weeks_by_player": weeks_by_player,
+        "legs_by_player": dict(legs_by_player),
         "hit_nights_by_player": hit_nights_by_player,
         # League nights each player has played (GP), and the nights each team plays this
         # season per division -- empty for a season nobody has told us about. Together they
@@ -381,7 +375,7 @@ def divisions(season):
 
 def team_table(season, team_name):
     """A captain's roll-up: who scored, with each player's rank inside their division."""
-    table = players.division_table(season["hits"], season["weeks_by_player"])
+    table = players.division_table(season["hits"], season["legs_by_player"])
     rows = []
     for division_rows in table.values():
         for row in division_rows:

@@ -44,6 +44,11 @@ DARTS_LABELS = ["3-DART AVG", "MARKS PER RD", "FIRST 9", "CHECKOUT", "LEG WINS",
 SINGLES_NOTE = "Averages cover singles legs only"
 NO_SINGLES   = "No singles legs"
 
+# PPL, all star points per leg played, replaced PPW, points per week (owner, 2026-11-13). Every
+# page that shows it says what it is, once.
+PPL_NOTE = "PPL is points per leg played"
+PPL      = r"\d+(?:\.\d)?"         # one decimal at most, as build.py prints it (`:g`)
+
 failures = []
 
 
@@ -948,6 +953,29 @@ def check_navigation(pages):
     # was a week-1 figure, and the season has drifted from it.
     ratio = [n for n, m in site.items() if re.search(r"2\.5\s*(?:&times;|×|x\b)", m)]
     check("no page quotes the retired 2.5x division gap", not ratio, str(ratio[:3]))
+    # PPW, points per week, became PPL, points per leg played (owner, 2026-11-13).
+    ppw = [n for n, m in site.items() if re.search(r"\bPPW\b", m)]
+    check("no page shows the retired PPW", not ppw, str(ppw[:3]))
+    # A figure -- never None, never blank -- on every All-Stars row and leader card, on the boards
+    # and on Awards, and on every player page's points card. Standings and team pages show PTS
+    # alone in the same row-pts slot, and never had a PPW.
+    scope = set(all_stars_boards(site)) | {
+        n for n in site if re.fullmatch(r"(?:player|award)/.+\.html|awards(?:-[a-z]+)?\.html", n)}
+    blank, blocks = [], 0
+    for name in sorted(scope):
+        found = (re.findall(r'<span class="(?:row|leader)-pts">.*?</span>\s*</span>', site[name],
+                            re.S)
+                 + re.findall(r'<h2>ALL STAR POINTS</h2>.*?</div>', site[name], re.S))
+        blocks += len(found)
+        blank += [name + ": " + " ".join(b.split())[:70] for b in found
+                  if not re.search(rf'<span class="num">PPL {PPL}(?: &middot;|</span>)'
+                                   rf'|<b class="num">{PPL}</b><small>PPL</small>', b)]
+    check(f"all {blocks} All-Stars rows, leader cards and points cards show a PPL",
+          blocks and not blank, f"{len(blank)}: {blank[:2]}")
+    shows = [n for n, m in sorted(site.items()) if re.search(r">PPL [\d.]|<small>PPL<", m)]
+    unexplained = [n for n in shows if site[n].count(PPL_NOTE) != 1]
+    check(f"all {len(shows)} pages that show PPL say once what it is",
+          shows and not unexplained, str(unexplained[:3]))
     boards = [n for n in site if re.fullmatch(r"index\.html|division-\d\.html", n)]
     no_chip = [n for n in boards if 'href="all.html"' not in site[n]]
     check("every division board offers the ALL chip", not no_chip, str(no_chip))
