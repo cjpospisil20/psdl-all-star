@@ -293,6 +293,20 @@ a:hover {{ color: var(--white); }}
 .hit-val {{ flex-shrink: 0; font-family: var(--display); font-weight: 400; font-size: 22px;
            color: var(--white); }}
 
+/* A season's hits past its top three, on a player page. A <details> disclosure, so every hit is
+   in the markup and it opens with JavaScript off; the summary is styled like the show-all
+   button, and its chevron turns over when open. */
+.more-hits summary {{
+  list-style: none; display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 46px; margin: 4px 16px 0; border-radius: 9px; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--hairline);
+  font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: var(--gold);
+}}
+.more-hits summary::-webkit-details-marker {{ display: none; }}
+.more-hits[open] summary {{ margin-bottom: 4px; }}
+.more-hits[open] summary svg {{ transform: rotate(180deg); }}
+.more-hits + .headline {{ margin-top: 20px; }}
+
 /* ---------- feed cards ---------- */
 .feed-card {{
   display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px;

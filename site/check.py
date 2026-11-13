@@ -31,6 +31,15 @@ AA_TEXT     = 4.5      # WCAG 2.1 SC 1.4.3, normal-size text
 AA_NON_TEXT = 3.0      # WCAG 2.1 SC 1.4.11, icons and control boundaries
 MIN_TAP     = 44       # DESIGN-SPEC layout rule
 
+# The player page (owner, 2026-11-12): the All Time section's id, how many of a season's hits show
+# before the rest fold away, and the six singles figures every darts card carries, in order.
+# Restated rather than imported from build.py: this suite judges the output, not the code.
+ALL_TIME_ID  = "all-time"
+TOP_HITS     = 3
+DARTS_LABELS = ["3-DART AVG", "MARKS PER RD", "FIRST 9", "CHECKOUT", "LEG WINS", "OPP 3DA"]
+SINGLES_NOTE = "Averages cover singles legs only"
+NO_SINGLES   = "No singles legs"
+
 failures = []
 
 
@@ -1039,16 +1048,22 @@ def current_season_key(standings, night):
 
 
 def points_on_page(page, fragment=None, all_time=False):
-    """The total a player page shows for one season (the ALL STAR POINTS card at `fragment`, or the
-    first one), or for their career (the ALL TIME card, which only multi-season pages have)."""
-    if all_time and "<h2>ALL TIME" in page:
-        found = re.search(r'<h2>ALL TIME.*?<b class="num">([\d,]+)</b>', page, re.S)
-    else:
-        start = page.find(f'id="{fragment}"') if fragment else 0
+    """The total a player page shows: the ALL STAR POINTS card of the All Time section (`all_time`,
+    on a page that has one -- multi-season pages do), of the season section at `fragment`, or of
+    the page's first season. That first season is NOT the first card on a multi-season page: the
+    All Time section sits above it (2026-11-12), and a link with no fragment means the first
+    season."""
+    if all_time and f'id="{ALL_TIME_ID}"' in page:
+        start = page.find(f'id="{ALL_TIME_ID}"')
+    elif fragment:
+        start = page.find(f'id="{fragment}"')
         if start < 0:
             return None
-        found = re.search(r'<h2>ALL STAR POINTS</h2>.*?<b class="num">([\d,]+)</b>',
-                          page[start:], re.S)
+    else:
+        first = re.search(rf'<div class="headline" id="(?!{ALL_TIME_ID}")', page)
+        start = first.start() if first else 0
+    found = re.search(r'<h2>ALL STAR POINTS</h2>.*?<b class="num">([\d,]+)</b>',
+                      page[start:], re.S)
     return int(found.group(1).replace(",", "")) if found else None
 
 
@@ -1253,6 +1268,126 @@ def check_both_nights(pages):
     check("no repeated Feed heading", not dup_headings, str(dup_headings[:3]))
 
 
+# ---------------------------------------------------------------- 15. player pages
+
+# What a player page is made of, in page order: the All Time heading (A) or a season's (S), a
+# darts card (D), an ALL STAR POINTS card (P), and a hit list's heading (H).
+PLAYER_PARTS = re.compile(r'<div class="headline" id="(?P<id>[^"]+)">'
+                          r'|<h2>(?P<darts>THE DARTS &middot; SINGLES[^<]*)</h2>'
+                          r'|<h2>(?P<points>ALL STAR POINTS)</h2>'
+                          r'|<h2 class="section">THE (?P<hits>\d+) HITS?</h2>')
+
+
+def darts_cards(page):
+    """[(title, [(value, label)], body)] for every darts card on a player page, in page order."""
+    cards = []
+    for title, body in re.findall(r'<h2>(THE DARTS &middot; SINGLES[^<]*)</h2>(.*?)\n  </div>\n',
+                                  page, re.S):
+        stats = re.findall(r'<b class="num">([^<]*)</b><small>([^<]*)</small>', body)
+        cards.append((title, stats, body))
+    return cards
+
+
+def figure(value):
+    """A darts-card figure as a number -- None for the em dash."""
+    value = _html.unescape(value).rstrip("%")
+    return None if value == "—" else float(value)
+
+
+def check_player_pages(pages):
+    """The player page (owner, 2026-11-12): an All Time section with the singles averages and the
+    points over the seasons the page shows; every season with its own averages; the THIS SEASON
+    card gone; and a season's top three hits, the rest folded into a <details>."""
+    print("\n15. Player pages -- All Time, every season's averages, the top three hits")
+    site = {name.replace("\\", "/"): markup for name, markup in pages.items()}
+    player_pages = {n: m for n, m in site.items() if n.startswith("player/")}
+    check("found the player pages", len(player_pages) > 100, str(len(player_pages)))
+
+    misshapen, stale, bad_darts, bad_caption, outside = [], [], [], [], []
+    bad_fold, unsorted = [], []
+    cards = lists = folds = compared = 0
+    for name, page in sorted(player_pages.items()):
+        # ---- shape: All Time (two or more seasons) then every season, each complete ----
+        seq = "".join("A" if m["id"] == ALL_TIME_ID else "S" if m["id"] else
+                      "D" if m["darts"] else "P" if m["points"] else "H"
+                      for m in PLAYER_PARTS.finditer(page))
+        top = re.search(rf'id="{ALL_TIME_ID}"><span>\s*<h2 class="section">ALL TIME &middot; '
+                        r'(\d+) SEASONS</h2>', page)
+        if not re.fullmatch(r"ADP(?:SDPH){2,}|S?DPH", seq) \
+                or bool(top) != seq.startswith("A") \
+                or (top and int(top.group(1)) != seq.count("H")):
+            misshapen.append(f"{name}: {seq}")
+
+        # ---- the retired card: MATCHES, LEGS, DARTS ----
+        if re.search(r"<h2>TH(?:IS|E) SEASON</h2>|<small>(?:MATCHES|LEGS|DARTS)</small>", page):
+            stale.append(name)
+
+        # ---- every darts card: the six figures in order, or a line saying there are none ----
+        found = darts_cards(page)
+        cards += len(found)
+        for title, stats, body in found:
+            if stats and [label for _value, label in stats] != DARTS_LABELS \
+                    or not stats and NO_SINGLES not in body:
+                bad_darts.append(f"{name}: {_html.unescape(title)}")
+        # The averages are explained once, on the first card with figures to explain.
+        with_figures = [body for _title, stats, body in found if stats]
+        if page.count(SINGLES_NOTE) != (1 if with_figures else 0) \
+                or with_figures and SINGLES_NOTE not in with_figures[0]:
+            bad_caption.append(name)
+
+        # ---- All Time adds up the seasons below, so each of its figures lies between theirs ----
+        # Not LEG WINS: it counts legs of every format (players.form_sums), so a season whose card
+        # shows no singles figures -- and so no LEG WINS -- still adds its legs to All Time's.
+        if seq.startswith("A") and found:
+            (_t, career, _b), seasons = found[0], found[1:]
+            for i, label in enumerate(DARTS_LABELS):
+                if label == "LEG WINS":
+                    continue
+                values = [figure(stats[i][0]) for _t, stats, _b in seasons if stats]
+                values = [v for v in values if v is not None]
+                mine = figure(career[i][0]) if career else None
+                compared += 1
+                if (mine is None) != (not values) \
+                        or values and not min(values) <= mine <= max(values):
+                    outside.append(f"{name}: {label} {mine} vs seasons {values}")
+
+        # ---- every hit list: the top three, the rest in one fold that counts them right ----
+        for total, body in re.findall(r'<h2 class="section">THE (\d+) HITS?</h2>.*?</div>\n'
+                                      r'(.*?)(?=<div class="headline"|<nav aria-label="Sections")',
+                                      page, re.S):
+            lists += 1
+            total = int(total)
+            shown, fold, rest = body.partition('<details class="more-hits">')
+            more = re.fullmatch(r'\s*<summary>(\d+) MORE HIT(S?)<svg[^>]*>.*?</svg></summary>\n'
+                                r'(.*)</details>\s*', rest, re.S)
+            inside = more.group(3).count('<div class="hit">') if more else 0
+            folds += bool(fold)
+            if shown.count('<div class="hit">') != min(total, TOP_HITS) \
+                    or bool(fold) != (total > TOP_HITS) \
+                    or fold and not (more and int(more.group(1)) == inside == total - TOP_HITS
+                                     and (more.group(2) == "S") == (inside != 1)):
+                bad_fold.append(f"{name}: THE {total} HITS")
+            values = [int(v) for v in re.findall(r'<span class="hit-val num">(\d+)</span>', body)]
+            if len(values) != total or values != sorted(values, reverse=True):
+                unsorted.append(f"{name}: {values[:6]}")
+
+    check("every player page is All Time (two or more seasons) then each season, and each part "
+          "has its averages, its points and its hits", not misshapen, str(misshapen[:3]))
+    check("no player page keeps the retired THIS SEASON card (MATCHES, LEGS, DARTS)", not stale,
+          str(stale[:3]))
+    check(f"all {cards} darts cards show the six singles figures in order, or say there are no "
+          "singles legs", cards and not bad_darts, str(bad_darts[:3]))
+    check("the averages are explained once per page, on its first darts card with figures",
+          not bad_caption, str(bad_caption[:3]))
+    check(f"all {compared} All Time figures lie between the lowest and highest of the seasons "
+          "the page shows", compared and not outside, str(outside[:3]))
+    check(f"all {lists} hit lists show their top {TOP_HITS}, and the {folds} with more fold the "
+          "rest into one <details> whose count is right", lists and folds and not bad_fold,
+          str(bad_fold[:3]))
+    check("every hit list runs most points first, every hit present", not unsorted,
+          str(unsorted[:3]))
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -1288,6 +1423,7 @@ def main():
     check_schedule(pages)
     check_season_history(pages)
     check_both_nights(pages)
+    check_player_pages(pages)
 
     print(f"\n{'ALL CHECKS PASSED' if not failures else str(len(failures)) + ' CHECK(S) FAILED'}")
     if failures:

@@ -150,8 +150,8 @@ This discovery removed what had been the single largest piece of remaining build
   mid-turn, so their count is exactly 3 × turns taken.
 - **A leg's first turn names only one partner.** In doubles and triples the partners alternate
   turns, so anything keyed off `turns[0]` sees only whoever threw first — by week 9 that left 45
-  players short of nights they had played. `players.throwers()` reads every turn; GP and the player
-  page's MATCHES come from it.
+  players short of nights they had played. `players.throwers()` reads every turn, and GP comes from
+  it. (So did the player page's MATCHES until the owner removed that card on 2026-11-12.)
 - **Averages are singles-only, deliberately.** In doubles and triples the darts and the points belong
   to the side, so there is no honest way to split them between partners — crediting the side's figures
   to each player inflates everyone. DartConnect's own card is captioned "SINGLES 501 SIDO" for the
@@ -304,10 +304,12 @@ season, so it is a season-long landmark, not a weekly feature. Season to date: 2
    rule and its styling are already built and will appear.
 6. **Persistent storage** — still unnecessary. Everything recomputes from the archived recaps on each
    run, which at ~180 matches/season takes seconds. Revisit only if that stops being true.
-7. **Player-page LEGS, DARTS and LEG WINS credit only each leg's opener.** `form_stats` keys its
-   activity counts off `turns[0]`, so a doubles or triples partner who threw second is missing from
-   them, and the opener is credited with the whole side's darts. MATCHES had the same bug and now
-   comes from `nights_by_player` (see the 2026-11-11 GP entry); the other three were left alone.
+7. **Player-page LEG WINS credits only each leg's opener, in every format.** `form_sums` keys its
+   leg counts off `turns[0]`, so a doubles or triples partner who threw second is missing from them.
+   And unlike every other figure on the SINGLES card, LEG WINS counts doubles and triples legs too.
+   MATCHES had the same opener bug and was fixed (see the 2026-11-11 GP entry). LEGS and DARTS had it
+   as well and were never fixed; they left the page with MATCHES on 2026-11-12. LEG WINS remains,
+   both per season and All Time.
 
 ### Open questions
 
@@ -1023,3 +1025,70 @@ season picker still opened and its link still navigated to Fall 2025's Division 
 Open, for the owner: Monday's season length per division (for playoff ticks). And a rollover note: a
 league's "current" season is its latest with an archived recap, so between seasons the Schedule
 keeps showing the finished season until the new one's first match is archived.
+
+### 2026-11-12 — Player page: All Time averages, every season's averages, the top three hits
+
+The owner asked for four changes to the player page.
+
+- **All Time gets the singles averages.** A player with two or more seasons now opens with an ALL
+  TIME section ("ALL TIME · 3 SEASONS", "The 3 seasons below, Monday and Tuesday nights together").
+  It holds the six singles figures (3-DART AVG, MARKS PER RD, FIRST 9, CHECKOUT, LEG WINS, OPP 3DA),
+  then the points card as before.
+  - **The owner chose that All Time covers only the seasons the page shows** (the seasons with an
+    all-star hit), so it is exactly the season cards below added together. Thirty players also threw
+    singles in a season their page does not show; for the 17 of them with an All Time section, those
+    legs are left out.
+  - The averages add up each season's raw sums and divide once:
+    - `players.form_sums()` is the accumulator, and every value in it is a plain total.
+    - `form_figures()` does the division.
+    - `combined_form()` adds the sums across seasons.
+  - `form_stats()` is now `form_figures` over `form_sums`, and team pages are unchanged: all 863
+    player-seasons reproduce exactly.
+  - `opponents`, `legs` and `darts` are gone from its output. `opponents` does not add up across
+    seasons, and nothing read the other two once the THIS SEASON card went.
+- **The THIS SEASON card (MATCHES, LEGS, DARTS) is gone.** Its caption (averages are singles only;
+  checkout % is our own definition) moved to the page's first darts card with figures, and appears
+  once.
+- **Every season has its own averages.** Before, only the first section did. A season with no
+  singles legs (7 today, e.g. John Booth's Fall 2026 Tuesday) says so in one line instead of showing
+  six blanks. Its LEG WINS counts only doubles legs, so showing it alone under a SINGLES title would
+  mislead.
+- **Top three hits, the rest folded.** Each season shows its three best hits. The rest sit in a
+  `<details class="more-hits">` whose summary reads "N MORE HITS" ("1 MORE HIT" for a season of four
+  hits). 583 of the 792 hit lists fold. The summary is styled like the show-all button and works with
+  JavaScript off; `app.js` did not change.
+- **Ties are pinned.**
+  - Hits used to be sorted by points alone, so ties fell back to matches.json order. That file is
+    refetched while a season is live, so the top three could change on a refetch.
+  - `build.by_points()` now breaks ties newest night first, then in the order the turns were thrown.
+    Every season already showed that order except Monday's merged Spring 2026, where stage 1's hits
+    came before stage 2's.
+  - Every page lists exactly the hits it did before.
+- **Averages print fixed places**: 49.00, not 49.0 (508 figures), as team pages and DartConnect print
+  them.
+
+Checks.
+- **A §13 fix.** In `check.py` §13, "board rows show the same total as the player's own page" read a
+  link with no fragment as the page's first ALL STAR POINTS card. That card is now All Time's, so the
+  check would have failed every multi-season page. `points_on_page` now starts at the first season
+  section, or at the All Time section for an All Time row.
+- **New `check.py` §15:**
+  - every player page is All Time (two or more seasons), then each season, each with its averages,
+    points and hits
+  - the THIS SEASON card is gone
+  - every darts card shows the six figures in order, or the no-singles line
+  - the caption appears once, on the first card with figures
+  - every All Time figure lies between the lowest and highest of the page's seasons (except LEG WINS,
+    which counts every format)
+  - every hit list shows its top three and folds the rest with the right count
+  - hits run most points first
+
+  Ten deliberate breakages were each caught.
+- **New `verify.py` §12 check.** For every multi-season player with one spelling, All Time's averages
+  equal one pass over all of those seasons' legs. It fails when `combined_form` averages the averages
+  (tried). verify loads Monday's stages separately, which only splits the sums more finely.
+
+**Verified:** `verify.py`, `build.py` (433 pages) and `check.py` pass. Against main's build, only
+`app.css` and the 347 player pages changed. In Chrome at phone width: the All Time block; a fold
+closed and open; Enter and Space on a focused summary. **With scripts blocked** (a sandboxed iframe),
+a fold still opened and showed its 13 hits.

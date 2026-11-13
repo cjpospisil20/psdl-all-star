@@ -247,8 +247,45 @@ def form_stats(recaps):
 
     Validated against DartConnect's own per-leg averages: 84 singles legs, mean delta 0.000.
     """
-    acc = collections.defaultdict(lambda: collections.defaultdict(float))
-    opponents_faced = collections.defaultdict(set)
+    return {name: form_figures(sums) for name, sums in form_sums(recaps).items()}
+
+
+def combined_form(parts):
+    """Form over several seasons at once: a player page's All Time singles averages.
+
+    `parts` are one player's form_sums() entries, one per season. They are added together and
+    divided once -- exactly as if form_stats() had read all of those seasons' legs in one pass,
+    which verify.py checks. Season averages are never averaged: a season of 300 darts must not
+    weigh as much as a season of 3,000.
+    """
+    total = collections.Counter()
+    for part in parts:
+        total.update(part)
+    return form_figures(total)
+
+
+def form_figures(sums):
+    """One player's form from their raw sums -- form_sums() for a season, or several seasons'
+    added together by combined_form(). Each average is divided here, once, from the sums."""
+    a = collections.Counter(sums)
+    return {
+        "three_dart_avg": round(a["points"] / a["darts"] * 3, 2) if a["darts"] else None,
+        "first_nine":     round(a["first9"] / a["first9_legs"] / 3, 2) if a["first9_legs"] else None,
+        "mpr":            round(a["mpr_weighted"] / a["mpr_darts"], 2) if a["mpr_darts"] else None,
+        "leg_win_pct":    round(a["leg_wins"] / a["legs"] * 100, 1) if a["legs"] else None,
+        "checkout_pct":   round(a["co_hits"] / a["co_attempts"] * 100, 1) if a["co_attempts"] else None,
+        "opp_three_dart": round(a["opp_points"] / a["opp_darts"] * 3, 2) if a["opp_darts"] else None,
+        "singles_legs":   int(a["legs_01"] + a["legs_crk"]),
+    }
+
+
+def form_sums(recaps):
+    """The raw per-player sums behind form_stats(): {name: Counter}, every value a plain total
+    -- points, darts, legs, checkout attempts -- so that two seasons' sums can be added together
+    (combined_form). Keep it that way: a figure that does not add up across seasons, such as a
+    count of distinct opponents, does not belong here.
+    """
+    acc = collections.defaultdict(collections.Counter)
 
     for props in recaps:
         for g in allstar.games(props):
@@ -266,17 +303,12 @@ def form_stats(recaps):
                 darts = _darts_thrown(g, side, turns)
                 won   = (g.get("winner_index") == (0 if side == "home" else 1))
 
-                # Activity counts cover every format the player appeared in -- but only for
-                # the leg's opener, so a doubles partner who threw second is missing from them
-                # (summary.md, follow-ups). Nights played come from throwers(), which reads
-                # every turn.
+                # LEG WINS counts every format the player appeared in -- but only for the leg's
+                # opener, so a doubles partner who threw second is missing from it (summary.md,
+                # follow-ups). Nights played come from throwers(), which reads every turn.
                 a = acc[name]
                 a["legs"] += 1
-                a["all_darts"] += darts
                 a["leg_wins"] += 1 if won else 0
-                opp_name = clean_name(turns[0][other].get("name"))
-                if opp_name:
-                    opponents_faced[name].add(opp_name)
 
                 if not singles:
                     continue
@@ -322,21 +354,7 @@ def form_stats(recaps):
                         a["mpr_darts"]    += darts
                     a["legs_crk"] += 1
 
-    out = {}
-    for p, a in acc.items():
-        out[p] = {
-            "three_dart_avg": round(a["points"] / a["darts"] * 3, 2) if a["darts"] else None,
-            "first_nine":     round(a["first9"] / a["first9_legs"] / 3, 2) if a["first9_legs"] else None,
-            "mpr":            round(a["mpr_weighted"] / a["mpr_darts"], 2) if a["mpr_darts"] else None,
-            "leg_win_pct":    round(a["leg_wins"] / a["legs"] * 100, 1) if a["legs"] else None,
-            "checkout_pct":   round(a["co_hits"] / a["co_attempts"] * 100, 1) if a["co_attempts"] else None,
-            "opp_three_dart": round(a["opp_points"] / a["opp_darts"] * 3, 2) if a["opp_darts"] else None,
-            "singles_legs":   int(a["legs_01"] + a["legs_crk"]),
-            "legs":           int(a["legs"]),
-            "darts":          int(a["all_darts"]),
-            "opponents":      len(opponents_faced[p]),
-        }
-    return out
+    return dict(acc)
 
 
 def division_table(hits, weeks_by_player=None):
