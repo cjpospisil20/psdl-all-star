@@ -37,6 +37,13 @@ FONTS_HREF = ("https://fonts.googleapis.com/css2?"
 DISPLAY = "'Anton', 'Oswald', sans-serif"        # titles, rank numerals, every large number
 BODY    = "'Archivo', 'Helvetica Neue', sans-serif"
 
+# Wider screens (owner, 2026-11-13). The phone layout is everything in the stylesheet above its
+# "wider screens" section, and that section only adds rules inside min-width queries, so nothing
+# narrower than WIDE changes. A media query cannot read var(), so the breakpoints are numbers here.
+WIDE    = 768    # tablets and up: the five sections move into the header, the column widens
+DESKTOP = 1024   # laptops and up: labels beside the icons, paired cards, two fixtures across
+MAIN    = 880    # the content column at its widest
+
 
 def stylesheet():
     """One stylesheet for every page."""
@@ -365,4 +372,82 @@ a:hover {{ color: var(--white); }}
           justify-content: center; gap: 5px; }}
 .tabs a span {{ font-size: 8.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--muted); }}
 .tabs a[aria-current] span {{ color: var(--gold); }}
+
+/* ---------- wider screens ----------
+   Everything above is the phone layout, and nothing below changes it: every rule here sits in a
+   min-width query, which check.py section 16 enforces. From {WIDE}px the page stops being a
+   430px column. The header and status strip run edge to edge, the content sits in one centred
+   column up to {MAIN}px, and the five sections move from the bottom bar into the header's right
+   side. The markup is the same on every screen. The tab bar is still the last thing in .app,
+   and the grid lifts it into the header's row. */
+@media (min-width: {WIDE}px) {{
+  :root {{ --main: {MAIN}px; --gutter: 24px; }}
+
+  /* Named lines: full is edge to edge, main is the column, mid splits it for paired cards.
+     Grid items keep their margins uncollapsed, as the phone's flex column does.
+     Tab still follows the markup, so the sections come after the page, as on a phone. Do not
+     add reading-flow: grid-rows to fix that. In Chrome 157 it skips a <summary> inside a grid
+     item, so no keyboard could open the season or league picker, or a player's MORE HITS. */
+  .app {{
+    max-width: none; padding-bottom: 56px;
+    display: grid; align-content: start;
+    grid-template-columns:
+      [full-start] minmax(var(--gutter), 1fr)
+      [main-start] minmax(0, calc(var(--main) / 2)) [mid] minmax(0, calc(var(--main) / 2))
+      [main-end] minmax(var(--gutter), 1fr) [full-end];
+  }}
+  .app > * {{ grid-column: main; }}
+
+  /* Edge to edge, with their contents 16px inside the column -- where the cards and the rows'
+     text start, as the phone's 16px header padding lines up with them. */
+  .hdr, .statusbar {{
+    grid-column: full;
+    padding-left: calc(max(var(--gutter), (100% - var(--main)) / 2) + 16px);
+    padding-right: calc(max(var(--gutter), (100% - var(--main)) / 2) + 16px);
+  }}
+  .hdr {{ grid-row: 1; min-height: 80px; }}
+  /* The sections sit over the right of this row. A long title wraps rather than run under them:
+     450px is the five 76px sections, the logo plate and a gap. */
+  .hdr-txt, .back {{ max-width: calc(100% - 450px); }}
+  .hdr.sub {{ justify-content: flex-start; }}
+  .hdr.sub .hdr-plate {{ order: -1; }}
+  .hdr.sub + .headline, .statusbar + .headline {{ padding-top: 20px; }}
+
+  /* The tab bar, lifted into the header's row: the same five links and icons, the current one
+     gold, with a gold rule along the header's bottom edge. */
+  .tabs {{
+    grid-row: 1; grid-column: main; justify-self: end; align-self: stretch;
+    position: static; max-width: none; margin: 0; padding: 0;
+    display: flex; background: none; border: 0;
+  }}
+  .tabs a {{ height: 80px; width: 76px; }}
+  .tabs a span {{ font-size: 10px; }}
+  .tabs a:not([aria-current]):hover span {{ color: var(--white); }}
+  .tabs a[aria-current] {{ box-shadow: inset 0 -2px 0 var(--gold); }}
+
+  a.row:hover {{ background: var(--surface); }}
+  .statgrid {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
+}}
+
+@media (min-width: {DESKTOP}px) {{
+  :root {{ --gutter: 32px; }}
+
+  /* Each label beside its icon, evenly padded: about 607px for the five. 650px reserves them
+     (less the 16px they overhang the header's padding), the 54px logo plate and a small gap.
+     That leaves a title 198px at full width; the longest, PS MONDAY STANDINGS, is about 182px. */
+  .tabs a {{ width: auto; padding: 0 14px; flex-direction: row; gap: 8px; }}
+  .tabs a span {{ font-size: 12px; letter-spacing: 0.08em; }}
+  .hdr-txt, .back {{ max-width: calc(100% - 650px); }}
+
+  /* A player's darts card and points card, side by side. Only the player page puts two cards
+     together; a card on its own (the team card) keeps the full width. */
+  .card:has(+ .card) {{ grid-column: main-start / mid; margin-right: 7px; }}
+  .card + .card {{ grid-column: mid / main-end; margin-left: 7px; }}
+
+  /* The schedule: the division filter beside the team search, and two fixtures across under
+     each night's heading. */
+  .sched-controls {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+  .night {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }}
+  .night > .headline {{ grid-column: 1 / -1; }}
+}}
 """

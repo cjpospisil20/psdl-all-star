@@ -2,7 +2,8 @@
 
 Mobile-first web app showing **All Star Points** for the Park Slope Dart League, plus the
 league standings pulled from DartConnect. Designed for a player on a phone, in a dim bar,
-on a Tuesday night, one-handed, holding a drink.
+on a Tuesday night, one-handed, holding a drink. Since 2026-11-13 it also opens out on a tablet
+or desktop (see **Wider screens** under Layout); the phone layout is unchanged by that.
 
 The six screens in `design/` are static HTML mockups of the intended UI. Open any of them
 in a browser. They are the visual contract, not application code.
@@ -74,9 +75,9 @@ the original letterforms, colour flipped. Its only page, the first-180 screen, w
 
 - Phone frame is **390px** wide. Screens are tall and scroll; the artboards are fixed-height
   snapshots of the full scroll.
-- Bottom tab bar, 5 items, 64px tall: Standings · All-Stars · Schedule · Feed · Awards.
+- Bottom tab bar on a phone, 5 items, 64px tall: Standings · All-Stars · Schedule · Feed · Awards.
   (Feed replaced Team on 2026-11-11; team pages open from Standings. Schedule replaced Match the
-  same day, with a calendar icon.)
+  same day, with a calendar icon.) From 768px the same five sit in the header — see below.
 - Every tappable target is **≥44px**.
 - Icons are inline stroke SVG. No icon fonts, no emoji.
 - Controls are real elements — `<a href>`, `<button>`, `<input>` + `<label>`, `<details>` +
@@ -97,6 +98,28 @@ the original letterforms, colour flipped. Its only page, the first-180 screen, w
 - **Two nights.** Awards and the Feed show both nights together, so every entry names its night
   ("Westbury Inn · Division 1 · Tuesday"). A one-division league (Monday's "PS Monday") shows no
   division chips.
+- **Wider screens** (owner, 2026-11-13). The phone layout is the design. A tablet or desktop gets
+  the same pages, opened out, and nothing under 768px changes:
+  - **From 768px** the page stops being a 430px column. The header and status strip run edge to
+    edge, and the content sits in one centred column up to 880px, lined up with the header's
+    logo. The five sections move from the bottom bar to the right of the header: the same icons
+    above the same labels, 80px tall, the current one gold with a 2px gold rule along the
+    header's bottom edge. Stat grids run three across. Hovering a row gives it the surface fill.
+    On a detail page the logo plate comes first and the back link sits beside it.
+  - **From 1024px** each section's label sits beside its icon. A player's darts card and points
+    card sit side by side, the Schedule runs two fixtures across under each night's heading, and
+    its division filter and team search share a row. Live is still a gold border and label, never
+    a fill.
+  - **The markup is the same on every screen.** Only the stylesheet changes: the rules live in
+    the "wider screens" section at the end of `tokens.stylesheet()`, every one inside an
+    `@media (min-width: …)` of 768px or more, and `check.py` section 16 holds that. Nothing is
+    built twice for a desktop.
+  - **Keyboard order follows the markup**, so on a desktop Tab reaches the five sections after
+    the page's own links, as on a phone. `reading-flow: grid-rows` would reorder it but is
+    deliberately not used: in Chrome 157 it skips a `<summary>` inside a grid item, which would
+    leave the pickers and MORE HITS unreachable by keyboard.
+  - There is no desktop mockup in `design/`. The real pages at 820, 1024 and 1440px were the
+    reference.
 
 ---
 

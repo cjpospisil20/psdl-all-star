@@ -1,7 +1,8 @@
 """Output verification suite. Run after a build: python3 site/check.py
 
 scraper/verify.py asserts the DATA is right -- totals, team mapping, scoring rules.
-This file asserts the SITE is right: the HTML and CSS that actually reach a phone.
+This file asserts the SITE is right: the HTML and CSS that actually reach a phone, and since
+2026-11-13 the stylesheet's wider-screen layer that a tablet or desktop adds on top (section 16).
 
 Everything here is a static check on public/. No browser is available, so anything that
 genuinely needs layout or paint (does a 46px-tall control end up 46px after the font loads?
@@ -15,6 +16,9 @@ Deliberately NOT checked, because a static reader cannot honestly answer them:
     declared floors are checked; the painted result needs layout.
   - whether Anton and Archivo actually arrive, and what the fallback looks like if they do not.
   - reflow at 320px, and whether a long name wraps before it clips.
+  - where the wide layout actually puts things: the tab bar lifted into the header's row, a
+    player's paired cards, the schedule's two columns. Section 16 checks the rules that do it;
+    the placement itself needs layout, so screenshots at 820, 1024 and 1440px check that.
   - focus rings, and keyboard order through the tab bar.
   - contrast of text over anything that is not a flat declared colour (nothing in the build
     does this today; if a gradient or image backdrop appears, this suite will not notice).
@@ -94,10 +98,33 @@ def text_nodes(markup):
     return re.findall(r">([^<>]+)<", body)
 
 
-def css_rules(css):
-    """(selector, {prop: value}) for every selector in a flat stylesheet."""
+def css_layers(css):
+    """The stylesheet in source order as [(condition, text)]. The condition is None for the
+    phone layer and the @media condition for each block's body.
+
+    Since 2026-11-13 the stylesheet is the phone layout plus @media (min-width) blocks for wider
+    screens. Each block is found by its braces, so the rules inside it keep their condition
+    rather than reading as if they applied everywhere. Section 16 refuses any other at-rule, and
+    an @media inside an @media, so one level is all there is to read.
+    """
     css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
-    for match in re.finditer(r"([^{}]+)\{([^{}]*)\}", css):
+    layers, start = [], 0
+    for opening in re.finditer(r"@media\b([^{;]*)\{", css):
+        if opening.start() < start:
+            continue                    # nested inside a block already read; section 16 fails it
+        layers.append((None, css[start:opening.start()]))
+        depth, end = 1, opening.end()
+        while depth and end < len(css):
+            depth += {"{": 1, "}": -1}.get(css[end], 0)
+            end += 1
+        layers.append((" ".join(opening.group(1).split()), css[opening.end():end - 1]))
+        start = end
+    layers.append((None, css[start:]))
+    return layers
+
+
+def _rules(text):
+    for match in re.finditer(r"([^{}]+)\{([^{}]*)\}", text):
         decls = {}
         for decl in match.group(2).split(";"):
             if ":" in decl:
@@ -105,6 +132,32 @@ def css_rules(css):
                 decls[prop.strip().lower()] = value.strip()
         for selector in match.group(1).split(","):
             yield " ".join(selector.split()), decls
+
+
+def css_rules(css):
+    """(selector, {prop: value}) for every rule in source order: the phone's and every wider
+    screen's. A colour, a font or a control height declared only for a desktop is held to the
+    same standard as the phone's."""
+    for _condition, text in css_layers(css):
+        yield from _rules(text)
+
+
+def phone_rules(css):
+    """(selector, {prop: value}) for the phone layer only: what a screen narrower than every
+    @media sees."""
+    for condition, text in css_layers(css):
+        if condition is None:
+            yield from _rules(text)
+
+
+def merged_rules(css):
+    """{selector: declarations}, merged across every layer in source order: what a selector ends
+    up with on the widest screen. A plain dict would keep only a selector's last rule, so a
+    desktop rule that sets one property would hide every property the phone's rule sets."""
+    merged = {}
+    for selector, decls in css_rules(css):
+        merged.setdefault(selector, {}).update(decls)
+    return merged
 
 
 def strip_pseudo(selector):
@@ -247,13 +300,8 @@ def check_colour(pages, css):
     variables = root_vars(css)
     palette = {normalise_hex(v): k for k, v in tokens.COLOURS.items()}
 
-    if re.search(r"@(media|supports|container)", css):
-        # The rule parser is flat. An at-rule block would silently swallow its contents and
-        # every colour inside it would go unchecked, so refuse rather than under-report.
-        print("\n3. Contrast")
-        check("stylesheet has no at-rule blocks the parser cannot see", False,
-              "@media/@supports found -- css_rules() must learn to descend before trusting this suite")
-        return
+    # css_rules() reads inside the @media blocks for wider screens (2026-11-13), so every colour
+    # declared for a desktop is judged here too. Section 16 refuses any at-rule it cannot read.
 
     # ---- which selectors actually ship ----
     classes, attrs = set(), set()
@@ -271,6 +319,8 @@ def check_colour(pages, css):
                 return False
         return True
 
+    # Every background a selector declares, in any layer: a desktop rule that repaints a surface
+    # adds a candidate rather than replacing the phone's, so text is judged against both.
     backgrounds = {}
     for selector, decls in rules:
         raw = decls.get("background-color") or decls.get("background")
@@ -278,7 +328,9 @@ def check_colour(pages, css):
             continue
         colour = resolve_var(raw.split()[0], variables)
         if colour.startswith("#"):
-            backgrounds[strip_pseudo(selector).strip()] = normalise_hex(colour)
+            found = backgrounds.setdefault(strip_pseudo(selector).strip(), [])
+            if normalise_hex(colour) not in found:
+                found.append(normalise_hex(colour))
 
     def background_for(selector):
         """Nearest declared background walking up the selector's own ancestor prefix."""
@@ -286,7 +338,7 @@ def check_colour(pages, css):
         for cut in range(len(parts), 0, -1):
             prefix = " ".join(parts[:cut])
             if prefix in backgrounds:
-                return [backgrounds[prefix]], prefix
+                return backgrounds[prefix], prefix
         return [normalise_hex(tokens.COLOURS[t]) for t in PANEL_TOKENS], "panel (inherited)"
 
     print("\n3. Contrast -- every foreground/background pair the site actually paints")
@@ -429,8 +481,7 @@ def check_fonts(pages, css):
     check("every page links the font stylesheet", not linked, f"{len(linked)} missing")
 
     check(".num sets font-variant-numeric: tabular-nums",
-          any(sel == ".num" and decls.get("font-variant-numeric") == "tabular-nums"
-              for sel, decls in css_rules(css)))
+          merged_rules(css).get(".num", {}).get("font-variant-numeric") == "tabular-nums")
 
 
 # ---------------------------------------------------------------- 6. document structure
@@ -523,17 +574,20 @@ def check_tap_targets(pages, css):
     check(f"all {checked} declared control heights are >= {MIN_TAP}px", not too_small,
           str(too_small))
 
-    # A row with no height at all must at least floor itself.
-    rows = {sel: d for sel, d in css_rules(css) if sel in (".row", ".hit")}
+    # A row with no height at all must at least floor itself -- on every screen, so the rules are
+    # merged across the layers: a desktop rule may add to a row, but not drop its floor.
+    merged = merged_rules(css)
+    rows = {sel: d for sel, d in merged.items() if sel in (".row", ".hit")}
     for selector, decls in rows.items():
         floor = decls.get("min-height", "")
         check(f"{selector} declares a min-height >= {MIN_TAP}px",
               bool(re.fullmatch(r"(\d+)px", floor)) and int(floor[:-2]) >= MIN_TAP,
               f"min-height:{floor or 'unset'}")
 
+    # The phone's bar. From 768px the same links sit in the header, 80px tall (section 16).
     check("tab bar is the 64px the spec asks for",
           any(sel == ".tabs a" and decls.get("height") == "64px"
-              for sel, decls in css_rules(css)))
+              for sel, decls in phone_rules(css)))
 
     # BROWSER-ONLY, deliberately not checked here: the *rendered* box of a control whose size
     # comes from padding + line-height (.leader, .row, .hit) cannot be measured without layout.
@@ -616,7 +670,7 @@ def check_names(pages):
 
 def check_names_css(css):
     print("\n   The CSS that keeps names readable")
-    rules = {sel: d for sel, d in css_rules(css)}
+    rules = merged_rules(css)
     name = rules.get(".name", {})
     # No white-space assertion here on purpose: the double space in 'Colin  Ratner' is preserved
     # by components.esc() encoding it as '&nbsp;', which HTML cannot collapse whatever
@@ -691,7 +745,7 @@ def check_numerals(pages):
 
 def check_spec_rules(pages, css):
     print("\n10. DESIGN-SPEC invariants visible in the output")
-    rules = {sel: d for sel, d in css_rules(css)}
+    rules = merged_rules(css)        # what each selector ends up with, on any screen
     gold  = normalise_hex(tokens.COLOURS["gold"])
 
     check("rare chips are gold-filled with black text",
@@ -1388,6 +1442,53 @@ def check_player_pages(pages):
           str(unsorted[:3]))
 
 
+# ---------------------------------------------------------------- 16. wider screens
+
+# The phone layout is the stylesheet's base layer. From this width up, @media rules may only add
+# to it (owner, 2026-11-13). Restated rather than imported from tokens.py: this suite judges the
+# output, not the code.
+WIDE_FROM = 768
+
+
+def check_wide_screens(pages, css):
+    print(f"\n16. Wider screens -- phones keep the base layout; rules from {WIDE_FROM}px only add")
+    plain = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    others = sorted(set(re.findall(r"@(?!media\b)[a-zA-Z-]+", plain)))
+    check("the stylesheet's only at-rule is @media", not others,
+          f"{others} -- css_layers() reads @media alone; teach it before using another")
+
+    blocks = [(condition, text) for condition, text in css_layers(css) if condition is not None]
+    check("found the wider-screen @media blocks", bool(blocks), "none -- the desktop layout is gone")
+    nested = [condition for condition, text in blocks if "@" in text]
+    check("no @media sits inside another", not nested, str(nested))
+
+    # A max-width query, or a min-width under 768, would reach a phone: the one thing this layer
+    # must never do.
+    narrow = []
+    for condition, _text in blocks:
+        found = re.fullmatch(r"\(min-width:\s*(\d+)px\)", condition)
+        if not found or int(found.group(1)) < WIDE_FROM:
+            narrow.append(condition)
+    check(f"every @media is a min-width of {WIDE_FROM}px or more, so no phone sees it",
+          not narrow, str(narrow))
+
+    bar = {}
+    for selector, decls in phone_rules(css):
+        if selector == ".tabs":
+            bar.update(decls)
+    check("on a phone the tab bar is fixed to the bottom of the screen",
+          bar.get("position") == "fixed" and bar.get("bottom") == "0", str(bar))
+
+    # The wide layout lifts the tab bar into the header's row with a grid on .app, so the bar must
+    # be a child of .app. It must also come after the content: section 15 reads each hit list up to
+    # the Sections nav.
+    misplaced = [n for n, m in pages.items()
+                 if not re.search(r'<nav aria-label="Sections" class="tabs">.*?</nav>\s*</div>\s*'
+                                  r'</body>\s*</html>\s*$', m, re.S)]
+    check(f"on all {len(pages)} pages the Sections nav is the last thing in .app", not misplaced,
+          f"{len(misplaced)} pages, e.g. {misplaced[:3]}")
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -1424,6 +1525,7 @@ def main():
     check_season_history(pages)
     check_both_nights(pages)
     check_player_pages(pages)
+    check_wide_screens(pages, css)
 
     print(f"\n{'ALL CHECKS PASSED' if not failures else str(len(failures)) + ' CHECK(S) FAILED'}")
     if failures:
