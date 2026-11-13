@@ -3,13 +3,14 @@
 > **Living document.** Update this at the end of any working session. It is the handoff file for
 > future agent sessions — read it first, before exploring the code.
 
-**Last updated:** 2026-11-12
+**Last updated:** 2026-11-13
 **Owner:** cjpospisil20@gmail.com
 **Status:** Live at <https://psdartleague.com/>, rebuilt by GitHub Actions the morning after each
-match night — 428 static pages from 519 archived matches across six seasons of both nights (Monday
+match night — 433 static pages from 519 archived matches across six seasons of both nights (Monday
 and Tuesday leagues, back to Fall 2025), plus each night's Schedule of match nights still to come.
-Not yet reconciled with the commissioners. ROADMAP Steps 1–3 complete; Step 15's domain and HTTPS
-done early; part of Step 10 (the Schedule) and the Phase 2 season selector done early.
+Built for a phone; from 768px it opens out into a desktop layout. Not yet reconciled with the
+commissioners. ROADMAP Steps 1–3 complete; Step 15's domain and HTTPS done early; part of Step 10
+(the Schedule), Step 5's responsive shell and the Phase 2 season selector done early.
 
 ---
 
@@ -1092,3 +1093,81 @@ Checks.
 `app.css` and the 347 player pages changed. In Chrome at phone width: the All Time block; a fold
 closed and open; Enter and Space on a focused summary. **With scripts blocked** (a sandboxed iframe),
 a fold still opened and showed its 13 hits.
+
+### 2026-11-13 — Desktop layout: the site opens out from 768px; phones unchanged
+
+The owner asked for the site to be responsive on desktop, not just mobile. Until now it was a 430px
+phone column at every width, and the bottom tab bar too. On a 1440px screen that left about 500px of
+empty ground on each side.
+
+- **The owner chose a centred column, CSS only.** The alternative was a two-pane layout (pickers on
+  the left, list on the right), which needed new wrapper markup on every page type. The markup is
+  unchanged: against main's build only `app.css` differs, and main's `app.css` is a byte-for-byte
+  prefix of the new one. The new rules are one "wider screens" section appended to
+  `tokens.stylesheet()`, with the breakpoints `WIDE` (768), `DESKTOP` (1024) and the column `MAIN`
+  (880) as constants in `tokens.py`, because a media query cannot read `var()`.
+- **From 768px:**
+  - `.app` becomes a CSS grid with named lines (`full`, `main`, and `mid` to split the column).
+  - The header and status strip run edge to edge. Their contents sit 16px inside the column, where
+    the cards and the rows' text start, so the logo lines up with them.
+  - The tab bar is still the last child of `.app`. The grid lifts it into the header's row, at the
+    right: the same icons over the same labels, 80px tall, the current one gold with a 2px gold rule
+    on the header's bottom edge.
+  - Detail pages put the logo plate before the back link.
+  - Stat grids go three across, and link rows get the surface fill on hover.
+- **From 1024px:**
+  - Nav labels sit beside their icons.
+  - A player's darts and points cards sit side by side (`.card:has(+ .card)` and `.card + .card`).
+    Every player page has its cards in pairs (1,030 pairs, never one alone or three together), and
+    team pages have one card each, which keeps the full width.
+  - The Schedule's nights run two fixtures across, and its division filter and team search share a
+    row.
+- **A title never runs under the nav.** `.hdr-txt` and `.back` get a max-width that reserves the
+  nav's width (450px, then 650px). Measured in Chrome, the five desktop sections are 607px wide. The
+  longest title, LEAGUE STANDINGS, is 166px, and the longest back link, PS MONDAY STANDINGS, is
+  182px. Both clear the nav by 30px or more.
+- **Keyboard order is unchanged.** On a desktop, Tab reaches the sections after the page's own
+  links. `reading-flow: grid-rows` was tried, and it does make Tab go header → sections → page. But in
+  Chrome 157 it skips a `<summary>` inside a grid item, so no keyboard could open the season or
+  league picker, or MORE HITS. It was dropped, and `tokens.py` and DESIGN-SPEC say why.
+- **Not sticky.** A sticky desktop header would not work as written: a grid item's containing block
+  is its grid area, and row 1 is only as tall as the header. The header scrolls away on a desktop, as
+  it does on a phone.
+
+Checks.
+- **`check.py` reads `@media` now.** It used to read the stylesheet as one flat layer, and §3 refused
+  any `@media` outright. Now:
+  - `css_layers()` splits the stylesheet by brace depth.
+  - `css_rules()` walks every layer, so contrast, palette, fonts, tap targets and gold fills judge
+    the desktop rules too.
+  - `phone_rules()` reads the base layer alone; the 64px tab-bar check uses it.
+  - `merged_rules()` merges a selector's declarations across layers. The checks that looked a
+    selector up in a dict (the `.row` and `.hit` floors, `.name`, `.chip`, `.num`) use it. A plain
+    dict kept only the last rule, so a desktop rule that set one property would have hidden the
+    phone rule's others.
+  - Contrast keeps every background a selector declares, in any layer.
+- **New §16, wider screens:**
+  - the only at-rule is `@media`, and none nests
+  - every `@media` is a `min-width` of 768px or more, so no phone sees one
+  - on a phone the tab bar is fixed to the bottom
+  - on all 433 pages the Sections nav is the last thing in `.app`
+
+  Twelve deliberate breakages were each caught: a max-width query, a min-width of 500px, an
+  `@supports` block, a nested `@media`, a 40px control and a 20px row floor in the wide layer, a
+  non-palette hex, low-contrast text, a re-coloured `.chip.rare`, `.name` no longer wrapping, `.num`
+  no longer tabular, and the tab bar moved off the end of `.app`.
+
+**Verified:** `verify.py`, `build.py` (433 pages) and `check.py` pass.
+- Against main's build only `app.css` changed, and main's is a prefix of it.
+- In headless Chrome at 500px (the narrowest it renders, and below the breakpoint), all 9 page types
+  are byte-identical to main's screenshots. At 767px it is the phone layout.
+- At 768, 820, 1024, 1280, 1440 and 1920px, across six pages: no sideways scroll, no title under the
+  nav, and the nav in the header row.
+- Screenshots at 820, 1024 and 1440px of the board, the ALL board, standings, a team page, a
+  five-season player page, the schedule, the awards index, an award page and the feed.
+- On a desktop:
+  - The ALL board's search ("lettieri" finds 1 row) and show-all (10 rows to 244) work.
+  - The season picker opens in the page flow by keyboard and closes on Escape.
+  - The Schedule's live styling reads well two across.
+- **With scripts blocked** (a sandboxed iframe): the desktop grid, the paired cards, the two-across
+  fixtures, and a MORE HITS fold that opens.

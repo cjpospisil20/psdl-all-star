@@ -1,7 +1,7 @@
 # PSDL All Star app — conventions
 
-A mobile web app for the Park Slope Dart League (Brooklyn, Tuesday nights) showing **All Star
-Points** and the **league standings**. Replaces a 29-column spreadsheet site that, per the
+A mobile-first web app for the Park Slope Dart League (Brooklyn, Tuesday nights) showing **All Star
+Points** and the **league standings**. It opens out on a tablet or desktop too (2026-11-13). Replaces a 29-column spreadsheet site that, per the
 commissioners, almost nobody reads — and 2–3 hours a week of commissioner data entry.
 
 ## Start here
@@ -52,7 +52,7 @@ docs/      rulebook, design brief, exports
 | `scraper/feed.py` | News feed events for both nights' current seasons, night by night; check-in and checkout records per night (matching Awards). Also `standings_by_night(season)` — cumulative standings from each side's own `points` field, used by verify. |
 | `scraper/verify.py` | Assertion suite. Run before publishing. |
 | `scraper/standings.py` | Terminal view of the same data the site renders. Debugging aid. |
-| `site/tokens.py` | The palette and type from DESIGN-SPEC, in one place, emitted as `public/app.css`. |
+| `site/tokens.py` | The palette and type from DESIGN-SPEC, in one place, emitted as `public/app.css`. The stylesheet is the phone layout, then a "wider screens" section of `@media (min-width)` rules (breakpoints `WIDE` 768 and `DESKTOP` 1024, column `MAIN` 880). |
 | `site/components.py` | Shared fragments: page shell, header, sub-header (back links), status bar, the season/league picker, division nav, chips, icons, recap links. |
 | `site/app.js` | Progressive enhancement only — search filter, long-table collapse, back-link history, the schedule's filters and live night, closing a picker on an outside tap or Escape. |
 | `site/build.py` | Renders all pages into `public/`: every season's All-Stars boards (with the season picker) and All Time, one career page per player, the schedule, standings, team pages (reached from standings), awards, the feed. Every link and write goes through `board_href` / `player_href` / `team_href`. |
@@ -98,6 +98,12 @@ open public/index.html
    **do not lighten either.**
 8. **The site must work with JavaScript off.** Every row is in the markup; `app.js` only filters
    and collapses what is already there.
+9. **Phones first** (owner, 2026-11-13). The phone layout is the stylesheet's base layer. A tablet
+   or desktop only *adds* to it: every wider-screen rule sits in the "wider screens" section at
+   the end of `tokens.stylesheet()`, inside an `@media (min-width: …)` of 768px or more, so no
+   phone ever sees one. The markup is the same on every screen — never emit a desktop-only copy
+   of anything. The tab bar stays the last thing in `.app`; from 768px the grid lifts it into the
+   header's row. `check.py` section 16 enforces all of this.
 
 ## Non-negotiables — data
 
@@ -210,7 +216,9 @@ current Tuesday season's Division 1. A past season's boards say FINAL and that t
 by this site's rules; a player page covers every season, and a season's board opens that season's
 section of it.
 
-The bottom tab bar is Standings · All-Stars · Schedule · Feed · Awards. The Schedule tab
+The tab bar is Standings · All-Stars · Schedule · Feed · Awards: at the bottom on a phone, at the
+right of the header from 768px, where the content opens out into a centred column up to 880px
+(2026-11-13; DESIGN-SPEC "Wider screens"). The Schedule tab
 (2026-11-11) replaced the Match tab and its 131 per-match pages: it lists every match night still to
 come — home v away, division by division, with a division menu and team search — and gilds tonight's
 matches while they are on. There is no Teams tab or teams index any more (retired 2026-11-11): a team

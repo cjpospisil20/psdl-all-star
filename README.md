@@ -19,7 +19,8 @@ trustworthy to a sceptical captain.
 It also carries the **schedule** — every match night still to come, home v away, by division,
 with tonight's matches highlighted in gold while they are being played.
 
-The site is live at **<https://psdartleague.com>**.
+The site is live at **<https://psdartleague.com>**. It is built for a phone, and opens out on a
+tablet or desktop: a wider column, with the five sections in the header instead of a bottom bar.
 
 ## Running it locally
 
