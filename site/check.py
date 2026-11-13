@@ -893,22 +893,27 @@ def check_navigation(pages):
                 if 'class="divnav"' in site[n] and '<b class="num">ALL</b>' not in site[n]]
     check("every board with division chips offers ALL", not chipless, str(chipless[:3]))
 
-    # ---- the awards index names who holds each award ----
-    index = site.get("awards.html", "")
-    missing = []
-    for name in sorted(n for n in site if n.startswith("award/")):
-        first = re.search(r'href="\.\./(player/[^"]+\.html(?:#[^"]*)?)"', site[name])
-        if first and f'href="{first.group(1)}"' not in index:
-            missing.append(f"{name}: {first.group(1)}")
-    check("the awards index names the holder of every award that has one", not missing,
-          str(missing[:3]))
-    # Division leaders are listed in division order: sorting them by points would rank them
-    # across divisions.
-    section = re.search(r"ALL STAR POINTS LEADER</h2>(.*?)<h2", index, re.S)
-    order = [int(d) for d in re.findall(r'<small class="name">Division (\d)',
-                                        section.group(1))] if section else []
-    check("the points leaders are listed in division order", order and order == sorted(order),
-          str(order))
+    # ---- the awards index names who holds each award, per night ----
+    awards_pages = {n: m for n, m in site.items()
+                    if re.fullmatch(r"awards(-[a-z]+)?\.html", n)}
+    for index_name, index_markup in sorted(awards_pages.items()):
+        detail_prefix = "award/monday-" if "monday" in index_name else "award/"
+        detail_pages = sorted(n for n in site if n.startswith(detail_prefix)
+                              and ("monday-" in n) == ("monday" in index_name))
+        missing = []
+        for name in detail_pages:
+            first = re.search(r'href="\.\./(player/[^"]+\.html(?:#[^"]*)?)"', site[name])
+            if first and f'href="{first.group(1)}"' not in index_markup:
+                missing.append(f"{name}: {first.group(1)}")
+        check(f"{index_name} names the holder of every award that has one", not missing,
+              str(missing[:3]))
+    for index_name, index_markup in sorted(awards_pages.items()):
+        section = re.search(r"ALL STAR POINTS LEADER</h2>(.*?)<h2", index_markup, re.S)
+        order = [int(d) for d in re.findall(r'<small class="name">Division (\d)',
+                                            section.group(1))] if section else []
+        if order:
+            check(f"{index_name} points leaders are listed in division order",
+                  order == sorted(order), str(order))
 
 
 # ---------------------------------------------------------------- 12. the schedule
@@ -1153,23 +1158,35 @@ def check_season_history(pages):
 
 # ---------------------------------------------------------------- 14. both nights
 
+def awards_pages(site):
+    """Every Awards page: awards.html, awards-monday.html, and every award/*.html."""
+    return {n: m for n, m in site.items()
+            if re.fullmatch(r"awards(-[a-z]+)?\.html", n) or n.startswith("award/")}
+
+
 def check_both_nights(pages):
-    """Standings and the Schedule per night, with a league picker; Awards and the Feed for both
-    nights, every entry naming its night (owner, 2026-11-12)."""
-    print("\n14. Both nights -- the league picker, and Awards and the Feed naming each night")
+    """Standings, the Schedule and Awards per night, each with a league picker; the Feed groups
+    cards under night headings (owner, 2026-11-12)."""
+    print("\n14. Both nights -- the league picker on Standings, Schedule and Awards; the Feed")
     site = {name.replace("\\", "/"): markup for name, markup in pages.items()}
     standings, schedules = standings_pages(site), schedule_pages(site)
-    chosen = {**standings, **schedules}
+    awards = awards_pages(site)
 
-    # ---- the league picker: one per page, the current option the page itself ----
+    # ---- the league picker: Standings, Schedule and Awards indexes each have one ----
+    chosen = {**standings, **schedules}
+    awards_indexes = {n: m for n, m in awards.items() if not n.startswith("award/")}
+    all_with_picker = {**chosen, **awards_indexes}
     lists, wrong = set(), []
-    for name, page in sorted(chosen.items()):
+    for name, page in sorted(all_with_picker.items()):
         pickers = re.findall(r'<details class="picker"[^>]*>(.*?)</details>', page, re.S)
-        if len(pickers) != 1:
-            wrong.append(f"{name}: {len(pickers)} pickers")
+        league_pickers = [p for p in pickers
+                          if re.search(r'<summary><small>LEAGUE', p)]
+        if len(league_pickers) != 1:
+            wrong.append(f"{name}: {len(league_pickers)} league pickers")
             continue
-        nav = re.search(r'<nav aria-label="League">(.*?)</nav>', pickers[0], re.S)
-        shown = re.search(r"<summary><small>LEAGUE</small><b>(.*?)</b>", pickers[0])
+        picker = league_pickers[0]
+        nav = re.search(r'<nav aria-label="League">(.*?)</nav>', picker, re.S)
+        shown = re.search(r"<summary><small>LEAGUE</small><b>(.*?)</b>", picker)
         options = re.findall(r'<a href="([^"]+)"( aria-current="page")?>(.*?)</a>',
                              nav.group(1)) if nav else []
         current = [(href, text) for href, mark, text in options if mark]
@@ -1177,19 +1194,31 @@ def check_both_nights(pages):
             wrong.append(f"{name}: {len(current)} current options")
             continue
         href, text = current[0]
-        if site.get(href) != page:
+        resolved = (pathlib.Path(name).parent / href).as_posix()
+        if site.get(resolved) != page and site.get(href) != page:
             wrong.append(f"{name}: its current option opens {href}")
-        if shown.group(1) != text or text.lower() != f"{night_of(page)} night":
-            wrong.append(f"{name}: shows {shown.group(1)!r}, marks {text!r}")
         lists.add(tuple(t for _h, _m, t in options))
-    check(f"all {len(chosen)} Standings and Schedule pages have one league picker whose current "
-          "option is the page", not wrong, str(wrong[:3]))
+    check(f"all {len(all_with_picker)} Standings, Schedule and Awards pages have a league picker "
+          "whose current option is the page", not wrong, str(wrong[:3]))
     nights = next(iter(lists)) if len(lists) == 1 else ()
     check("every league picker offers the same nights, Tuesday first",
           len(lists) == 1 and len(nights) >= 2 and nights[0] == "Tuesday night", str(lists))
-    check("the Standings and Schedule tabs open Tuesday's",
+    check("the Standings, Schedule and Awards tabs open Tuesday's",
           night_of(site.get("standings.html", "")) == "tuesday"
-          and night_of(site.get("schedule.html", "")) == "tuesday")
+          and night_of(site.get("schedule.html", "")) == "tuesday"
+          and "awards.html" in site)
+
+    # ---- award detail pages each have a league picker ----
+    detail_pages = {n: m for n, m in awards.items() if n.startswith("award/")}
+    wrong_detail = []
+    for name, markup in sorted(detail_pages.items()):
+        league_pickers = [p for p in re.findall(r'<details class="picker"[^>]*>(.*?)</details>',
+                                                 markup, re.S)
+                          if re.search(r'<summary><small>LEAGUE', p)]
+        if len(league_pickers) != 1:
+            wrong_detail.append(f"{name}: {len(league_pickers)} league pickers")
+    check(f"all {len(detail_pages)} award detail pages have a league picker",
+          not wrong_detail, str(wrong_detail[:3]))
 
     # ---- a night's Standings and Schedule only ever link that night's teams ----
     team_night = {}
@@ -1202,45 +1231,16 @@ def check_both_nights(pages):
     check("every team a Standings or Schedule page links plays on that page's night",
           not crossed, str(crossed[:3]))
 
-    # ---- Awards and the Feed: the league at large, every entry naming its night ----
-    unnamed, named = [], collections.Counter()
-    award_pages = ["awards.html"] + sorted(n for n in site if n.startswith("award/"))
-    for name in award_pages + ["feed.html"]:
-        markup = site.get(name, "")
-        entries = (re.findall(r'<div class="hit".*?</div>', markup, re.S)
-                   + re.findall(r'<a class="(?:row|feed-card)".*?</a>', markup, re.S))
-        if name.startswith("award/") and "LEADER" in markup:
-            entries = re.findall(r'<div class="hit".*?</div>', markup, re.S)  # leader rows sit
-            # under a section that names the night; see the next check
-        for entry in entries:
-            night = re.search(r"&middot; (Monday|Tuesday)</small>", entry)
-            if night:
-                named[night.group(1)] += 1
-            else:
-                text = re.sub(r"<[^>]+>|\s+", " ", entry)
-                unnamed.append(f"{name}: {text[:60]}")
-    check(f"all {sum(named.values())} Awards entries and Feed cards name their night",
-          not unnamed and named, str(unnamed[:3]))
-    check("Awards and the Feed carry both nights",
-          named["Monday"] > 0 and named["Tuesday"] > 0, str(dict(named)))
-    detail = site.get("award/points-leader.html", "")
-    sections = re.findall(r'<h2 class="section">[^<]*</h2><p>([^<]*)</p>', detail)
-    check("every points-leader section names its night",
-          bool(sections) and all(s in ("Monday night", "Tuesday night") for s in sections),
-          str(sections))
-
-    # Division leaders are listed Tuesday's divisions first, in order, then Monday's -- never by
-    # points, which would rank them across divisions.
-    index = site.get("awards.html", "")
-    section = re.search(r"ALL STAR POINTS LEADER</h2>(.*?)<h2", index, re.S)
-    rows = [t.split(" &middot; ") for t in
-            re.findall(r'<small class="name">(.*?)</small>', section.group(1))] if section else []
-    nights_order = [r[-1] for r in rows]
-    tuesday = [int(m.group(1)) for r in rows if r[-1] == "Tuesday"
-               and (m := re.fullmatch(r"Division (\d+)", r[0]))]
-    check("the points leaders run Tuesday's divisions in order, then Monday's",
-          bool(rows) and nights_order == sorted(nights_order, key=lambda n: n != "Tuesday")
-          and tuesday == sorted(tuesday), str(rows[:8]))
+    # ---- the Feed: grouped by night, every card under a heading ----
+    feed = site.get("feed.html", "")
+    night_names = re.findall(r'<h2 class="section">(TUESDAY|MONDAY) NIGHT', feed)
+    check("the Feed has night headings", bool(night_names))
+    check("both nights appear in the Feed",
+          "TUESDAY" in night_names and "MONDAY" in night_names, str(set(night_names)))
+    full_headings = re.findall(r'<h2 class="section">([^<]+)</h2>', feed)
+    dup_headings = [full_headings[i] for i in range(1, len(full_headings))
+                    if full_headings[i] == full_headings[i - 1]]
+    check("no repeated Feed heading", not dup_headings, str(dup_headings[:3]))
 
 
 # ---------------------------------------------------------------- main

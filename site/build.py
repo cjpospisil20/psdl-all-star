@@ -328,7 +328,7 @@ def leader_card(row, up="", key=None):
 """
 
 
-def player_row(row, extra=False, up="", rank="division", division=False, key=None, night=None):
+def player_row(row, extra=False, up="", rank="division", division=False, key=None):
     """One leaderboard row.
 
     rank      what fills the rank column: "division" (the default; the top three are gold),
@@ -337,7 +337,6 @@ def player_row(row, extra=False, up="", rank="division", division=False, key=Non
     division  name the division beside the team, on any list that mixes divisions.
     key       the season the row is from, so the link opens that season's section of the
               player's page. None (All Time) opens the top of it.
-    night     name the night too, on a list that mixes Monday and Tuesday (Awards).
     """
     rank_html = ""
     if rank == "division":
@@ -347,8 +346,6 @@ def player_row(row, extra=False, up="", rank="division", division=False, key=Non
         rank_html = f'\n    <span class="row-rank num wide">{row["league_rank"]}</span>'
     where = (f"{esc(row['division'])} &middot; {esc(row['team'])}" if division
              else esc(row["team"]))
-    if night:
-        where += f" &middot; {night}"
     return f"""  <a class="row" href="{player_href(row['player'], key, up)}"
      data-row="{esc(row['player'])} {esc(row['team'])}"{' data-extra' if extra else ''}>{rank_html}
     <span class="row-main">
@@ -810,6 +807,20 @@ def build_league_standings(season, leagues):
 
 # ---------------------------------------------------------------- awards
 
+def awards_href(season, up=""):
+    """The Awards index for a night: awards.html for Tuesday, awards-monday.html for Monday."""
+    if season["primary"]:
+        return f"{up}awards.html"
+    return f"{up}awards-{season['night'].lower()}.html"
+
+
+def award_detail_href(season, key, up=""):
+    """A single award's detail page: award/<key>.html for Tuesday, award/monday-<key>.html."""
+    if season["primary"]:
+        return f"{up}award/{key}.html"
+    return f"{up}award/{season['night'].lower()}-{key}.html"
+
+
 def award_hit(h, up="", lead="", extra=False):
     """One award entry: who threw it, for which team, the turn's value, and the recap behind it.
 
@@ -818,7 +829,7 @@ def award_hit(h, up="", lead="", extra=False):
     return f"""  <div class="hit"{' data-extra' if extra else ''}>{lead}
     <span class="hit-main">
       <a href="{player_href(h['player'], h.get('season'), up)}"><b class="name">{esc(h['player'])}</b></a>
-      <small class="name">{esc(h.get('team', ''))} &middot; {esc(h.get('division', ''))} &middot; {h['night']}</small>
+      <small class="name">{esc(h.get('team', ''))} &middot; {esc(h.get('division', ''))}</small>
       <small>{esc(h['game'])} &middot; {esc(events._pretty_date(h['date']))} &middot;
       {C.recap_link(h)}</small>
     </span>
@@ -845,20 +856,28 @@ def both_nights(leagues):
 
 
 def build_awards(leagues):
-    """The Awards tab: the league at large -- the current season of both nights (owner,
-    2026-11-12: most teams play both). Every entry names the night it happened. Points leaders
-    stay per division, Tuesday's divisions first, then Monday's."""
-    data = awards.compute_all([h for s in leagues for h in s["hits"]], {})
-    leaders = [(s, d, s["table"].get(d, [])[:5]) for s in leagues for d in s["divisions"]]
+    """The Awards tab: one page per night, behind the LEAGUE picker (owner, 2026-11-12).
+
+    Each night's Awards page shows that night's holders only. Largest Check-In and Largest
+    Checkout are awarded separately per night. The Awards tab opens Tuesday's page.
+    """
+    for season in leagues:
+        build_league_awards(season, leagues)
+
+
+def build_league_awards(season, leagues):
+    """Awards index and detail pages for one night."""
+    data = awards.compute_all(season["hits"], season["table"])
+    leaders = [(season, d, season["table"].get(d, [])[:5]) for d in season["divisions"]]
+    picker = league_picker(leagues, season, None, lambda s, _d: awards_href(s))
 
     body = [C.header("AWARDS"),
-            C.statusbar(both_nights(leagues)),
+            C.statusbar(f"{season['label'].upper()} · {season['night'].upper()}"),
+            picker,
             f'  <div class="headline"><span><h1>AWARDS</h1>'
-            f'<p>Who holds each award, season to date, Monday and Tuesday &middot; all from '
+            f'<p>Who holds each award, season to date &middot; all from '
             f'DartConnect</p></span></div>\n']
 
-    # Who holds each award is on this page, so nobody has to tap in to find out. A detail page
-    # link follows only where that page has more to show than the holders.
     for award in awards.AWARDS:
         key, kind, entries = award["key"], award["kind"], data[award["key"]]
         body.append(f'  <div class="headline"><span>'
@@ -866,22 +885,17 @@ def build_awards(leagues):
                     f'<p>{esc(award["blurb"])}</p></span></div>\n')
         holders, more = [], None
         if kind == "division":
-            # In division order, never by points: sorting the leaders would rank them across
-            # divisions, which is exactly what this award is careful not to do.
-            holders = [player_row(rows[0], rank=None, division=True, key=s["key"],
-                                  night=s["night"])
-                       for s, _d, rows in leaders if rows]
+            holders = [player_row(rows[0], rank=None, division=True, key=season["key"])
+                       for _s, _d, rows in leaders if rows]
             depth = max((len(rows) for _s, _d, rows in leaders), default=0)
             if depth > 1:
                 more = f"TOP {depth} IN EACH DIVISION"
         elif kind == "one":
-            # Every entry ranked first, so a tie shows all of its holders.
             first = [h for h in entries if h["rank"] == 1]
             holders = [award_hit(h) for h in first]
             if len(entries) > len(first):
                 more = "FULL LEAGUE TABLE"
         elif kind == "many":
-            # A club's holders are all of its members.
             holders = [award_hit(h, lead=chip_lead(h)) for h in entries]
 
         if not holders:
@@ -889,32 +903,39 @@ def build_awards(leagues):
             continue
         body.extend(holders)
         if more:
-            body.append(f'  <a class="btn" href="award/{key}.html">{more}'
+            body.append(f'  <a class="btn" href="{award_detail_href(season, key)}">{more}'
                         f'{icon("chevron", tokens.COLOURS["gold"], 15)}</a>\n')
 
     body.append('  <p class="caption">Every number traces back to DartConnect &mdash; tap a '
                 'name for the player&rsquo;s turns, or a set and game to open the match '
                 'recap.</p>\n')
-    write("awards.html", C.page("PSDL All Star — Awards", "".join(body), "awards"))
+    named = "" if season["primary"] else f", {season['night']}"
+    write(awards_href(season),
+          C.page(f"PSDL All Star — Awards{named}", "".join(body), "awards"))
 
     for award in awards.AWARDS:
         key = award["key"]
-        write(f"award/{key}.html", award_page(award, data[key], leaders))
+        write(award_detail_href(season, key),
+              award_page(award, data[key], leaders, season, leagues))
 
 
-def award_page(award, entries, leaders):
+def award_page(award, entries, leaders, season, leagues):
     key = award["key"]
     kind = award["kind"]
 
-    body = [C.subheader("AWARDS", "../awards.html", ["awards.html"], up="../")]
+    index = awards_href(season, up="../")
+    back_from = [awards_href(s) for s in leagues]
+    body = [C.subheader("AWARDS", index, back_from, up="../"),
+            league_picker(leagues, season, None,
+                          lambda s, _d: award_detail_href(s, key, up="../"))]
 
     if kind == "division":
         body.append(f'  <div class="headline"><span><h1>{esc(award["title"].upper())}</h1>'
                     f'<p>{esc(award["blurb"])}</p></span></div>\n')
-        for season, division, rows in leaders:
+        for _s, division, rows in leaders:
             body.append(f'  <div class="headline"><span>'
                         f'<h2 class="section">{esc(division.upper())}</h2>'
-                        f'<p>{season["night"]} night</p></span></div>\n')
+                        f'</span></div>\n')
             if not rows:
                 body.append('  <p class="caption">No scores yet in this division.</p>\n')
                 continue
@@ -947,15 +968,15 @@ def award_page(award, entries, leaders):
             body.append('  <p class="caption">Nobody yet this season. '
                         'Check back after more match nights.</p>\n')
         else:
-            body.append('  <p class="caption">Ranked across all divisions and both nights '
-                        '&mdash; the league awards this one league-wide. '
-                        'Ties share a place.</p>\n')
+            body.append(f'  <p class="caption">Ranked across every {season["night"]} division '
+                        '&mdash; each night awards its own. Ties share a place.</p>\n')
             for i, h in enumerate(entries):
                 body.append(award_hit(h, up="../", lead=rank_lead(h), extra=i >= PREVIEW_ROWS))
             if len(entries) > PREVIEW_ROWS:
                 body.append(show_all_button(f"SHOW ALL {len(entries)}"))
 
-    return C.page(f"PSDL All Star — {award['title']}", "".join(body), "awards", depth=1)
+    named = "" if season["primary"] else f", {season['night']}"
+    return C.page(f"PSDL All Star — {award['title']}{named}", "".join(body), "awards", depth=1)
 
 
 # ---------------------------------------------------------------- feed
@@ -972,24 +993,25 @@ def feed_card(evt):
     else:
         icon_html = f'\n    {icon(evt["icon_name"], tokens.COLOURS["gold"], 20)}'
 
-    div_label = f" &middot; {esc(evt['division'])}" if evt.get("division") else ""
+    div_label = f"{esc(evt['division'])}" if evt.get("division") else ""
 
     return f"""  <a class="feed-card" href="{href}"{target}>{icon_html}
     <span class="feed-body">
       <b>{esc(evt['headline'])}</b>
       <span>{esc(evt['body'])}</span>
-      <small>Week {evt['week']} &middot; {esc(events._pretty_date(evt['date']))}{div_label} &middot; {evt['night']}</small>
+      <small>{div_label}</small>
     </span>
   </a>
 """
 
 
 def build_feed(leagues):
-    """The Feed: the league at large -- the current season of both nights, every card naming its
-    night (owner, 2026-11-12). Leader cards link the right night's board and standings."""
+    """The Feed: the league at large -- the current season of both nights, grouped by night
+    (owner, 2026-11-12). Leader cards link the right night's board and standings."""
     feed_events = feed.generate_events(
         leagues, board_href=lambda s, d: board_href(s, d),
-        standings_href=lambda s, d: standings_href(s, d))
+        standings_href=lambda s, d: standings_href(s, d),
+        award_href=lambda s, key: award_detail_href(s, key))
 
     body = [C.header("NEWS FEED"),
             C.statusbar(both_nights(leagues)),
@@ -1000,7 +1022,21 @@ def build_feed(leagues):
     if not feed_events:
         body.append('  <p class="caption">Nothing posted yet.</p>\n')
     else:
+        current_group = None
         for evt in feed_events:
+            group = (evt["date"], evt["night"])
+            if group != current_group:
+                current_group = group
+                night_label = f"{evt['night'].upper()} NIGHT"
+                date_label = events._pretty_date(evt["date"])
+                week_label = f"Week {evt['week']}"
+                actual_day = feed.weekday_name(evt["date"])
+                if actual_day and actual_day != evt["night"]:
+                    week_label += f" &middot; played on {actual_day}"
+                body.append(f'  <div class="headline"><span>'
+                            f'<h2 class="section">{night_label} &middot; '
+                            f'{esc(date_label)}</h2>'
+                            f'<p>{week_label}</p></span></div>\n')
             body.append(feed_card(evt))
 
     body.append('  <p class="caption">Every event is computed from DartConnect data. '
