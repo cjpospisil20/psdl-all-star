@@ -1089,9 +1089,19 @@ def check_season_history(pages):
           len(lists) == 1 and len(seasons) >= 3 and seasons[0] == "All Time",
           f"{len(lists)} different lists")
     home = re.search(r'<a href="[^"]+" aria-current="page">(.*?)</a>', site.get("index.html", ""))
-    check("the home page shows the current Tuesday season, first after All Time",
+    check("the home page is the picker's first Tuesday season",
           bool(home) and len(seasons) > 1 and home.group(1) == seasons[1] and "Tuesday" in seasons[1],
           home.group(1) if home else "no picker")
+    if len(seasons) > 1:
+        real = seasons[1:]
+        nights = [("Tuesday" if "Tuesday" in s else "Monday") for s in real]
+        labels = [_html.unescape(s).split(" · ")[0].strip() for s in real]
+        contiguous = True
+        for i in range(1, len(labels)):
+            if labels[i] == labels[i - 1] and nights[i] == "Tuesday" and nights[i - 1] == "Monday":
+                contiguous = False
+        check("the picker runs season by season, Tuesday before Monday",
+              contiguous, str(list(zip(labels, nights))))
 
     # ---- every board that ranks across divisions crowns nobody (CLAUDE.md non-negotiable 3) ----
     known = {_html.unescape(re.search(r"<h1>(.*?)</h1>", site[n]).group(1)).lower()

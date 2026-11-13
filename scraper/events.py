@@ -51,24 +51,172 @@ def current_id(league=None):
     return max(played, key=lambda e: (e["start_date"] or "", e["id"]))["id"]
 
 
-def _display_order(entries):
-    """The primary league's current season first; then newest first, then league order.
+def base_label(label):
+    """Strip a trailing ' Stage N' — 'Spring 2026 Stage 1' becomes 'Spring 2026'."""
+    return re.sub(r"\s+[Ss]tage\s+\d+$", "", label)
 
-    Three stable sorts, last key first, so each tie falls through to the key before it.
+
+def season_order(seasons):
+    """The owner's order: newest season first, Tuesday before Monday inside each season.
+
+    A season's group is its base label across both nights. Groups run newest first by the
+    earliest start_date in the group; inside a group, Tuesday first (fetch.LEAGUES rank),
+    then newest first. Three stable sorts, last key first.
     """
     league_rank = {league: i for i, (league, _night) in enumerate(fetch.LEAGUES)}
+    group_date = {}
+    for s in seasons:
+        bl = base_label(s["label"])
+        d = s.get("start_date") or ""
+        if bl not in group_date or d < group_date[bl]:
+            group_date[bl] = d
+
+    ordered = sorted(seasons, key=lambda s: s.get("id", 0))
+    ordered.sort(key=lambda s: league_rank.get(s.get("league", ""), len(league_rank)))
+    ordered.sort(key=lambda s: group_date.get(base_label(s["label"]), ""), reverse=True)
+    return ordered
+
+
+def _display_order(entries):
+    """season_order plus the home season forced to the front."""
     primary = current_id()
-    ordered = sorted(entries, key=lambda e: (league_rank.get(e["league"], len(league_rank)),
-                                             e["id"]))
-    ordered.sort(key=lambda e: e["start_date"] or "", reverse=True)
+    ordered = season_order(entries)
     ordered.sort(key=lambda e: e["id"] != primary)
     return ordered
 
 
+def _can_merge(parts):
+    """Whether stage-labelled seasons should be merged: same league, none is current, first
+    stage (chronologically) has one division. While a staged season is current, Standings, the
+    Schedule, team pages, Awards and the Feed follow DartConnect's current stage, so it stays
+    separate."""
+    if not parts or len(parts) < 2:
+        return False
+    if any(e["id"] == current_id(e["league"]) for e in parts):
+        return False
+    first = min(parts, key=lambda e: e["start_date"] or "")
+    divs = set()
+    for c in json.loads((fetch.season_dir(first["id"]) / "standings.json")
+                        .read_text(encoding="utf-8"))["competitors"]:
+        divs.add(c["division"])
+    return len(divs) == 1
+
+
+def merge_stages(parts):
+    """Build one season dict from stage seasons. `parts` must be sorted by start_date."""
+    loaded = [load_season(e["id"]) for e in parts]
+    first = loaded[0]
+    label = base_label(first["label"])
+    key = re.sub(r"[^a-z0-9]+", "-", f"{first['night']} {label}".lower()).strip("-")
+
+    all_hits, all_matches, all_recaps, all_sided = [], [], [], []
+    weeks_by_player = collections.defaultdict(set)
+    hit_nights_by_player = collections.defaultdict(set)
+    nights_by_player = collections.defaultdict(set)
+    all_dates = set()
+    week_of = {}
+    division = first["divisions"][0] if first.get("divisions") else divisions(first)[0]
+
+    for stage in loaded:
+        stage_id = stage["id"]
+        for h in stage["hits"]:
+            copy = dict(h)
+            copy["season"] = key
+            copy["division"] = division
+            all_hits.append(copy)
+        for m in stage["matches"]:
+            copy = dict(m)
+            copy["season"] = key
+            copy["division"] = division
+            all_matches.append(copy)
+        all_recaps.extend(stage["recaps"])
+        all_sided.extend(stage["sided_recaps"])
+        all_dates.update(stage["dates"])
+        week_of.update(stage["week_of"])
+        for player, rounds in stage["weeks_by_player"].items():
+            for r in rounds:
+                weeks_by_player[player].add((stage_id, r))
+        for player, nights in stage["hit_nights_by_player"].items():
+            hit_nights_by_player[player].update(nights)
+        for player, nights in stage["nights_by_player"].items():
+            nights_by_player[player].update(nights)
+
+    teams = players.team_map(all_sided)
+    for h in all_hits:
+        h["team"] = h["team"] or teams.get(h["player"])
+
+    last = loaded[-1]
+    return {
+        "id":         parts[0]["id"],
+        "league":     first["league"],
+        "night":      first["night"],
+        "label":      label,
+        "key":        key,
+        "start_date": first["start_date"],
+        "active":     False,
+        "primary":    first["primary"],
+        "current":    False,
+        "dir":        first["dir"],
+        "schedule":   last["schedule"],
+        "standings":  last["standings"],
+        "recaps":     all_recaps,
+        "sided_recaps": all_sided,
+        "hits":       all_hits,
+        "busts":      sum((s["busts"] for s in loaded), collections.Counter()),
+        "matches":    all_matches,
+        "teams":      teams,
+        "dates":      sorted(all_dates),
+        "week_of":    week_of,
+        "latest_week": max((s["latest_week"] for s in loaded), default=0),
+        "latest_date": max((s["latest_date"] for s in loaded if s["latest_date"]),
+                           default=None),
+        "weeks_by_player": dict(weeks_by_player),
+        "hit_nights_by_player": dict(hit_nights_by_player),
+        "nights_by_player": dict(nights_by_player),
+        "season_nights": {},
+        "missing":    [m for s in loaded for m in s["missing"]],
+        "fixtures":   [],
+        "stages":     loaded,
+    }
+
+
 def load_all():
-    """Every season that has data, in display order -- see _display_order."""
+    """Every season that has data, in display order. Stages of the same season are merged when
+    eligible (same base label, same league, not current, first stage has one division)."""
     entries = [e for e in registry() if _has_recaps(e["id"])]
-    return [load_season(e["id"]) for e in _display_order(entries)]
+    ordered = _display_order(entries)
+
+    league_rank = {league: i for i, (league, _night) in enumerate(fetch.LEAGUES)}
+    groups = collections.OrderedDict()
+    for e in ordered:
+        bl = base_label(e["label"])
+        gk = (e["league"], bl)
+        groups.setdefault(gk, []).append(e)
+
+    result = []
+    for (league, bl), parts in groups.items():
+        stage_parts = [e for e in parts if base_label(e["label"]) != e["label"]]
+        if len(stage_parts) >= 2 and _can_merge(stage_parts):
+            stage_parts.sort(key=lambda e: e["start_date"] or "")
+            merged = merge_stages(stage_parts)
+            non_stages = [e for e in parts if e not in stage_parts]
+            for e in non_stages:
+                result.append(load_season(e["id"]))
+            result.append(merged)
+        else:
+            for e in parts:
+                result.append(load_season(e["id"]))
+
+    primary = current_id()
+    result.sort(key=lambda s: s["id"] != primary)
+
+    seen_keys = set()
+    deduped = []
+    for s in result:
+        if s["key"] not in seen_keys:
+            seen_keys.add(s["key"])
+            deduped.append(s)
+    return deduped
 
 
 _DAYS   = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
@@ -220,7 +368,10 @@ def load_season(season_id=None):
 
 
 def divisions(season):
-    """Division labels in league order, from the standings feed."""
+    """Division labels in league order, from the standings feed. A merged season uses its
+    first stage's divisions (all hits carry that one division)."""
+    if "stages" in season:
+        return divisions(season["stages"][0])
     seen = []
     for c in season["standings"]["competitors"]:
         if c["division"] not in seen:

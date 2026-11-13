@@ -146,13 +146,9 @@ def plan_sections(seasons):
 
 
 def picker_order(seasons):
-    """The season picker's order: All Time, then each night's seasons, newest first -- Tuesday's
-    first, as the primary league."""
-    league_rank = {league: i for i, (league, _night) in enumerate(events.fetch.LEAGUES)}
-    ordered = sorted(seasons, key=lambda s: s["id"])
-    ordered.sort(key=lambda s: s["start_date"] or "", reverse=True)
-    ordered.sort(key=lambda s: league_rank.get(s["league"], len(league_rank)))
-    return ordered
+    """The season picker's order: newest season first, Tuesday before Monday inside each
+    season. Delegates to events.season_order (the owner's order, 2026-11-12)."""
+    return events.season_order(seasons)
 
 
 def season_picker(seasons, here, division):
