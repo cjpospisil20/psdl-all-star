@@ -106,7 +106,7 @@ def _season_events(season, board_href, standings_href, award_href):
     prev_div_leaders = {}
     prev_standings = {}
     standings_pts = collections.defaultdict(lambda: collections.defaultdict(int))
-    cum_hits, cum_weeks = [], collections.defaultdict(set)
+    cum_hits = []
     prev_checkin = prev_checkout = None
     out = []
 
@@ -114,12 +114,11 @@ def _season_events(season, board_href, standings_href, award_href):
         week = round_of[date]
         night_hits = [h for h in season["hits"] if h["date"] == date]
         cum_hits.extend(night_hits)
-        for h in night_hits:
-            cum_weeks[h["player"]].add(h["date"])
 
         out.extend(_achievement_events(night_hits, week, date, night))
 
-        table = players.division_table(cum_hits, dict(cum_weeks))
+        # Leaders go on points alone, so the table needs no legs (its PPL stays None).
+        table = players.division_table(cum_hits)
         out.extend(_allstar_leader_events(table, prev_div_leaders, week, date, night,
                                           lambda d: board_href(season, d)))
         for d, rows in table.items():

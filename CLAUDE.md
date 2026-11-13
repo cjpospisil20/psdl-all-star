@@ -45,7 +45,7 @@ docs/      rulebook, design brief, exports
 |---|---|
 | `scraper/fetch.py` | **The only module that touches the network.** Both leagues (`LEAGUES`: Tuesday `ParkSDL`, Monday `ParkSlopeDLM`). Discovers each league's seasons into `data/seasons.json`; archives each recap to `data/seasons/<id>/recaps/` on first fetch; refreshes a season's `matches.json`, `standings.json` and `fixtures.json` while it is active. |
 | `scraper/allstar.py` | Rules engine — Rulebook Section F applied to turn data. Emits individual hits. |
-| `scraper/players.py` | Player → team, form stats recomputed from turns (`form_sums` per season, added up across seasons by `combined_form` for a player page's All Time), the per-division ranked table, the All Time table (`career_table`), who a name is across seasons (`identity`), nights played (GP) and playoff eligibility (`SEASON_NIGHTS`, `playoff_minimum`). |
+| `scraper/players.py` | Player → team, form stats recomputed from turns (`form_sums` per season, added up across seasons by `combined_form` for a player page's All Time), the per-division ranked table with PPL — points per leg played, legs from `legs_played` — the All Time table (`career_table`), who a name is across seasons (`identity`), nights played (GP) and playoff eligibility (`SEASON_NIGHTS`, `playoff_minimum`). |
 | `scraper/awards.py` | Season-end award data — 171+ Club, Big Fish, R9 Club, C5+, largest checkout/check-in, division leaders. Pure functions over hits; build.py passes one night's hits (awards are per night, owner 2026-11-12). |
 | `scraper/events.py` | `load_season(id)` — assembles one season from the archive (no id: the Tuesday league's current season); `load_all()` (merges eligible stages), `season_order()`, `base_label()`, `merge_stages()`, `registry()`, `current_id(league)`. The single entry point `site/` uses. |
 | `scraper/fixtures.py` | Match nights still to come, from a season's `fixtures.json` — the Schedule tab. Also New York time (`eastern_offset`, `league_today`). Pure, offline. |
@@ -143,8 +143,9 @@ open public/index.html
    build if one does. If a value is unknown, omit the element — see `ALL_STAR_CUT = None`, and
    `players.SEASON_NIGHTS`: a season it does not list shows GP with no playoff check marks.
 9. `summary.md` holds the rest of the hard-won specifics (`ending_marks` is points not marks;
-   `darts_thrown` only exists for the checkout player; averages are singles-only). Read it before
-   touching `players.py`.
+   `darts_thrown` only exists for the checkout player; averages are singles-only; a leg counts for
+   every player in its turns, not just its opener, and DartConnect's set and game numbers are not a
+   unique leg id). Read it before touching `players.py`.
 10. **Future fixtures come from DartConnect's lineups feed, not `matches.json`.** `matches.json` only
     ever lists matches that have started; `POST api/league/ParkSDL/lineups/{season}` lists every match
     not yet complete, saved as `data/fixtures.json`. On the Schedule, HOME is the team DartConnect
@@ -160,7 +161,7 @@ open public/index.html
     standings, schedule, recaps and fixtures against that league before writing them; `verify.py` §12
     checks it again. Team ids are per season (resolve within the season). A Monday recap's
     `division_title` reads `"Division: PS Monday"` — hits take the schedule's division
-    (`score_match(division=…)`). PPW counts DartConnect rounds (`round_seq`), not dates: make-up
+    (`score_match(division=…)`). A week is a DartConnect round (`round_seq`), not a date: make-up
     nights gave Fall 2025 23 dates over 15 rounds. A league's **current** season is its latest with
     an archived recap (`events.current_id`) — not DartConnect's `active` flag, which a new season
     gets weeks before its first match night.

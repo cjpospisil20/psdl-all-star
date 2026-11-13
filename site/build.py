@@ -58,6 +58,11 @@ SECTIONS, SPELLING, PAGE = {}, {}, {}
 RECOMPUTED = (" A finished season is recomputed from DartConnect by this site&rsquo;s rules, so "
               "its points may differ from what the league awarded at the time.")
 
+# What PPL means, said once on every page that shows it, as a team page spells out GP. PPL
+# replaced PPW, points per week, on 2026-11-13 (owner), so it is new to every reader.
+# players.legs_played counts the legs.
+PPL_NOTE = "PPL is points per leg played &mdash; singles, doubles and triples alike."
+
 
 def is_home(season):
     """The Tuesday league's current season -- the one the site has always shown."""
@@ -237,8 +242,8 @@ def build_season_boards(season, seasons):
 
         ranked = ("This board ranks players against their own division only. " if several
                   else "")
-        body.append(f'  <p class="caption">{ranked}Tap any player to see the turns behind the '
-                    f'number.{recomputed}</p>\n')
+        body.append(f'  <p class="caption">{ranked}{PPL_NOTE} Tap any player to see the turns '
+                    f'behind the number.{recomputed}</p>\n')
 
         page = C.page(f"PSDL All Star — {division}{named}", "".join(body), "all-stars")
         write(board_href(season, division), page)
@@ -269,8 +274,8 @@ def build_season_boards(season, seasons):
         body.append(show_all_button(f"SHOW ALL {len(everyone)} PLAYERS"))
     body.append('  <p class="caption">Every division on one board, highest points first. '
                 'A league rank says as much about a player&rsquo;s division as about the player '
-                '&mdash; pick a division above to compare like with like. Tap any player to see '
-                f'the turns behind the number.{recomputed}</p>\n')
+                f'&mdash; pick a division above to compare like with like. {PPL_NOTE} Tap any '
+                f'player to see the turns behind the number.{recomputed}</p>\n')
     write(board_href(season), C.page(f"PSDL All Star — All divisions{named}", "".join(body),
                                      "all-stars"))
 
@@ -304,8 +309,8 @@ def build_all_time(seasons, career):
                 'together, highest points first. A player&rsquo;s points from both nights count '
                 'together, under the name DartConnect has for them. A rank here says as much about '
                 'a player&rsquo;s division as about the player &mdash; pick a season above to '
-                f'compare a division like with like.{RECOMPUTED} Tap any player to see the turns '
-                'behind the number.</p>\n')
+                f'compare a division like with like.{RECOMPUTED} {PPL_NOTE} Tap any player to see '
+                'the turns behind the number.</p>\n')
     write(board_href(None), C.page("PSDL All Star — All Time", "".join(body), "all-stars"))
 
 
@@ -320,7 +325,7 @@ def leader_card(row, up="", key=None):
       </span>
       <span class="leader-pts">
         <b class="num">{row['points']:,}</b>
-        <span class="num">PPW {row['ppw']:g} &middot; AS {row['hits']}</span>
+        <span class="num">PPL {row['ppl']:g} &middot; AS {row['hits']}</span>
       </span>
     </span>
     <span class="chips">{C.chips_for(row['counts'], allstar.RARE)}</span>
@@ -355,7 +360,7 @@ def player_row(row, extra=False, up="", rank="division", division=False, key=Non
     </span>
     <span class="row-pts">
       <b class="num">{row['points']:,}</b>
-      <span class="num">PPW {row['ppw']:g}</span>
+      <span class="num">PPL {row['ppl']:g}</span>
     </span>
   </a>
 """
@@ -458,10 +463,12 @@ def player_page(name, sections, total, career_form):
 """)
         body.append(darts_card("THE DARTS &middot; SINGLES, ALL TIME", career_form,
                                career_form is noted, "in these seasons"))
-        body.append(points_card(total))
+        body.append(points_card(total, PPL_NOTE))
 
-    for (season, row, hits, form) in sections:
-        body.append(season_section(name, season, row, hits, form, named, form is noted))
+    # PPL is explained once too: on the ALL TIME card above, or else on the first season's card.
+    for i, (season, row, hits, form) in enumerate(sections):
+        body.append(season_section(name, season, row, hits, form, named, form is noted,
+                                   explain_ppl=career_form is None and i == 0))
     return C.page(f"PSDL All Star — {name}", "".join(body), "all-stars", depth=1)
 
 
@@ -501,7 +508,7 @@ def darts_card(title, form, note, when="this season"):
 
 
 def points_card(row, caption=""):
-    """All star points, hits and PPW: a season's division-table row, or a career_table row."""
+    """All star points, hits and PPL: a season's division-table row, or a career_table row."""
     if caption:
         caption = f'\n    <p class="caption" style="margin:12px 0 0">{caption}</p>'
     return f"""  <div class="card">
@@ -509,19 +516,19 @@ def points_card(row, caption=""):
     <div class="statgrid three">
       <span class="stat"><b class="num">{row['points']:,}</b><small>POINTS</small></span>
       <span class="stat"><b class="num">{row['hits']}</b><small>HITS (AS)</small></span>
-      <span class="stat"><b class="num">{row['ppw']:g}</b><small>PPW</small></span>
+      <span class="stat"><b class="num">{row['ppl']:g}</b><small>PPL</small></span>
     </div>{caption}
   </div>
 """
 
 
-def season_section(name, season, row, hits, form, named, note):
+def season_section(name, season, row, hits, form, named, note, explain_ppl=False):
     """One season of a player's page: its singles averages, its points and rank, and its hits.
 
     `named` heads the section with its season, which every page but a home-season-only one
-    needs; `note` puts SINGLES_NOTE on this season's darts card. The best TOP_HITS hits show; the
-    rest are folded into a <details>, so every one is still in the markup and opens without
-    JavaScript.
+    needs; `note` puts SINGLES_NOTE on this season's darts card, and `explain_ppl` PPL_NOTE on its
+    points card. The best TOP_HITS hits show; the rest are folded into a <details>, so every one
+    is still in the markup and opens without JavaScript.
     """
     body = []
     if named:
@@ -536,8 +543,9 @@ def season_section(name, season, row, hits, form, named, note):
     title = ("THE DARTS &middot; SINGLES, SEASON TO DATE" if season["active"]
              else "THE DARTS &middot; SINGLES")
     body.append(darts_card(title, form, note))
-    body.append(points_card(row, f"{ordinal(row['rank'])} of {row['of']} in "
-                                 f"{esc(row['division'])}. Ranked within division only."))
+    ranked = (f"{ordinal(row['rank'])} of {row['of']} in {esc(row['division'])}. "
+              "Ranked within division only.")
+    body.append(points_card(row, f"{ranked} {PPL_NOTE}" if explain_ppl else ranked))
 
     body.append(f'  <div class="headline"><span><h2 class="section">THE {len(hits)} HIT'
                 f'{"S" if len(hits) != 1 else ""}</h2>'
@@ -935,6 +943,7 @@ def build_league_awards(season, leagues):
             f'<p>Who holds each award, season to date &middot; all from '
             f'DartConnect</p></span></div>\n']
 
+    shows_ppl = False
     for award in awards.AWARDS:
         key, kind, entries = award["key"], award["kind"], data[award["key"]]
         body.append(f'  <div class="headline"><span>'
@@ -944,6 +953,7 @@ def build_league_awards(season, leagues):
         if kind == "division":
             holders = [player_row(rows[0], rank=None, division=True, key=season["key"])
                        for _s, _d, rows in leaders if rows]
+            shows_ppl = shows_ppl or bool(holders)
             depth = max((len(rows) for _s, _d, rows in leaders), default=0)
             if depth > 1:
                 more = f"TOP {depth} IN EACH DIVISION"
@@ -963,9 +973,11 @@ def build_league_awards(season, leagues):
             body.append(f'  <a class="btn" href="{award_detail_href(season, key)}">{more}'
                         f'{icon("chevron", tokens.COLOURS["gold"], 15)}</a>\n')
 
+    # The division leaders' rows carry a PPL, so the page says what it is.
+    ppl = f" {PPL_NOTE}" if shows_ppl else ""
     body.append('  <p class="caption">Every number traces back to DartConnect &mdash; tap a '
                 'name for the player&rsquo;s turns, or a set and game to open the match '
-                'recap.</p>\n')
+                f'recap.{ppl}</p>\n')
     named = "" if season["primary"] else f", {season['night']}"
     write(awards_href(season),
           C.page(f"PSDL All Star — Awards{named}", "".join(body), "awards"))
@@ -1006,6 +1018,8 @@ def award_page(award, entries, leaders, season, leagues):
                 body.append(f'  <a class="btn" href="{board_href(season, division, up="../")}">'
                             f'FULL {esc(division.upper())} TABLE'
                             f'{icon("chevron", tokens.COLOURS["gold"], 15)}</a>\n')
+        if any(rows for _s, _d, rows in leaders):
+            body.append(f'  <p class="caption">{PPL_NOTE}</p>\n')
     elif kind == "many":
         body.append(f'  <div class="headline"><span><h1>{esc(award["title"].upper())}</h1>'
                     f'<p>{esc(award["blurb"])}</p></span></div>\n')
@@ -1136,7 +1150,7 @@ def main():
         if s["missing"]:
             print(f"  ! {len(s['missing'])} match recaps missing from {s['label']} "
                   f"{s['night']} -- run scraper/fetch.py", file=sys.stderr)
-        s["table"] = players.division_table(s["hits"], s["weeks_by_player"])
+        s["table"] = players.division_table(s["hits"], s["legs_by_player"])
         s["divisions"] = events.divisions(s)
     career = players.career_table(seasons, {s["key"]: s["table"] for s in seasons})
     plan_sections(seasons)

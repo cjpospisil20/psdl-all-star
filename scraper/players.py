@@ -146,14 +146,19 @@ def resolve_sides(props, row, canonical):
 SENTINEL_PLAYERS = {"-SHORT-"}
 
 
+def _leg_names(g):
+    """Yield (side, player) for every turn slot in one leg, -SHORT- left out."""
+    for t in g["turns"]:
+        for side in ("home", "away"):
+            name = clean_name(t[side].get("name"))
+            if name and name not in SENTINEL_PLAYERS:
+                yield side, name
+
+
 def _turn_names(props):
     """Yield (side, player) for every turn slot in a match, -SHORT- left out."""
     for g in allstar.games(props):
-        for t in g["turns"]:
-            for side in ("home", "away"):
-                name = clean_name(t[side].get("name"))
-                if name and name not in SENTINEL_PLAYERS:
-                    yield side, name
+        yield from _leg_names(g)
 
 
 def _side_names(sided_recaps):
@@ -172,6 +177,26 @@ def throwers(props):
     more short by week 9 of Fall 2026, and 14 short of a night they had scored an all star on.
     """
     return {name for _side, name in _turn_names(props)}
+
+
+def legs_played(props):
+    """{player: legs} for one match: every leg each player threw at least one turn in.
+
+    What PPL divides by (owner, 2026-11-13: points per leg, replacing points per week). Every
+    format counts -- singles, doubles and triples, '01 and cricket -- because an all star can be
+    hit in any of them. And every turn counts, not each leg's opening one, for the reason
+    throwers() gives: a doubles partner who threw second played that leg too. Counting openers
+    alone, as form_sums does for LEG WINS, gave 226 of Fall 2026's 244 scorers the wrong count.
+
+    A leg is counted by its place in the match, never by DartConnect's set and game numbers:
+    those are not unique. Two archived matches number two different legs alike -- a 501 singles
+    set with two "game 1"s (68eedeb5..., Fall 2025), and two cricket singles games both "set 6,
+    game 1" (69b0b45c..., Spring 2026).
+    """
+    legs = collections.Counter()
+    for g in allstar.games(props):
+        legs.update({name for _side, name in _leg_names(g)})
+    return legs
 
 
 # Regular-season nights each team plays, per division, keyed by DartConnect season id. A league
@@ -357,30 +382,35 @@ def form_sums(recaps):
     return dict(acc)
 
 
-def division_table(hits, weeks_by_player=None):
+def division_table(hits, legs_by_player=None):
     """Ranked all-star table per division. Ranking is ALWAYS within a division.
 
     Division 1 scores far more than Division 5, so a league-wide ranking would be meaningless
     and actively misleading. See DESIGN-SPEC hard requirement 2. The one exception, approved by
     the owner, is the All-Stars ALL board -- see league_table(), which never touches these ranks.
+
+    PPL is points per leg played, over the season's `legs_by_player` (events.load_season, from
+    legs_played). Without them -- the Feed, which ranks by points alone -- every row's ppl is None,
+    so no page can show a figure divided by anything else.
     """
     stats = allstar.aggregate(hits)
     meta  = {}
     for h in hits:
         meta.setdefault(h["player"], {"division": h["division"], "team": h["team"]})
 
+    legs_by_player = legs_by_player or {}
     by_div = collections.defaultdict(list)
     for player, counter in stats.items():
         info = meta[player]
-        weeks = len(weeks_by_player.get(player, ())) if weeks_by_player else 1
+        legs = legs_by_player.get(player, 0)
         by_div[info["division"]].append({
             "player":   player,
             "team":     info["team"],
             "division": info["division"],
             "points":   counter["PTS"],
             "hits":     counter["AS"],
-            "ppw":      round(counter["PTS"] / weeks, 1) if weeks else counter["PTS"],
-            "weeks":    weeks,
+            "ppl":      round(counter["PTS"] / legs, 1) if legs else None,
+            "legs":     legs,
             "counts":   {c: counter[c] for c in allstar.COLUMNS if counter[c]},
         })
 
@@ -419,12 +449,16 @@ def career_table(seasons, tables):
     identity(): Monday and Tuesday points add up when the two names differ only in spacing,
     punctuation or capitals, and a name that differs in any letter is another player (data rule 5).
     The name shown is the one from the player's first season in display order -- the current
-    Tuesday season when they are in it -- and so are the division and team. PPW divides by every
-    round with a hit, in every season; a week with a hit on both nights counts twice.
+    Tuesday season when they are in it -- and so are the division and team.
+
+    PPL divides by the legs of exactly the seasons the player has a row in -- the seasons their
+    page lists below its ALL TIME card, whose averages pool those same seasons -- on both nights.
+    Legs are not hits, so adding up the season rows' legs is the right total here: a season with
+    no all star hit has no row, and its legs stay out, as its darts do.
     """
     stats = allstar.aggregate([{**h, "player": identity(h["player"])}
                                for s in seasons for h in s["hits"]])
-    first, weeks, played = {}, collections.Counter(), collections.defaultdict(list)
+    first, legs, played = {}, collections.Counter(), collections.defaultdict(list)
     for s in seasons:
         rows = {r["player"]: r for rs in tables[s["key"]].values() for r in rs}
         for player, row in rows.items():
@@ -432,8 +466,7 @@ def career_table(seasons, tables):
             first.setdefault(who, (s, row))
             if s["key"] not in played[who]:
                 played[who].append(s["key"])
-        for player, rounds in s["weeks_by_player"].items():
-            weeks[identity(player)] += len(rounds)
+            legs[who] += row["legs"]
 
     out = []
     for who, counter in stats.items():
@@ -446,8 +479,8 @@ def career_table(seasons, tables):
             "night":    s["night"],
             "points":   counter["PTS"],
             "hits":     counter["AS"],
-            "ppw":      round(counter["PTS"] / weeks[who], 1) if weeks[who] else counter["PTS"],
-            "weeks":    weeks[who],
+            "ppl":      round(counter["PTS"] / legs[who], 1) if legs[who] else None,
+            "legs":     legs[who],
             "seasons":  played[who],
             "counts":   {c: counter[c] for c in allstar.COLUMNS if counter[c]},
         })
