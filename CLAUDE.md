@@ -47,7 +47,7 @@ docs/      rulebook, design brief, exports
 | `scraper/allstar.py` | Rules engine — Rulebook Section F applied to turn data. Emits individual hits. |
 | `scraper/players.py` | Player → team, form stats recomputed from turns, the per-division ranked table, the All Time table (`career_table`), who a name is across seasons (`identity`), nights played (GP) and playoff eligibility (`SEASON_NIGHTS`, `playoff_minimum`). |
 | `scraper/awards.py` | Season-end award data — 171+ Club, Big Fish, R9 Club, C5+, largest checkout/check-in, division leaders. Pure functions over hits; build.py passes one night's hits (awards are per night, owner 2026-11-12). |
-| `scraper/events.py` | `load_season(id)` — assembles one season from the archive (no id: the Tuesday league's current season); `load_all()`, `registry()`, `current_id(league)`. The single entry point `site/` uses. |
+| `scraper/events.py` | `load_season(id)` — assembles one season from the archive (no id: the Tuesday league's current season); `load_all()` (merges eligible stages), `season_order()`, `base_label()`, `merge_stages()`, `registry()`, `current_id(league)`. The single entry point `site/` uses. |
 | `scraper/fixtures.py` | Match nights still to come, from a season's `fixtures.json` — the Schedule tab. Also New York time (`eastern_offset`, `league_today`). Pure, offline. |
 | `scraper/feed.py` | News feed events for both nights' current seasons, night by night; check-in and checkout records per night (matching Awards). Also `standings_by_night(season)` — cumulative standings from each side's own `points` field, used by verify. |
 | `scraper/verify.py` | Assertion suite. Run before publishing. |
@@ -185,7 +185,7 @@ scope on 2026-11-12 — as far back as DartConnect goes (Fall 2025), and no furt
 ## Where things stand
 
 The site is **live** at <https://psdartleague.com/>, rebuilt the morning after each match night by
-`.github/workflows/build.yml`. `site/build.py` generates **436 pages** from 519 archived matches
+`.github/workflows/build.yml`. `site/build.py` generates **433 pages** from 519 archived matches
 across six seasons of both nights — 347 player pages (one per player, every season they have
 scored in), 38 team pages (31 Tuesday, 7 Monday), the current Tuesday season's 5 division
 leaderboards + the ALL board, 17 boards for the other five seasons and All Time, 6 standings pages
@@ -202,7 +202,10 @@ still work) — and `scraper/verify.py` and `site/check.py` both pass.
 at `award/<key>.html` and `award/monday-<key>.html`; Largest Check-In and Largest Checkout are
 awarded separately for each night. The Feed is **the league at large**: both nights' current
 seasons, grouped by night heading. The All-Stars tab has a **season picker**
-above the division chips: All Time, then every season of both nights. The home page is still the
+above the division chips: All Time, then every season of both nights, newest first with Tuesday
+before Monday inside each season (owner, 2026-11-12). Monday's Spring 2026 "Stage 1" and "Stage 2"
+are merged into one season of 73 players (`events.merge_stages`); stages merge when same base label,
+same league, none current, and the first stage has one division. The home page is still the
 current Tuesday season's Division 1. A past season's boards say FINAL and that they are recomputed
 by this site's rules; a player page covers every season, and a season's board opens that season's
 section of it.
