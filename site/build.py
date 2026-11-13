@@ -21,6 +21,10 @@ OUT = ROOT / "public"
 ALL_STAR_CUT = None
 
 PREVIEW_ROWS = 10          # rows before "show all"
+# A season's hits on a player page before the rest fold away behind "N MORE HITS" (owner,
+# 2026-11-12). The fold is a <details>, so every hit is still in the markup and it opens with
+# JavaScript off.
+TOP_HITS = 3
 
 # The logo assets the pages use. design/assets/ also holds the reversed wordmark, which only the
 # first-180 celebration screen used. That screen was retired on 2026-11-12 -- the Feed and Awards
@@ -365,6 +369,8 @@ def build_players(seasons, career):
 
     The page has a section per season (plan_sections), in display order: the current Tuesday
     season first when the player is in it, so every link from the home season needs no fragment.
+    A player with two or more seasons also gets an All Time section above them, covering exactly
+    those seasons -- the ones the page shows (owner, 2026-11-12).
     """
     rows = {s["key"]: {r["player"]: r for rs in s["table"].values() for r in rs} for s in seasons}
     hits = collections.defaultdict(list)
@@ -372,36 +378,61 @@ def build_players(seasons, career):
         for h in s["hits"]:
             hits[(h["player"], s["key"])].append(h)
     by_key = {s["key"]: s for s in seasons}
-    forms = {s["key"]: players.form_stats(s["recaps"]) for s in seasons}
+    # Each season's raw singles sums, under the name DartConnect has that season. A season's
+    # averages are divided from its own sums; All Time adds the seasons' sums up and divides once.
+    sums = {s["key"]: players.form_sums(s["recaps"]) for s in seasons}
     totals = {r["identity"]: r for r in career}
-    since = min(seasons, key=lambda s: (s["start_date"] or "", s["id"]))["label"]
 
     for who, keys in SECTIONS.items():
         spelt = [SPELLING[(who, k)] for k in keys]
-        sections = [(by_key[k], rows[k][name], sorted(hits[(name, k)], key=lambda h: -h["points"]))
-                    for k, name in zip(keys, spelt)]
-        form = forms[keys[0]].get(spelt[0], {})
+        parts = [sums[k].get(name, {}) for k, name in zip(keys, spelt)]
+        sections = [(by_key[k], rows[k][name], by_points(hits[(name, k)]),
+                     players.form_figures(part))
+                    for k, name, part in zip(keys, spelt, parts)]
+        career_form = players.combined_form(parts) if len(keys) > 1 else None
         write(f"player/{PAGE[who]}.html",
-              player_page(spelt[0], sections, form, totals[who], since))
+              player_page(spelt[0], sections, totals[who], career_form))
 
 
-def player_page(name, sections, form, total, since):
+def by_points(hits):
+    """A player's hits, most points first; among equal points the latest night first, and inside a
+    night the order the turns were thrown. Newest-first is the order the page always showed, but
+    only because DartConnect's matches.json happens to list dates that way -- and that file is
+    refetched while a season is live. Pinned here to fields the archived recap fixes, so which
+    hits make a season's top three cannot shift on a refetch. Three stable sorts, last key first.
+    """
+    ordered = sorted(hits, key=lambda h: (h["match_id"], h["set_index"] or 0,
+                                          h["game_number"] or 0))
+    ordered.sort(key=lambda h: h["date"], reverse=True)
+    ordered.sort(key=lambda h: -h["points"])
+    return ordered
+
+
+# The page's one explanation of the averages: on its first darts card that shows figures.
+SINGLES_NOTE = ("Averages cover singles legs only &mdash; in doubles the darts belong to the "
+                "pair, so they cannot be split fairly. Checkout % counts turns taken with 170 or "
+                "less remaining; that is our definition, not DartConnect&rsquo;s.")
+
+
+def player_page(name, sections, total, career_form):
     """A player's page: every season they have scored in, one section each.
 
-    `sections` is [(season, division-table row, hits)] in display order. The first section opens
-    with the player's form for that season (singles averages, and MATCHES -- league nights played,
-    the GP a team page shows, so the two always agree). Each section after it has the season's
-    points and every hit behind them. A player with two or more seasons also gets an ALL TIME card.
+    `sections` is [(season, division-table row, hits, form)] in display order, `form` being the
+    player's singles averages that season. Each section has those averages, the season's points
+    and its hits -- the best TOP_HITS, the rest folded behind "N MORE HITS". A player with two or
+    more seasons gets an All Time section first, with the same two cards over those seasons
+    together: `career_form` from players.combined_form, `total` their career_table row.
 
-    A player whose only section is the current Tuesday season gets the page they always had.
+    A player whose only section is the current Tuesday season gets the page they always had,
+    with no section headings.
     """
-    season, row, _hits = sections[0]
+    season, row, _hits, _form = sections[0]
     named = len(sections) > 1 or not is_home(season)
     back_label = f"{row['division'].upper()} ALL-STARS"
     back_href = board_href(season, row["division"], up="../")
     # Every board that links here, so app.js can return to whichever the reader came from.
     back_from = [board_href(season, row["division"]), "index.html"]
-    for s, r, _h in sections:
+    for s, r, _h, _f in sections:
         for page in (board_href(s, r["division"]), board_href(s), board_href(None)):
             if page not in back_from:
                 back_from.append(page)
@@ -412,27 +443,86 @@ def player_page(name, sections, form, total, since):
   </span></div>
 """]
 
-    if len(sections) > 1:
-        body.append(f"""  <div class="card">
-    <h2>ALL TIME &middot; {len(sections)} SEASONS</h2>
-    <div class="statgrid three">
-      <span class="stat"><b class="num">{total['points']:,}</b><small>POINTS</small></span>
-      <span class="stat"><b class="num">{total['hits']}</b><small>HITS (AS)</small></span>
-      <span class="stat"><b class="num">{total['ppw']:g}</b><small>PPW</small></span>
-    </div>
-    <p class="caption" style="margin:12px 0 0">Monday and Tuesday nights together, every season
-    since {esc(since)}.</p>
-  </div>
-""")
+    forms = [f for *_rest, f in sections]
+    # The averages are explained once, on the first darts card with figures to explain.
+    noted = next((f for f in [career_form] + forms if f and f["singles_legs"]), None)
 
-    for i, (season, row, hits) in enumerate(sections):
-        body.append(season_section(name, season, row, hits, form if i == 0 else None, named))
+    if career_form is not None:
+        nights = sorted({s["night"] for s, *_rest in sections})
+        together = (f"{' and '.join(nights)} nights together" if len(nights) > 1
+                    else "added together")
+        body.append(f"""  <div class="headline" id="{ALL_TIME}"><span>
+    <h2 class="section">ALL TIME &middot; {len(sections)} SEASONS</h2>
+    <p>The {len(sections)} seasons below, {together}</p>
+  </span></div>
+""")
+        body.append(darts_card("THE DARTS &middot; SINGLES, ALL TIME", career_form,
+                               career_form is noted, "in these seasons"))
+        body.append(points_card(total))
+
+    for (season, row, hits, form) in sections:
+        body.append(season_section(name, season, row, hits, form, named, form is noted))
     return C.page(f"PSDL All Star — {name}", "".join(body), "all-stars", depth=1)
 
 
-def season_section(name, season, row, hits, form, named):
-    """One season of a player's page. `form` only for the first section; `named` heads the
-    section with its season, which every page but a home-season-only one needs."""
+def darts_card(title, form, note, when="this season"):
+    """A player's singles averages, for a season or All Time; `note` adds SINGLES_NOTE.
+
+    With no singles legs at all the card says so in a line rather than show six blanks -- among
+    them LEG WINS, which counts doubles legs too and would otherwise sit alone under a SINGLES
+    title.
+    """
+    if not form["singles_legs"]:
+        return f"""  <div class="card">
+    <h2>{title}</h2>
+    <p class="caption" style="margin:0">No singles legs {when} &mdash; the averages count
+    singles legs only.</p>
+  </div>
+"""
+
+    # Fixed places, as DartConnect prints them and the team pages show them: 49.00, not 49.0.
+    def stat(label, value, places, suffix=""):
+        shown = "&mdash;" if value is None else f"{value:.{places}f}{suffix}"
+        return f'<span class="stat"><b class="num">{shown}</b><small>{label}</small></span>'
+
+    caption = f'\n    <p class="caption" style="margin:12px 0 0">{SINGLES_NOTE}</p>' if note else ""
+    return f"""  <div class="card">
+    <h2>{title}</h2>
+    <div class="statgrid">
+      {stat("3-DART AVG", form["three_dart_avg"], 2)}
+      {stat("MARKS PER RD", form["mpr"], 2)}
+      {stat("FIRST 9", form["first_nine"], 2)}
+      {stat("CHECKOUT", form["checkout_pct"], 1, "%")}
+      {stat("LEG WINS", form["leg_win_pct"], 1, "%")}
+      {stat("OPP 3DA", form["opp_three_dart"], 2)}
+    </div>{caption}
+  </div>
+"""
+
+
+def points_card(row, caption=""):
+    """All star points, hits and PPW: a season's division-table row, or a career_table row."""
+    if caption:
+        caption = f'\n    <p class="caption" style="margin:12px 0 0">{caption}</p>'
+    return f"""  <div class="card">
+    <h2>ALL STAR POINTS</h2>
+    <div class="statgrid three">
+      <span class="stat"><b class="num">{row['points']:,}</b><small>POINTS</small></span>
+      <span class="stat"><b class="num">{row['hits']}</b><small>HITS (AS)</small></span>
+      <span class="stat"><b class="num">{row['ppw']:g}</b><small>PPW</small></span>
+    </div>{caption}
+  </div>
+"""
+
+
+def season_section(name, season, row, hits, form, named, note):
+    """One season of a player's page: its singles averages, its points and rank, and its hits.
+
+    `named` heads the section with its season, which every page but a home-season-only one
+    needs; `note` puts SINGLES_NOTE on this season's darts card. The best TOP_HITS hits show; the
+    rest are folded into a <details>, so every one is still in the markup and opens without
+    JavaScript.
+    """
     body = []
     if named:
         # A season whose DartConnect name differs from the page's (spacing, punctuation, capitals)
@@ -443,49 +533,11 @@ def season_section(name, season, row, hits, form, named):
     <p class="name">{esc(row['division'])} &middot; {esc(row['team'])}{listed}</p>
   </span></div>
 """)
-    nights = len(season["nights_by_player"].get(name, ()))
-    if form:
-        def stat(label, value, suffix=""):
-            shown = "&mdash;" if value is None else f"{value}{suffix}"
-            return f'<span class="stat"><b class="num">{shown}</b><small>{label}</small></span>'
-
-        darts, days = (("THE DARTS &middot; SINGLES, SEASON TO DATE", "THIS SEASON")
-                       if season["active"] else ("THE DARTS &middot; SINGLES", "THE SEASON"))
-        body.append(f"""  <div class="card">
-    <h2>{darts}</h2>
-    <div class="statgrid">
-      {stat("3-DART AVG", form.get("three_dart_avg"))}
-      {stat("MARKS PER RD", form.get("mpr"))}
-      {stat("FIRST 9", form.get("first_nine"))}
-      {stat("CHECKOUT", form.get("checkout_pct"), "%")}
-      {stat("LEG WINS", form.get("leg_win_pct"), "%")}
-      {stat("OPP 3DA", form.get("opp_three_dart"))}
-    </div>
-  </div>
-  <div class="card">
-    <h2>{days}</h2>
-    <div class="statgrid three">
-      {stat("MATCHES", nights)}
-      {stat("LEGS", form.get("legs"))}
-      {stat("DARTS", f"{form.get('darts', 0):,}")}
-    </div>
-    <p class="caption" style="margin:12px 0 0">Averages cover singles legs only &mdash; in
-    doubles the darts belong to the pair, so they cannot be split fairly. Checkout % counts
-    turns taken with 170 or less remaining; that is our definition, not DartConnect&rsquo;s.</p>
-  </div>
-""")
-
-    body.append(f"""  <div class="card">
-    <h2>ALL STAR POINTS</h2>
-    <div class="statgrid three">
-      <span class="stat"><b class="num">{row['points']:,}</b><small>POINTS</small></span>
-      <span class="stat"><b class="num">{row['hits']}</b><small>HITS (AS)</small></span>
-      <span class="stat"><b class="num">{row['ppw']:g}</b><small>PPW</small></span>
-    </div>
-    <p class="caption" style="margin:12px 0 0">{ordinal(row['rank'])} of {row['of']} in
-    {esc(row['division'])}. Ranked within division only.</p>
-  </div>
-""")
+    title = ("THE DARTS &middot; SINGLES, SEASON TO DATE" if season["active"]
+             else "THE DARTS &middot; SINGLES")
+    body.append(darts_card(title, form, note))
+    body.append(points_card(row, f"{ordinal(row['rank'])} of {row['of']} in "
+                                 f"{esc(row['division'])}. Ranked within division only."))
 
     body.append(f'  <div class="headline"><span><h2 class="section">THE {len(hits)} HIT'
                 f'{"S" if len(hits) != 1 else ""}</h2>'
@@ -493,11 +545,12 @@ def season_section(name, season, row, hits, form, named):
 
     best = max((h["turn_value"] for h in hits if h["game"] != "Cricket"), default=None)
     flagged = False
+    rows = []
     for h in hits:
         detail = h["detail"]
         if not flagged and best and h["turn_value"] == best and h["game"] != "Cricket":
             detail, flagged = "Best turn of the season", True
-        body.append(f"""  <div class="hit">
+        rows.append(f"""  <div class="hit">
     <span class="chip{' rare' if h['rare'] else ''}">{esc(h['display'])}</span>
     <span class="hit-main">
       <b>{esc(detail)}</b>
@@ -507,6 +560,14 @@ def season_section(name, season, row, hits, form, named):
     <span class="hit-val num">{h['points']}</span>
   </div>
 """)
+    body.extend(rows[:TOP_HITS])
+    rest = len(rows) - TOP_HITS
+    if rest > 0:
+        body.append(f'  <details class="more-hits">\n    <summary>{rest} MORE HIT'
+                    f'{"S" if rest != 1 else ""}{icon("chevron", tokens.COLOURS["gold"], 15)}'
+                    f'</summary>\n')
+        body.extend(rows[TOP_HITS:])
+        body.append("  </details>\n")
     return "".join(body)
 
 

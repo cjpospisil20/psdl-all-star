@@ -493,6 +493,32 @@ def check_archive(seasons):
           [r["league_rank"] for r in career] == list(range(1, len(career) + 1))
           and all(career[i]["points"] >= career[i + 1]["points"] for i in range(len(career) - 1)))
 
+    # A player page's All Time singles averages (owner, 2026-11-12) add up the raw sums of the
+    # seasons the page shows and divide once (players.combined_form) -- never an average of season
+    # averages. So adding a player's per-season sums must equal one pass over all of those
+    # seasons' legs together, however the seasons are split: this suite loads Monday's stages
+    # separately, where the site merges them. A pooled pass knows a player by name, so this
+    # covers everyone with one spelling; MPR may differ by a rounding step, as its sums are floats.
+    sums = {s["key"]: players.form_sums(s["recaps"]) for s in seasons}
+    by_key = {s["key"]: s for s in seasons}
+    groups = collections.defaultdict(list)
+    for r in career:
+        if len(r["seasons"]) > 1 and len(spellings[r["identity"]]) == 1:
+            groups[tuple(r["seasons"])].append(r["player"])
+    wrong, compared = [], 0
+    for keys, names in groups.items():
+        pooled = players.form_stats([props for k in keys for props in by_key[k]["recaps"]])
+        for name in names:
+            compared += 1
+            summed = players.combined_form(sums[k].get(name, {}) for k in keys)
+            expect = pooled.get(name) or players.form_figures({})
+            if any((a is None) != (b is None) or (a is not None and abs(a - b) > 0.011)
+                   for a, b in ((summed[f], expect[f]) for f in expect)):
+                wrong.append(name)
+    check(f"all {compared} multi-season players' All Time averages add up their seasons' legs, "
+          "never averaging the averages", compared and not wrong,
+          f"{len(wrong)} wrong: {wrong[:3]}")
+
     for league, night in events.fetch.LEAGUES:
         current = [s["key"] for s in seasons if s["league"] == league and s["current"]]
         if any(s["league"] == league for s in seasons):
