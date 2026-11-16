@@ -45,7 +45,7 @@ docs/      rulebook, design brief, exports
 |---|---|
 | `scraper/fetch.py` | **The only module that touches the network.** Both leagues (`LEAGUES`: Tuesday `ParkSDL`, Monday `ParkSlopeDLM`). Discovers each league's seasons into `data/seasons.json`; archives each recap to `data/seasons/<id>/recaps/` on first fetch; refreshes a season's `matches.json`, `standings.json` and `fixtures.json` while it is active. |
 | `scraper/allstar.py` | Rules engine — Rulebook Section F applied to turn data. Emits individual hits. |
-| `scraper/players.py` | Player → team, form stats recomputed from turns (`form_sums` per season, added up across seasons by `combined_form` for a player page's All Time), the per-division ranked table with PPL — points per leg played, legs from `legs_played` — the All Time table (`career_table`), who a name is across seasons (`identity`), nights played (GP) and playoff eligibility (`SEASON_NIGHTS`, `playoff_minimum`). |
+| `scraper/players.py` | Player → team; form stats and the W–L record by format, recomputed from turns over every leg, each turn credited to its thrower (`turns_thrown` → `form_sums` per season, added up across seasons by `combine` for a player's All Time; `form_figures`, `record`); the per-division ranked table with PPL — points per leg played, legs from `legs_played` — the All Time table (`career_table`), who a name is across seasons (`identity`), nights played (GP) and playoff eligibility (`SEASON_NIGHTS`, `playoff_minimum`). |
 | `scraper/awards.py` | Season-end award data — 171+ Club, Big Fish, R9 Club, C5+, largest checkout/check-in, division leaders. Pure functions over hits; build.py passes one night's hits (awards are per night, owner 2026-11-12). |
 | `scraper/events.py` | `load_season(id)` — assembles one season from the archive (no id: the Tuesday league's current season); `load_all()` (merges eligible stages), `season_order()`, `base_label()`, `merge_stages()`, `registry()`, `current_id(league)`. The single entry point `site/` uses. |
 | `scraper/fixtures.py` | Match nights still to come, from a season's `fixtures.json` — the Schedule tab. Also New York time (`eastern_offset`, `league_today`). Pure, offline. |
@@ -55,7 +55,7 @@ docs/      rulebook, design brief, exports
 | `site/tokens.py` | The palette and type from DESIGN-SPEC, in one place, emitted as `public/app.css`. The stylesheet is the phone layout, then a "wider screens" section of `@media (min-width)` rules (breakpoints `WIDE` 768 and `DESKTOP` 1024, column `MAIN` 880). |
 | `site/components.py` | Shared fragments: page shell, header, sub-header (back links), status bar, the season/league picker, division nav, chips, icons, recap links. |
 | `site/app.js` | Progressive enhancement only — search filter, long-table collapse, back-link history, the schedule's filters and live night, closing a picker on an outside tap or Escape. |
-| `site/build.py` | Renders all pages into `public/`: every season's All-Stars boards (with the season picker) and All Time, one career page per player, the schedule, standings, team pages (reached from standings), awards, the feed. Every link and write goes through `board_href` / `player_href` / `team_href`. |
+| `site/build.py` | Renders all pages into `public/`: every season's All-Stars boards (with the season picker) and All Time, each player's pages (one per season they threw in, plus All Time, behind a SEASON menu), the schedule, standings, team pages (reached from standings), awards, the feed. Every link and write goes through `board_href` / `player_href` (→ `player_view`) / `team_href`. |
 
 Run it:
 
@@ -143,9 +143,10 @@ open public/index.html
    build if one does. If a value is unknown, omit the element — see `ALL_STAR_CUT = None`, and
    `players.SEASON_NIGHTS`: a season it does not list shows GP with no playoff check marks.
 9. `summary.md` holds the rest of the hard-won specifics (`ending_marks` is points not marks;
-   `darts_thrown` only exists for the checkout player; averages are singles-only; a leg counts for
-   every player in its turns, not just its opener, and DartConnect's set and game numbers are not a
-   unique leg id). Read it before touching `players.py`.
+   `darts_thrown` only exists for the checkout player; averages count every leg, each turn credited
+   to whoever threw it, and a cricket mark counts unless both sides have closed that number; a leg
+   counts for every player in its turns, not just its opener, and DartConnect's set and game numbers
+   are not a unique leg id). Read it before touching `players.py`.
 10. **Future fixtures come from DartConnect's lineups feed, not `matches.json`.** `matches.json` only
     ever lists matches that have started; `POST api/league/ParkSDL/lineups/{season}` lists every match
     not yet complete, saved as `data/fixtures.json`. On the Schedule, HOME is the team DartConnect
@@ -192,9 +193,9 @@ scope on 2026-11-12 — as far back as DartConnect goes (Fall 2025), and no furt
 ## Where things stand
 
 The site is **live** at <https://psdartleague.com/>, rebuilt the morning after each match night by
-`.github/workflows/build.yml`. `site/build.py` generates **433 pages** from 519 archived matches
-across six seasons of both nights — 347 player pages (one per player, every season they have
-scored in), 38 team pages (31 Tuesday, 7 Monday), the current Tuesday season's 5 division
+`.github/workflows/build.yml`. `site/build.py` generates **1,169 pages** from 519 archived matches
+across six seasons of both nights — 1,083 player pages (347 players with an all star hit: a page
+for every season they threw a dart in, and All Time for the 253 with two or more), 38 team pages (31 Tuesday, 7 Monday), the current Tuesday season's 5 division
 leaderboards + the ALL board, 17 boards for the other five seasons and All Time, 6 standings pages
 (Tuesday's five, Monday's one), 2 awards indexes (one per night) and 14 award detail pages (7 per
 night), two schedules (Tuesday, Monday), the feed, and three aliases: `index.html` /
@@ -214,8 +215,12 @@ before Monday inside each season (owner, 2026-11-12). Monday's Spring 2026 "Stag
 are merged into one season of 73 players (`events.merge_stages`); stages merge when same base label,
 same league, none current, and the first stage has one division. The home page is still the
 current Tuesday season's Division 1. A past season's boards say FINAL and that they are recomputed
-by this site's rules; a player page covers every season, and a season's board opens that season's
-section of it.
+by this site's rules. A player's pages (2026-11-16) are one per season they threw a dart in, hit
+or not, plus All Time, chosen from a **SEASON menu** at the top; `player/<name>.html` opens on the
+current season (Tuesday first) or their newest, the others are `player/<name>/<season key>.html`
+and `player/<name>/all-time.html`, and a season's board opens that season's page. Each page shows
+averages and a **record (legs won–lost) by format** over every leg — singles, doubles and triples
+— then all star points and that season's hits.
 
 The tab bar is Standings · All-Stars · Schedule · Feed · Awards: at the bottom on a phone, at the
 right of the header from 768px, where the content opens out into a centred column up to 880px
@@ -225,7 +230,8 @@ come — home v away, division by division, with a division menu and team search
 matches while they are on. There is no Teams tab or teams index any more (retired 2026-11-11): a team
 page is opened by tapping its row on Standings (or a team on the Schedule), and lists the whole
 roster — scorers first, then teammates with no all star hits yet — with each player's GP (league
-nights played), singles '01 average and MPR, and a gold check mark beside every player who is playoff
+nights played), '01 average and MPR over every leg (as DartConnect's Standings averages are), and
+a gold check mark beside every player who is playoff
 eligible (Rulebook §H.2; the season length per division is `players.SEASON_NIGHTS`, confirmed by the
 owner for Tuesday — Monday's is not known yet, so Monday team pages show GP with no ticks). The Feed
 tab lists both nights' notable moments, newest night first.

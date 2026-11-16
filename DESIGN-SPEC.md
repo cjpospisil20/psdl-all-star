@@ -89,8 +89,10 @@ the original letterforms, colour flipped. Its only page, the first-180 screen, w
   flow rather than over it, and works with JavaScript off; `app.js` only closes it on an outside
   tap or Escape. Switching season keeps the division where the other season has it. The same
   component is the **league** picker at the top of Standings and the Schedule — "Tuesday night",
-  "Monday night" — one league at a time, Tuesday first.
-- **More hits** (2026-11-12): a player page lists each season's top three hits, and folds the rest
+  "Monday night" — one league at a time, Tuesday first — and the **season** menu under a player's
+  name (2026-11-16): All Time when they have two or more seasons, then each season they threw a
+  dart in, newest first, opening on the current season.
+- **More hits** (2026-11-12): a season's player page lists its top three hits, and folds the rest
   into a `<details>` whose summary reads "9 MORE HITS". The summary is styled like the show-all
   button (46px, surface fill, hairline border, gold label and a gold chevron that turns over when
   open), and the hits open in place beneath it. Every hit is still in the markup, and the fold
@@ -106,8 +108,9 @@ the original letterforms, colour flipped. Its only page, the first-180 screen, w
     above the same labels, 80px tall, the current one gold with a 2px gold rule along the
     header's bottom edge. Stat grids run three across. Hovering a row gives it the surface fill.
     On a detail page the logo plate comes first and the back link sits beside it.
-  - **From 1024px** each section's label sits beside its icon. A player's darts card and points
-    card sit side by side, the Schedule runs two fixtures across under each night's heading, and
+  - **From 1024px** each section's label sits beside its icon. A player's darts card and record
+    card sit side by side, with the points card full width beneath them; the Schedule runs two
+    fixtures across under each night's heading, and
     its division filter and team search share a row. Live is still a gold border and label, never
     a fill.
   - **The markup is the same on every screen.** Only the stylesheet changes: the rules live in
@@ -153,6 +156,11 @@ divided by every leg they threw a turn in — singles, doubles and triples, '01 
 PPW divided by the weeks a player had hit an all star in. Every page that shows PPL says once what
 it is, and `check.py` fails any page that shows PPW. The rulebook still says PPW for forfeit credit
 (§F.3), which stays a commissioner's calculation.
+
+**Record** (2026-11-16) = legs won–lost, written `12–8`, on a player page per format: singles '01,
+singles cricket, doubles '01, doubles cricket, triples '01. Every leg is a point, so a two-leg
+singles 501 set counts as two; added up, the record is the page's LEG WINS. A format the player has
+no leg in is left out, never shown as 0–0.
 
 ### Chip styling — the one rule that carries the design
 
@@ -213,9 +221,9 @@ point — the old system's real failure was that nobody looked at it.
 |---|---|
 | `design/standings.html` | League standings, straight from DartConnect. Division switcher, one division at a time. Since 2026-11-12 a league picker above it switches between the Tuesday and Monday leagues; the mockup predates it. |
 | `design/all-stars.html` | All-star points leaderboard by division. The heart of the app. Since 2026-11-12 a season picker sits above the division chips (All Time, then every season of both nights); the mockup predates it. The mockup's PPW is PPL on the site since 2026-11-13 (see the stat vocabulary); its week-1 figures are not relabelled, because 835 points is not 835 per leg. |
-| `design/player.html` | One player: DartConnect form stats, then all-star points and every hit. Since 2026-11-12 one page covers every season the player has scored in, and a past season's board opens its section. A player with two or more seasons gets an ALL TIME section first: the singles averages and the points over exactly the seasons below, the averages divided once from those seasons' added-up darts and points. Then each season, newest first, has its own singles averages, its points and rank, and its top three hits, with the rest folded behind "N MORE HITS". The mockup's activity strip (MATCHES, LEGS, DARTS) is not built: the owner removed it on 2026-11-12. The mockup's PPW is PPL on the site since 2026-11-13. The All Time PPL divides by the legs of the seasons below, as the averages do. |
+| `design/player.html` | One player: DartConnect form stats, then all-star points and every hit. Since 2026-11-16 it is one page per season the player threw a dart in (once they have an all star hit in any season), plus All Time, chosen from a SEASON menu under the name; it opens on the current season, and a season's board opens that season's page. Each page has three cards: THE DARTS — the six averages over every leg, singles, doubles and triples, each turn credited to whoever threw it (the mockup's card is captioned SINGLES; that was the site's rule until 2026-11-16); RECORD — legs won–lost in each format the player has played, in match order (singles '01, singles cricket, doubles '01, doubles cricket, triples '01); and ALL STAR POINTS with its rank. A season's page then lists its top three hits, the rest folded behind "N MORE HITS"; a season with no all star hit says so and has no rank. All Time adds up every season in the menu, divided once from the added-up darts, points and marks, and its PPL divides by every leg of those seasons. The mockup's activity strip (MATCHES, LEGS, DARTS) is not built: the owner removed it on 2026-11-12. The mockup's PPW is PPL on the site since 2026-11-13. |
 | `design/match.html` | **Retired 2026-11-11.** One match night, both teams, every hit linking to its turn. The Match tab became the Schedule (upcoming home v away fixtures, no all-star points), which has no mockup; `site/build.py` `build_schedule()` is its reference. |
-| `design/team.html` | Captain's roll-up of their players. Opened by tapping a team on Standings; lists the whole roster with GP (league nights played) and singles averages, and a gold check mark (inline SVG, never a glyph) after the name of each playoff-eligible player. |
+| `design/team.html` | Captain's roll-up of their players. Opened by tapping a team on Standings; lists the whole roster with GP (league nights played) and the '01 and CRK averages over every leg (singles only until 2026-11-16), and a gold check mark (inline SVG, never a glyph) after the name of each playoff-eligible player. |
 | `design/rare-hit.html` | **Retired 2026-11-12.** The celebration screen for the season's first 180 / R9 / C6. The owner removed it: the Feed and Awards celebrate those hits now. |
 
 ## Data in the mockups — what's real and what isn't

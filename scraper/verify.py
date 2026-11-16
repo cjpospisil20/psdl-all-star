@@ -4,6 +4,7 @@ These assertions encode the rules that were hard to get right, and the two bugs 
 actually found and fixed during development. They exist to stop those bugs coming back.
 """
 import collections, pathlib, re, sys
+from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import allstar, events, players
@@ -138,12 +139,15 @@ def check_season(season):
     check(f"all {len(player_slugs)} player slugs are unique", not collisions,
           f"{len(collisions)} collision(s): {collisions[:3]}")
     # Within one season, two names that are one players.identity() would be one person twice
-    # (or two people the site cannot tell apart) -- never something to merge silently.
+    # (or two people the site cannot tell apart) -- never something to merge silently. Everyone
+    # who threw, not only the scorers: a player's pages cover every season they threw a dart in
+    # (2026-11-16), and build.plan_sections refuses to guess.
     same = collections.defaultdict(set)
-    for r in rows:
-        same[players.identity(r["player"])].add(r["player"])
+    for name in season["legs_by_player"]:
+        same[players.identity(name)].add(name)
     twice = sorted(str(sorted(n)) for n in same.values() if len(n) > 1)
-    check("no two names in this season are one player", not twice, str(twice[:3]))
+    check(f"no two names among the {len(season['legs_by_player'])} who threw this season are one "
+          "player", not twice, str(twice[:3]))
     team_slugs = {}
     team_collisions = []
     for r in rows:
@@ -296,6 +300,148 @@ def check_season(season):
     elif season["current"]:
         print("  NOTE  no season length in players.SEASON_NIGHTS for this season -- team pages "
               "show GP without playoff check marks")
+
+    check_every_leg(season)
+
+
+def _as_printed(exact, printed):
+    """Whether `printed`, a figure as DartConnect prints it ("2.1", "1.31", "45.38"), is `exact`
+    (a Decimal) as DartConnect rounds. It is not consistent: some figures are rounded half-up,
+    some truncated, and some rounded to two places first and then to the one it prints."""
+    printed = str(printed)
+    step = Decimal(1).scaleb(-(len(printed.split(".")[1]) if "." in printed else 0))
+    shown = set()
+    for first in (None, ROUND_HALF_UP, ROUND_DOWN):
+        value = exact if first is None else exact.quantize(Decimal("0.01"), rounding=first)
+        for last in (ROUND_HALF_UP, ROUND_DOWN):
+            shown.add(value.quantize(step, rounding=last))
+    return Decimal(printed) in shown
+
+
+def check_every_leg(season):
+    """Section 11b: the player pages' averages and records count every leg -- singles, doubles and
+    triples -- with each turn credited to whoever threw it (owner, 2026-11-16;
+    players.turns_thrown). These checks are what make that honest: the turns of a side add up to
+    the side, the marks are counted as DartConnect counts them, the record and PPL count the same
+    legs, and a team's players add up to the averages DartConnect shows on Standings."""
+    print("\n11b. Averages and records -- every leg, each turn credited to whoever threw it")
+    sums = players.form_sums(season["recaps"])
+    legs = season["legs_by_player"]
+
+    # The record and PPL count the same legs, so a player's W-L can never disagree with the legs
+    # their PPL divides by.
+    off = sorted(p for p in set(legs) | set(sums)
+                 if sum(c["legs"] for c in sums.get(p, {}).values()) != legs.get(p, 0))
+    over = sorted(p for p, by_format in sums.items()
+                  for c in by_format.values() if c["wins"] > c["legs"])
+    check(f"all {len(legs)} players' legs, format by format, add up to the legs PPL divides by",
+          not off and not over, f"{off[:3]} {over[:3]}")
+
+    # What each team's players are credited with, against the team's own sides, leg by leg. This
+    # is what fails if a doubles partner is credited the side's darts and points instead of their
+    # own turns. The -SHORT- marker is no player, but DartConnect counts its SKIP turns as darts.
+    side, short = collections.defaultdict(collections.Counter), collections.defaultdict(collections.Counter)
+    won, played = collections.Counter(), collections.Counter()
+    flags = flagged = 0
+    mpr_sides, mpr_off = 0, []
+    for props, sides in season["sided_recaps"]:
+        for g in allstar.games(props):
+            for i, s in enumerate(("home", "away")):
+                played[sides.get(s)] += 1
+                won[sides.get(s)] += int(g.get("winner_index") == i)
+            if not g["turns"]:
+                continue
+            game = "01" if g["score_type"] == "P" else "cricket"
+            for s in ("home", "away"):
+                side[sides.get(s)][f"{game} darts"] += players._darts_thrown(g, s, g["turns"])
+                if game == "01":
+                    side[sides.get(s)]["01 points"] += sum(
+                        t[s]["turn_score"] for t in g["turns"]
+                        if isinstance(t[s].get("turn_score"), int) and t[s].get("color") != "BUST")
+            marks, darts = collections.Counter(), collections.Counter()
+            for t in players.turns_thrown(g):
+                if t["name"] in players.SENTINEL_PLAYERS:
+                    short[sides.get(t["side"])][f"{game} darts"] += t["darts"]
+                    short[sides.get(t["side"])]["01 points"] += t.get("points", 0)
+                if game == "cricket":
+                    marks[t["side"]] += t["marks"]
+                    darts[t["side"]] += t["darts"]
+                    found = re.fullmatch(r"(\d+)M", str(t["notable"] or ""))
+                    if found:
+                        flagged += 1
+                        flags += int(found.group(1)) == t["marks"]
+            for s in ("home", "away"):
+                printed = g[s].get("mpr")
+                if game != "cricket" or printed in (None, "") or not darts[s]:
+                    continue
+                mpr_sides += 1
+                if not _as_printed(Decimal(marks[s] * 3) / Decimal(darts[s]), printed):
+                    mpr_off.append(f"{props['matchInfo']['id']} set {g.get('set_index')} {s}: "
+                                   f"DartConnect {printed}, counted {marks[s] * 3 / darts[s]:.2f}")
+
+    credited = collections.defaultdict(collections.Counter)
+    for name, by_format in sums.items():
+        team = season["teams"].get(name)
+        for (_size, game), c in by_format.items():
+            if game == "01":
+                credited[team]["01 darts"] += c["darts"]
+                credited[team]["01 points"] += c["points"]
+            else:
+                credited[team]["cricket darts"] += c["marks_darts"]
+                credited[team]["marks"] += c["marks"]
+    split = sorted(str(team) for team, totals in side.items()
+                   if any(credited[team][k] + short[team][k] != totals[k] for k in totals))
+    check(f"all {len(side)} teams: the darts and points credited to their players, turn by turn, "
+          "add up to the team's own sides, leg by leg", not split, str(split[:3]))
+
+    # DartConnect's own counts of the marks that counted: its flag on a big turn ("5M"), and its
+    # marks per round for each side of each leg. One leg in the archive has an MPR of 0.00 with
+    # marks on the board; a stray like that is a NOTE, but more than 1% disagreeing would mean the
+    # counting itself is wrong (the order of throwing, say).
+    check(f"all {flagged:,} turns DartConnect flags as 5+ marks have that many counted marks",
+          flags == flagged, f"{flagged - flags} differ")
+    for note in mpr_off:
+        print(f"  NOTE  MPR differs from DartConnect's: {note}")
+    check(f"{mpr_sides - len(mpr_off):,} of {mpr_sides:,} cricket sides' marks per round match "
+          "DartConnect's", mpr_sides and len(mpr_off) <= mpr_sides / 100,
+          f"{len(mpr_off)} differ, e.g. {mpr_off[:2]}")
+
+    # A leg is won by one side, DartConnect's winner_index -- the result the record shows. Every
+    # team's legs from the recaps must fit inside its standings: DartConnect sometimes awards a
+    # leg that has no game recorded, and that can only leave the recaps short.
+    beyond, awarded = [], []
+    for c in season["standings"]["competitors"]:
+        team = players.clean_team(c["team_name"])
+        if won[team] > c["leg_wins"] or played[team] - won[team] > c["leg_count"] - c["leg_wins"]:
+            beyond.append(f"{team}: {won[team]}-{played[team] - won[team]}")
+        elif (won[team], played[team]) != (c["leg_wins"], c["leg_count"]):
+            awarded.append(f"{team} {c['leg_wins'] - won[team]}-"
+                           f"{c['leg_count'] - c['leg_wins'] - (played[team] - won[team])}")
+    check("no team has won or lost more legs in the recaps than its standings say",
+          not beyond, str(beyond[:3]))
+    if awarded:
+        print(f"  NOTE  legs on standings with no game in the recaps (won-lost): {', '.join(awarded)}")
+
+    # The team averages DartConnect shows on Standings count every leg too, so a team's players,
+    # added up, should give them -- the team page says so. Rounding and DartConnect's own oddities
+    # leave a few '01 figures a little off; only a gross difference fails.
+    exact, wide, teams = 0, [], 0
+    for c in season["standings"]["competitors"]:
+        team = players.clean_team(c["team_name"])
+        darts01 = credited[team]["01 darts"] + short[team]["01 darts"]
+        darts_crk = credited[team]["cricket darts"] + short[team]["cricket darts"]
+        if not darts01 or not darts_crk or c.get("ppr") in (None, "") or c.get("mpr") in (None, ""):
+            continue
+        teams += 1
+        three = Decimal(credited[team]["01 points"] * 3) / Decimal(darts01)
+        mpr = Decimal(credited[team]["marks"] * 3) / Decimal(darts_crk)
+        exact += _as_printed(three, c["ppr"]) and _as_printed(mpr, c["mpr"])
+        if abs(three - Decimal(str(c["ppr"]))) > Decimal("0.5") \
+                or abs(mpr - Decimal(str(c["mpr"]))) > Decimal("0.05"):
+            wide.append(f"{team}: '01 {three:.2f} v {c['ppr']}, CRK {mpr:.2f} v {c['mpr']}")
+    print(f"  NOTE  {exact} of {teams} teams' players add up exactly to DartConnect's '01 and CRK")
+    check(f"all {teams} teams' players add up to DartConnect's team averages, near enough",
+          not wide, str(wide[:3]))
 
 
 # Every game format the rules engine knows how to score. A new one (a 301, say) would be scored as
@@ -467,17 +613,32 @@ def check_archive(seasons):
     unknown = sorted(f for f in formats if f not in KNOWN_FORMATS)
     check(f"all {sum(formats.values()):,} games are in a format the rules engine scores",
           not unknown, str(unknown))
+    # And a format a player's record can name: singles, doubles or triples (players.leg_format).
+    sized, unsized = collections.Counter(), []
+    for s in seasons:
+        for props in s["recaps"]:
+            for g in allstar.games(props):
+                try:
+                    sized[players.leg_format(g)] += 1
+                except ValueError as exc:
+                    unsized.append(str(exc))
+    check(f"all {sum(sized.values()):,} games are singles, doubles or triples: "
+          + ", ".join(f"{size} {game} {n:,}" for (size, game), n in sorted(sized.items())),
+          not unsized, str(sorted(set(unsized))[:3]))
 
     keys = [s["key"] for s in seasons]
     check("every season has its own key", len(keys) == len(set(keys)), str(keys))
 
-    # A player page spans every season, one per players.identity() (owner, 2026-11-12): names that
-    # differ only in spacing, punctuation or capitals are one player. Two DIFFERENT identities that
-    # slug alike (José / Jose) would overwrite each other's page.
-    names = {h["player"] for s in seasons for h in s["hits"]}
+    # A player's pages span every season, one set per players.identity() (owner, 2026-11-12):
+    # names that differ only in spacing, punctuation or capitals are one player. Two DIFFERENT
+    # identities that slug alike (José / Jose) would overwrite each other's pages. A player has
+    # pages once they hit an all star, and they cover every season they threw in (2026-11-16).
+    scorers = {players.identity(h["player"]) for s in seasons for h in s["hits"]}
     spellings = collections.defaultdict(set)
-    for name in names:
-        spellings[players.identity(name)].add(name)
+    for s in seasons:
+        for name in s["legs_by_player"]:
+            if players.identity(name) in scorers:
+                spellings[players.identity(name)].add(name)
     pages = collections.defaultdict(set)
     for who, spelt in spellings.items():
         pages[_slug(sorted(spelt)[0])].add(who)
@@ -492,7 +653,7 @@ def check_archive(seasons):
     # All Time comes from the hits themselves (data rule 3), never from adding up season rows --
     # but the two must agree.
     tables = {s["key"]: players.division_table(s["hits"], s["legs_by_player"]) for s in seasons}
-    career = players.career_table(seasons, tables)
+    career = players.career_table(seasons)
     season_sum = collections.Counter()
     for t in tables.values():
         for rows in t.values():
@@ -512,13 +673,22 @@ def check_archive(seasons):
     legless = [r["player"] for r in career if r["ppl"] is None]
     check(f"all {len(career)} All Time rows have legs to divide by, so every PPL is defined",
           not legless, str(legless[:3]))
+    # All Time PPL divides by every leg of every season the player threw in, hit or not -- the
+    # seasons their pages cover (2026-11-16).
+    every_leg = collections.Counter()
+    for s in seasons:
+        for name, n in s["legs_by_player"].items():
+            every_leg[players.identity(name)] += n
+    short = [r["player"] for r in career if r["legs"] != every_leg[r["identity"]]]
+    check(f"all {len(career)} All Time rows divide by every leg the player has thrown",
+          not short, str(short[:3]))
 
-    # A player page's All Time singles averages (owner, 2026-11-12) add up the raw sums of the
-    # seasons the page shows and divide once (players.combined_form) -- never an average of season
-    # averages. So adding a player's per-season sums must equal one pass over all of those
+    # A player's All Time averages and record (owner, 2026-11-12 and 2026-11-16) add up the raw
+    # sums of every season they threw in, and divide once (players.combine) -- never an average of
+    # season averages. So adding a player's per-season sums must equal one pass over all of those
     # seasons' legs together, however the seasons are split: this suite loads Monday's stages
     # separately, where the site merges them. A pooled pass knows a player by name, so this
-    # covers everyone with one spelling; MPR may differ by a rounding step, as its sums are floats.
+    # covers everyone with one spelling. Every sum is a whole number, so they must agree exactly.
     sums = {s["key"]: players.form_sums(s["recaps"]) for s in seasons}
     by_key = {s["key"]: s for s in seasons}
     groups = collections.defaultdict(list)
@@ -527,16 +697,15 @@ def check_archive(seasons):
             groups[tuple(r["seasons"])].append(r["player"])
     wrong, compared = [], 0
     for keys, names in groups.items():
-        pooled = players.form_stats([props for k in keys for props in by_key[k]["recaps"]])
+        pooled = players.form_sums([props for k in keys for props in by_key[k]["recaps"]])
         for name in names:
             compared += 1
-            summed = players.combined_form(sums[k].get(name, {}) for k in keys)
-            expect = pooled.get(name) or players.form_figures({})
-            if any((a is None) != (b is None) or (a is not None and abs(a - b) > 0.011)
-                   for a, b in ((summed[f], expect[f]) for f in expect)):
+            summed = players.combine(sums[k].get(name, {}) for k in keys)
+            if players.form_figures(summed) != players.form_figures(pooled.get(name)) \
+                    or players.record(summed) != players.record(pooled.get(name)):
                 wrong.append(name)
-    check(f"all {compared} multi-season players' All Time averages add up their seasons' legs, "
-          "never averaging the averages", compared and not wrong,
+    check(f"all {compared} multi-season players' All Time averages and records add up their "
+          "seasons' legs, never averaging the averages", compared and not wrong,
           f"{len(wrong)} wrong: {wrong[:3]}")
 
     for league, night in events.fetch.LEAGUES:
