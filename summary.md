@@ -3,10 +3,10 @@
 > **Living document.** Update this at the end of any working session. It is the handoff file for
 > future agent sessions — read it first, before exploring the code.
 
-**Last updated:** 2026-11-13
+**Last updated:** 2026-11-16
 **Owner:** cjpospisil20@gmail.com
 **Status:** Live at <https://psdartleague.com/>, rebuilt by GitHub Actions the morning after each
-match night — 433 static pages from 519 archived matches across six seasons of both nights (Monday
+match night — 1,169 static pages from 519 archived matches across six seasons of both nights (Monday
 and Tuesday leagues, back to Fall 2025), plus each night's Schedule of match nights still to come.
 Built for a phone; from 768px it opens out into a desktop layout. Not yet reconciled with the
 commissioners. ROADMAP Steps 1–3 complete; Step 15's domain and HTTPS done early; part of Step 10
@@ -143,8 +143,9 @@ This discovery removed what had been the single largest piece of remaining build
   genuinely called `Foo &amp; Bar` into `Foo & Bar`.
 - **DartConnect's player-card endpoint returns 403** without a login, so form stats (3-dart average,
   first 9, MPR, leg win %, checkout %, opponent 3DA) are **recomputed from turn data** in
-  `players.py:form_stats()`. Validated against DartConnect's own per-leg averages: 84 singles legs,
-  mean delta 0.000.
+  `players.py` (`turns_thrown` → `form_sums` → `form_figures`). Validated against DartConnect's own
+  per-leg averages: 84 singles legs, mean delta 0.000; and since 2026-11-16 against its team
+  averages on Standings (see below).
 - **`ending_marks` on a cricket side is the POINTS total, not marks.** Computing MPR from it is wrong;
   DartConnect supplies `mpr` per side directly. (Real bug, found and fixed.)
 - **`darts_thrown` is only recorded for the player who checked out.** The loser never finishes
@@ -153,10 +154,27 @@ This discovery removed what had been the single largest piece of remaining build
   turns, so anything keyed off `turns[0]` sees only whoever threw first — by week 9 that left 45
   players short of nights they had played. `players.throwers()` reads every turn, and GP comes from
   it. (So did the player page's MATCHES until the owner removed that card on 2026-11-12.)
-- **Averages are singles-only, deliberately.** In doubles and triples the darts and the points belong
-  to the side, so there is no honest way to split them between partners — crediting the side's figures
-  to each player inflates everyone. DartConnect's own card is captioned "SINGLES 501 SIDO" for the
-  same reason.
+- **Averages count every leg, each turn credited to whoever threw it** (owner, 2026-11-16). They were
+  singles-only until then, on the grounds that a doubles side's darts belong to the pair. But every
+  turn record names its thrower, so a side's darts, points and marks split exactly between partners
+  (`players.turns_thrown`), with nothing shared out — crediting the side's figures to each partner
+  is what would inflate everyone, and verify §11b fails it. DartConnect's own team averages on
+  Standings count every leg too: a team's players, added up, reproduce its CRK in 108 of 108
+  team-seasons and its '01 in 101 of 108 (the rest within 0.2).
+- **Cricket MPR needs the marks that counted, not the marks thrown.** A turn's `turn_score` lists the
+  darts (`T20, S20`, `S19x2`, `SB`); a mark counts unless the thrower's side has closed that number
+  and the other side has too. That depends on who throws first in a round —
+  `starting_opponent_index`, which agrees with `is_starting_opponent` on all 7,530 legs. Counted
+  this way, every turn DartConnect flags `kM` (3,222) has k marks, and each side's MPR matches
+  DartConnect's `mpr` on 6,178 of 6,180 side-legs; the other two are one leg it records as 0.00.
+  Raw marks thrown match only 4,603. DartConnect prints its figures inconsistently — some rounded
+  half-up, some truncated (`1.318` → `1.31`), some rounded to two places and then one (`2.045` →
+  `2.05` → `2.1`) — so compare against every way it rounds (`verify._as_printed`).
+- **DartConnect's winner and the turns can disagree.** In two archived singles legs the player
+  recorded as the loser is the one who reached zero. The record follows `winner_index` (it is what
+  Standings counts — a team's legs from the recaps match its standings `leg_wins`/`leg_count`);
+  checkout % follows the turns. And four Fall 2026 teams are one leg each short of their standings:
+  legs DartConnect awarded with no game recorded (verify prints them as a NOTE).
 
 ---
 
@@ -216,7 +234,7 @@ site/build.py          renders all six screens into public/. Offline; no network
 site/check.py          output verification — asserts the HTML and CSS are right (contrast
                        maths, structure). verify.py checks the DATA; this checks the SITE.
 
-public/                the generated site — 165 pages. Regenerated from scratch each build
+public/                the generated site — 1,169 pages. Regenerated from scratch each build
                        (the directory is deleted first, so builds stay reproducible).
 design/*.html          six static mockups — the visual contract. Not application code.
 design/assets/         psdl-mark.png, psdl-wordmark-white.png — copied into public/assets/
@@ -307,12 +325,10 @@ season, so it is a season-long landmark, not a weekly feature. Season to date: 2
    rule and its styling are already built and will appear.
 6. **Persistent storage** — still unnecessary. Everything recomputes from the archived recaps on each
    run, which at ~180 matches/season takes seconds. Revisit only if that stops being true.
-7. **Player-page LEG WINS credits only each leg's opener, in every format.** `form_sums` keys its
-   leg counts off `turns[0]`, so a doubles or triples partner who threw second is missing from them.
-   And unlike every other figure on the SINGLES card, LEG WINS counts doubles and triples legs too.
-   MATCHES had the same opener bug and was fixed (see the 2026-11-11 GP entry). LEGS and DARTS had it
-   as well and were never fixed; they left the page with MATCHES on 2026-11-12. LEG WINS remains,
-   both per season and All Time.
+7. ~~**Player-page LEG WINS credits only each leg's opener, in every format.**~~ **Fixed
+   2026-11-16:** `form_sums` now counts a leg for every player in its turns (the same legs as
+   `legs_played`), and every figure on the card covers every format, so LEG WINS is no longer the odd
+   one out. It equals the page's W–L record added up.
 
 ### Open questions
 
@@ -1240,3 +1256,96 @@ Deliberate breakages were caught:
   figure) and the note. Nothing else moved.
 - A four-season page (Ayodele Amao) reproduces: 3,299 points over its seasons' 14 + 17 + 17 + 44 =
   92 legs gives the ALL TIME card's 35.9.
+
+### 2026-11-16 — Player pages: every leg, a season menu, a record per format
+
+The owner asked for three changes to the player page:
+1. averages over every leg, not singles only;
+2. a dropdown at the top to pick the season, opening on the current one;
+3. a win–loss record per game type.
+
+Asked two questions, they chose:
+- **team pages count every leg too**;
+- **the dropdown lists every season the player threw a dart in**, hit or not.
+
+**Averages over every leg.** Every turn names its thrower, so a doubles or triples side's turns are
+credited to whoever threw them (`players.turns_thrown`).
+- `form_sums` keeps per-format sums, each a plain total. `form_figures` divides them, `record`
+  gives W–L, and `combine` adds seasons together for All Time.
+- **Singles are unchanged except for MPR.** 3DA, first 9 and opponent 3DA are identical for all 863
+  player-seasons. MPR moved by 0.01 in 229, because it now counts the marks that counted, exactly,
+  rather than averaging DartConnect's rounded per-leg `mpr`. Checkout % changed for 5: the two legs
+  where DartConnect's winner never reached zero.
+- **The validation** is under "Other data gotchas":
+  - team averages reproduce Standings;
+  - every `kM` flag matches;
+  - MPR agrees on 6,178 of 6,180 side-legs.
+
+**The record** counts legs won–lost per format, in match order, leaving out formats with no legs.
+Every leg is a point, so it adds up to LEG WINS (`check.py` holds that on every page).
+
+**The season menu.**
+- It is the existing `components.picker`, so it works with JavaScript off. `app.js` is unchanged.
+- **One page per season** the player threw a dart in, once they have an all star hit anywhere:
+  - `player/<name>.html` opens on the first season in display order: the current Tuesday season,
+    else the current Monday season, else their newest. 283 of 347 players open on a current season.
+  - The other seasons are `player/<name>/<season key>.html`.
+  - `player/<name>/all-time.html` exists for the 253 players with two or more seasons.
+  - `build.player_view` makes every link and every write, and raises on a season the player didn't
+    play.
+- **The pages:**
+  - 1,083 player pages; the build goes from 433 pages to 1,169.
+  - 38 player-seasons with no hit (34 players) say so, with 0 points and no rank.
+  - Old `#season` fragment links land on the default page.
+- **All Time covers every season played**, so its PPL divides by every leg (`career_table`):
+  - 34 players' All Time PPL dropped, for example Paul Hargreaves from 65 to 56.
+  - 8 All Time rows now name the player's latest division and team.
+- **Team pages:**
+  - '01 and CRK now count every leg.
+  - The caption no longer says doubles can't be split.
+  - 16 non-scorers with pages from another season are now links.
+
+**Layout.** The darts card is now paired with the record card on desktop, not the points card. The
+classes `.card.darts` and `.card.record` replace the structural `.card:has(+ .card)` pairing, which
+would have misplaced a third card. `.picker:has(+ .card)` gives the gap above the first card, so the
+pair keeps a shared top edge.
+
+**New checks.**
+- `verify.py` §11b, per season:
+  - every player's legs by format equal `legs_by_player`;
+  - each team's credited darts and points equal its own sides, leg by leg;
+  - DartConnect's `kM` flags and per-side `mpr` match. This fails above 1% disagreement, and a single
+    stray prints as a NOTE;
+  - no team's legs exceed its standings;
+  - teams add up to the Standings averages, within a gross tolerance.
+- `verify.py` elsewhere:
+  - §6's same-person check covers every thrower;
+  - every game is singles, doubles or triples;
+  - All Time rows divide by every leg;
+  - the pooled All Time check is now exact and compares records too.
+- `check.py`:
+  - §9 treats `12–8` as a figure;
+  - §11: every team-page link opens that night's current-season page;
+  - §13: every board row opens the board's season and shows its total, and every player is on All
+    Time once;
+  - §15 rewritten: one menu per page, the same options across a player's pages, the page shapes,
+    the record adding up to LEG WINS, All Time summing its seasons, and a season's points summing
+    its hits.
+- **Deliberate breakages, each caught:**
+  - three data breakages: crediting partners the side's figures, legs from openers only, and a
+    reversed throw order;
+  - five site breakages: a season missing from one menu, an All Time record off by one, a W–L
+    without `.num`, a team link to the wrong season, and a board row to the wrong season.
+
+**Verified.** `verify.py`, `build.py` (1,169 pages) and `check.py` pass.
+- **Against main's build:**
+  - the current Tuesday boards, Tuesday awards, Standings, the Schedules and the Feed are
+    byte-identical;
+  - past-season boards and Monday's board and awards differ only in player links;
+  - the All Time board changed as listed above;
+  - so did team pages and `app.css`.
+- **In Chrome:**
+  - desktop at 1440px and phone at 390px (iframe), with the menu open, All Time and a page with no
+    hit;
+  - with scripts blocked (a sandboxed iframe), the menu opened and navigated;
+  - no console errors.

@@ -141,6 +141,8 @@ def merge_stages(parts):
     teams = players.team_map(all_sided)
     for h in all_hits:
         h["team"] = h["team"] or teams.get(h["player"])
+    # Every hit was restamped with the merged season's one division, so every team is in it too.
+    division_of = {team: division for team in teams.values()}
 
     last = loaded[-1]
     return {
@@ -162,6 +164,7 @@ def merge_stages(parts):
         "busts":      sum((s["busts"] for s in loaded), collections.Counter()),
         "matches":    all_matches,
         "teams":      teams,
+        "division_of": division_of,
         "dates":      sorted(all_dates),
         "week_of":    week_of,
         "latest_week": max((s["latest_week"] for s in loaded), default=0),
@@ -343,6 +346,10 @@ def load_season(season_id=None):
         "busts":      busts,
         "matches":    matches,
         "teams":      teams,
+        # Each team's division, from standings -- how a player page names the division of a
+        # season in which the player threw but hit no all star, so has no row on any board.
+        "division_of": {players.clean_team(c["team_name"]): c["division"]
+                        for c in standings_props["competitors"]},
         "dates":      dates,
         "week_of":    week_of,
         "latest_week": latest_week,

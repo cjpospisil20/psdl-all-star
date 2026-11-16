@@ -35,14 +35,16 @@ AA_TEXT     = 4.5      # WCAG 2.1 SC 1.4.3, normal-size text
 AA_NON_TEXT = 3.0      # WCAG 2.1 SC 1.4.11, icons and control boundaries
 MIN_TAP     = 44       # DESIGN-SPEC layout rule
 
-# The player page (owner, 2026-11-12): the All Time section's id, how many of a season's hits show
-# before the rest fold away, and the six singles figures every darts card carries, in order.
+# The player pages (owner, 2026-11-12 and 2026-11-16): the SEASON menu's All Time scope, how many
+# of a season's hits show before the rest fold away, the six figures every darts card carries and
+# the formats a record card may list, in order, and the note that says what the averages count.
 # Restated rather than imported from build.py: this suite judges the output, not the code.
-ALL_TIME_ID  = "all-time"
-TOP_HITS     = 3
-DARTS_LABELS = ["3-DART AVG", "MARKS PER RD", "FIRST 9", "CHECKOUT", "LEG WINS", "OPP 3DA"]
-SINGLES_NOTE = "Averages cover singles legs only"
-NO_SINGLES   = "No singles legs"
+ALL_TIME_ID   = "all-time"
+TOP_HITS      = 3
+DARTS_LABELS  = ["3-DART AVG", "MARKS PER RD", "FIRST 9", "CHECKOUT", "LEG WINS", "OPP 3DA"]
+RECORD_LABELS = ["SINGLES &rsquo;01", "SINGLES CRICKET", "DOUBLES &rsquo;01", "DOUBLES CRICKET",
+                 "TRIPLES &rsquo;01", "TRIPLES CRICKET"]
+LEGS_NOTE     = "Averages count every leg"
 
 # PPL, all star points per leg played, replaced PPW, points per week (owner, 2026-11-13). Every
 # page that shows it says what it is, once.
@@ -699,7 +701,8 @@ NUMERIC_SLOTS = [
     (r'<span class="([^"]*\bleader-rank\b[^"]*)"',   "leader rank"),
     (r'<span class="([^"]*\bhit-val\b[^"]*)"',       "hit value"),
 ]
-PURE_NUMBER = re.compile(r"^[\s\d.,%+:/]*\d[\s\d.,%+:/]*$")
+# The en dash is a player's record, legs won-lost (2026-11-16): 12–8 is a figure like any other.
+PURE_NUMBER = re.compile(r"^[\s\d.,%+:/–]*\d[\s\d.,%+:/–]*$")
 
 
 def check_numerals(pages):
@@ -875,9 +878,11 @@ def check_navigation(pages):
 
     # The full roster, per night: every player on a league's current-season boards is listed on
     # exactly one of that league's team pages, so nobody is left off a team and nobody is credited
-    # to two. (A player page covers every season, so a player from a past season alone has a page
-    # but no team page -- team pages are the current season's. A player on both nights is on one
-    # team page of each.)
+    # to two. A teammate with no all star yet this season is linked too when they have player pages
+    # from another season (2026-11-16) -- and every link opens the player's page for this night's
+    # current season, the season the team page is about. (A player from a past season alone has
+    # pages but no team page -- team pages are the current season's. A player on both nights is on
+    # one team page of each.)
     boards = all_stars_boards(site)
     for night in sorted(set(league_of.values())):
         key = current_season_key(standings, night)
@@ -891,11 +896,12 @@ def check_navigation(pages):
                                           site[name]))
         off_roster = sorted(scorers - set(listed))
         doubled = sorted(p for p, c in listed.items() if c > 1)
-        strays = sorted(set(listed) - scorers)
+        astray = sorted(p for p in listed if season_scope(site.get(p, "")) != key)
         check(f"all {len(scorers)} of {night.capitalize()}'s scorers appear on exactly one "
-              f"{night.capitalize()} team page",
-              scorers and not off_roster and not doubled and not strays,
-              f"missing {off_roster[:3]}, on two {doubled[:3]}, not on a board {strays[:3]}")
+              f"{night.capitalize()} team page, and all {len(listed)} team-page links open the "
+              f"player's page for {night.capitalize()}'s current season",
+              scorers and not off_roster and not doubled and not astray,
+              f"missing {off_roster[:3]}, on two {doubled[:3]}, another season {astray[:3]}")
 
     # ---- GP and the playoff check mark (2026-11-11) ----
     # The caption states the rule; every row must follow it. A page whose caption states no
@@ -1112,7 +1118,8 @@ def night_of(markup):
 
 
 def season_scope(markup):
-    """The season an All-Stars board shows -- its season picker's scope, e.g. 'monday-fall-2026'."""
+    """The season an All-Stars board or a player page shows -- its SEASON picker's scope, e.g.
+    'monday-fall-2026', or 'all-time'."""
     found = re.search(r'<details class="picker" data-scope="([^"]+)">\s*<summary><small>SEASON',
                       markup)
     return found.group(1) if found else None
@@ -1129,24 +1136,17 @@ def current_season_key(standings, night):
     return None
 
 
-def points_on_page(page, fragment=None, all_time=False):
-    """The total a player page shows: the ALL STAR POINTS card of the All Time section (`all_time`,
-    on a page that has one -- multi-season pages do), of the season section at `fragment`, or of
-    the page's first season. That first season is NOT the first card on a multi-season page: the
-    All Time section sits above it (2026-11-12), and a link with no fragment means the first
-    season."""
-    if all_time and f'id="{ALL_TIME_ID}"' in page:
-        start = page.find(f'id="{ALL_TIME_ID}"')
-    elif fragment:
-        start = page.find(f'id="{fragment}"')
-        if start < 0:
-            return None
-    else:
-        first = re.search(rf'<div class="headline" id="(?!{ALL_TIME_ID}")', page)
-        start = first.start() if first else 0
-    found = re.search(r'<h2>ALL STAR POINTS</h2>.*?<b class="num">([\d,]+)</b>',
-                      page[start:], re.S)
+def points_on_page(page):
+    """The total a player page shows on its ALL STAR POINTS card. Since 2026-11-16 each page is one
+    season, or All Time, with one points card."""
+    found = re.search(r'<h2>ALL STAR POINTS</h2>.*?<b class="num">([\d,]+)</b>', page, re.S)
     return int(found.group(1).replace(",", "")) if found else None
+
+
+def player_of(path):
+    """The player a page belongs to: player/<slug>.html and player/<slug>/<season>.html alike."""
+    found = re.fullmatch(r"player/([^/]+?)(?:/[^/]+)?\.html", path)
+    return found.group(1) if found else None
 
 
 def check_season_history(pages):
@@ -1241,25 +1241,35 @@ def check_season_history(pages):
     check("every #fragment link lands on an element with that id", not unresolved,
           str(unresolved[:3]))
 
-    mismatched, compared = [], 0
+    # A board row opens the player's page for the board's own season -- an All Time row their All
+    # Time page, or a one-season player's only page -- and shows the total that page shows.
+    mismatched, elsewhere, compared = [], [], 0
     for name, kind in boards.items():
+        scope = season_scope(site[name])
         for href, shown in re.findall(r'<a class="(?:row|leader)" href="(player/[^"]+)"[^>]*>'
                                       r'.*?<b class="num">([\d,]+)</b>', site[name], re.S):
-            path, _hash, fragment = href.partition("#")
-            got = points_on_page(site.get(path, ""), fragment or None, all_time=kind == "all-time")
+            page = site.get(href, "")
+            got = points_on_page(page)
             compared += 1
             if got != int(shown.replace(",", "")):
                 mismatched.append(f"{name}: {href} shows {shown}, the page says {got}")
+            opens = season_scope(page)
+            only_one = 'aria-label="Season">' in page and ">All Time</a>" not in page
+            if opens != scope and not (scope == ALL_TIME_ID and only_one):
+                elsewhere.append(f"{name}: {href} opens {opens}")
+    check(f"all {compared} board rows open the player's page for the board's season",
+          compared and not elsewhere, str(elsewhere[:3]))
     check(f"all {compared} board rows show the same total as the player's own page",
           compared and not mismatched, str(mismatched[:3]))
 
-    # ---- one page per player, every one of them on the All Time list exactly once ----
-    listed = collections.Counter(re.findall(r'<a class="row" href="(player/[^"#]+\.html)',
+    # ---- every player on the All Time list exactly once ----
+    listed = collections.Counter(player_of(h) for h in
+                                 re.findall(r'<a class="row" href="(player/[^"#]+\.html)',
                                             site.get("all-stars-all-time.html", "")))
-    player_pages = {n for n in site if n.startswith("player/")}
-    check(f"all {len(player_pages)} player pages are on the All Time list, each exactly once",
-          set(listed) == player_pages and all(c == 1 for c in listed.values()),
-          f"{len(player_pages - set(listed))} missing, "
+    everyone = {player_of(n) for n in site if n.startswith("player/")}
+    check(f"all {len(everyone)} players with pages are on the All Time list, each exactly once",
+          set(listed) == everyone and all(c == 1 for c in listed.values()),
+          f"{len(everyone - set(listed))} missing, "
           f"{sum(1 for c in listed.values() if c > 1)} twice")
 
 
@@ -1352,22 +1362,22 @@ def check_both_nights(pages):
 
 # ---------------------------------------------------------------- 15. player pages
 
-# What a player page is made of, in page order: the All Time heading (A) or a season's (S), a
-# darts card (D), an ALL STAR POINTS card (P), and a hit list's heading (H).
-PLAYER_PARTS = re.compile(r'<div class="headline" id="(?P<id>[^"]+)">'
-                          r'|<h2>(?P<darts>THE DARTS &middot; SINGLES[^<]*)</h2>'
+# What a player page is made of, in page order: a darts card (D), a record card (R), an ALL STAR
+# POINTS card (P) and a hit list's heading (H).
+PLAYER_PARTS = re.compile(r'<h2>(?P<darts>THE DARTS &middot; ALL LEGS[^<]*)</h2>'
+                          r'|<h2>(?P<record>RECORD &middot; LEGS WON&ndash;LOST)</h2>'
                           r'|<h2>(?P<points>ALL STAR POINTS)</h2>'
                           r'|<h2 class="section">THE (?P<hits>\d+) HITS?</h2>')
 
 
-def darts_cards(page):
-    """[(title, [(value, label)], body)] for every darts card on a player page, in page order."""
-    cards = []
-    for title, body in re.findall(r'<h2>(THE DARTS &middot; SINGLES[^<]*)</h2>(.*?)\n  </div>\n',
-                                  page, re.S):
-        stats = re.findall(r'<b class="num">([^<]*)</b><small>([^<]*)</small>', body)
-        cards.append((title, stats, body))
-    return cards
+def card(page, title):
+    """(figures, body) of the first card on a page whose <h2> starts with `title`: figures are
+    [(value, label)]. None when there is no such card."""
+    found = re.search(rf'<h2>{title}[^<]*</h2>(.*?)\n  </div>\n', page, re.S)
+    if not found:
+        return None
+    return (re.findall(r'<b class="num">([^<]*)</b><small>([^<]*)</small>', found.group(1)),
+            found.group(1))
 
 
 def figure(value):
@@ -1376,93 +1386,193 @@ def figure(value):
     return None if value == "—" else float(value)
 
 
+def season_menu(name, page):
+    """A player page's SEASON menu: (scope, shown, [(target page, current, text)]), each option's
+    href resolved against the page, or None if the page has no menu."""
+    found = re.search(r'<details class="picker" data-scope="([^"]+)">\s*<summary><small>SEASON'
+                      r'</small><b>(.*?)</b>.*?<nav aria-label="Season">(.*?)</nav>', page, re.S)
+    if not found:
+        return None
+    here = (OUT / name).parent
+    options = []
+    for href, mark, text in re.findall(r'<a href="([^"]+)"( aria-current="page")?>(.*?)</a>',
+                                       found.group(3)):
+        target = (here / href).resolve()
+        try:
+            target = target.relative_to(OUT.resolve()).as_posix()
+        except ValueError:
+            target = href
+        options.append((target, bool(mark), text))
+    return found.group(1), found.group(2), options
+
+
 def check_player_pages(pages):
-    """The player page (owner, 2026-11-12): an All Time section with the singles averages and the
-    points over the seasons the page shows; every season with its own averages; the THIS SEASON
-    card gone; and a season's top three hits, the rest folded into a <details>."""
-    print("\n15. Player pages -- All Time, every season's averages, the top three hits")
+    """The player pages (owner, 2026-11-16): one page per season the player threw a dart in, and
+    All Time when there are two or more, moved between by a SEASON menu at the top; averages over
+    every leg; a record per format; a season's top three hits, the rest folded into a <details>."""
+    print("\n15. Player pages -- a season menu, averages over every leg, a record per format")
     site = {name.replace("\\", "/"): markup for name, markup in pages.items()}
-    player_pages = {n: m for n, m in site.items() if n.startswith("player/")}
-    check("found the player pages", len(player_pages) > 100, str(len(player_pages)))
+    groups = collections.defaultdict(dict)
+    for name, markup in site.items():
+        if name.startswith("player/"):
+            groups[player_of(name)][name] = markup
+    check(f"found {len(groups)} players' pages, each with its own player/<name>.html",
+          len(groups) > 100 and all(f"player/{p}.html" in g for p, g in groups.items()),
+          str([p for p, g in groups.items() if f"player/{p}.html" not in g][:3]))
 
-    misshapen, stale, bad_darts, bad_caption, outside = [], [], [], [], []
-    bad_fold, unsorted = [], []
-    cards = lists = folds = compared = 0
-    for name, page in sorted(player_pages.items()):
-        # ---- shape: All Time (two or more seasons) then every season, each complete ----
-        seq = "".join("A" if m["id"] == ALL_TIME_ID else "S" if m["id"] else
-                      "D" if m["darts"] else "P" if m["points"] else "H"
-                      for m in PLAYER_PARTS.finditer(page))
-        top = re.search(rf'id="{ALL_TIME_ID}"><span>\s*<h2 class="section">ALL TIME &middot; '
-                        r'(\d+) SEASONS</h2>', page)
-        if not re.fullmatch(r"ADP(?:SDPH){2,}|S?DPH", seq) \
-                or bool(top) != seq.startswith("A") \
-                or (top and int(top.group(1)) != seq.count("H")):
-            misshapen.append(f"{name}: {seq}")
+    bad_menu, unlike, misshapen, stale, bad_darts, bad_record = [], [], [], [], [], []
+    bad_caption, uneven, unsummed, outside, bad_fold, unsorted = [], [], [], [], [], []
+    pages_seen = cards = lists = folds = compared = 0
+    for player, group in sorted(groups.items()):
+        menus, figures_of, records_of, points_of, hits_of = {}, {}, {}, {}, {}
+        for name, page in sorted(group.items()):
+            pages_seen += 1
+            # ---- the SEASON menu: one, its current option the page itself ----
+            menu = season_menu(name, page)
+            count = page.count('<details class="picker"')
+            if count != 1 or not menu:
+                bad_menu.append(f"{name}: {count} menus")
+                continue
+            scope, shown, options = menu
+            current = [(target, text) for target, mark, text in options if mark]
+            if len(current) != 1 or current[0][0] != name or shown != current[0][1]:
+                bad_menu.append(f"{name}: current option {current}")
+            menus[name] = (scope, [(target, text) for target, _mark, text in options])
 
-        # ---- the retired card: MATCHES, LEGS, DARTS ----
-        if re.search(r"<h2>TH(?:IS|E) SEASON</h2>|<small>(?:MATCHES|LEGS|DARTS)</small>", page):
-            stale.append(name)
+            # ---- shape: darts, record, points, and a season's hits ----
+            seq = "".join("D" if m["darts"] else "R" if m["record"] else "P" if m["points"] else "H"
+                          for m in PLAYER_PARTS.finditer(page))
+            points = points_on_page(page)
+            hit_values = [int(v) for v in re.findall(r'<span class="hit-val num">(\d+)</span>', page)]
+            if scope == ALL_TIME_ID:
+                good = seq == "DRP"
+            elif seq == "DRPH":
+                good = points and points == sum(hit_values) \
+                    and f"THE {len(hit_values)} HIT" in page
+                if not good:
+                    unsummed.append(f"{name}: {points} points, hits {sum(hit_values)}")
+            else:
+                good = seq == "DRP" and points == 0 and not hit_values \
+                    and "No all star hits" in page
+            if not good:
+                misshapen.append(f"{name}: {seq}")
+            points_of[name] = points
+            hits = re.search(r'<b class="num">(\d+)</b><small>HITS \(AS\)</small>', page)
+            hits_of[name] = int(hits.group(1)) if hits else None
 
-        # ---- every darts card: the six figures in order, or a line saying there are none ----
-        found = darts_cards(page)
-        cards += len(found)
-        for title, stats, body in found:
-            if stats and [label for _value, label in stats] != DARTS_LABELS \
-                    or not stats and NO_SINGLES not in body:
-                bad_darts.append(f"{name}: {_html.unescape(title)}")
-        # The averages are explained once, on the first card with figures to explain.
-        with_figures = [body for _title, stats, body in found if stats]
-        if page.count(SINGLES_NOTE) != (1 if with_figures else 0) \
-                or with_figures and SINGLES_NOTE not in with_figures[0]:
-            bad_caption.append(name)
+            # ---- the retired card: MATCHES, LEGS, DARTS ----
+            if re.search(r"<h2>TH(?:IS|E) SEASON</h2>|<small>(?:MATCHES|LEGS|DARTS)</small>", page):
+                stale.append(name)
 
-        # ---- All Time adds up the seasons below, so each of its figures lies between theirs ----
-        # Not LEG WINS: it counts legs of every format (players.form_sums), so a season whose card
-        # shows no singles figures -- and so no LEG WINS -- still adds its legs to All Time's.
-        if seq.startswith("A") and found:
-            (_t, career, _b), seasons = found[0], found[1:]
-            for i, label in enumerate(DARTS_LABELS):
-                if label == "LEG WINS":
-                    continue
-                values = [figure(stats[i][0]) for _t, stats, _b in seasons if stats]
+            # ---- the darts card: the six figures, LEG WINS always counted; the note once ----
+            darts = card(page, "THE DARTS")
+            cards += 1
+            labels = [label for _value, label in darts[0]] if darts else []
+            wins_pct = dict((label, value) for value, label in darts[0]).get("LEG WINS") \
+                if darts else None
+            if labels != DARTS_LABELS or not wins_pct or figure(wins_pct) is None:
+                bad_darts.append(f"{name}: {labels}")
+            if page.count(LEGS_NOTE) != 1 or not darts or LEGS_NOTE not in darts[1]:
+                bad_caption.append(name)
+            figures_of[name] = {label: figure(value) for value, label in darts[0]} if darts else {}
+
+            # ---- the record card: formats in match order, each a real W-L that adds up ----
+            record = card(page, "RECORD")
+            parsed = {}
+            for value, label in (record[0] if record else []):
+                found = re.fullmatch(r"(\d+)&ndash;(\d+)", value)
+                if found and label in RECORD_LABELS:
+                    parsed[label] = (int(found.group(1)), int(found.group(2)))
+            order = [label for _value, label in (record[0] if record else [])]
+            won = sum(w for w, _l in parsed.values())
+            played = sum(w + l for w, l in parsed.values())
+            if not record or len(parsed) != len(order) or not parsed \
+                    or order != [label for label in RECORD_LABELS if label in parsed] \
+                    or any(w + l < 1 for w, l in parsed.values()):
+                bad_record.append(f"{name}: {order}")
+            elif wins_pct and f"{round(won / played * 100, 1):.1f}%" != _html.unescape(wins_pct):
+                uneven.append(f"{name}: LEG WINS {wins_pct}, record {won}-{played - won}")
+            records_of[name] = parsed
+
+            # ---- every hit list: the top three, the rest in one fold that counts them right ----
+            for total, body in re.findall(r'<h2 class="section">THE (\d+) HITS?</h2>.*?</div>\n'
+                                          r'(.*?)(?=<div class="headline"|<nav aria-label="Sections")',
+                                          page, re.S):
+                lists += 1
+                total = int(total)
+                shown_hits, fold, rest = body.partition('<details class="more-hits">')
+                more = re.fullmatch(r'\s*<summary>(\d+) MORE HIT(S?)<svg[^>]*>.*?</svg></summary>\n'
+                                    r'(.*)</details>\s*', rest, re.S)
+                inside = more.group(3).count('<div class="hit">') if more else 0
+                folds += bool(fold)
+                if shown_hits.count('<div class="hit">') != min(total, TOP_HITS) \
+                        or bool(fold) != (total > TOP_HITS) \
+                        or fold and not (more and int(more.group(1)) == inside == total - TOP_HITS
+                                         and (more.group(2) == "S") == (inside != 1)):
+                    bad_fold.append(f"{name}: THE {total} HITS")
+                values = [int(v) for v in re.findall(r'<span class="hit-val num">(\d+)</span>', body)]
+                if len(values) != total or values != sorted(values, reverse=True):
+                    unsorted.append(f"{name}: {values[:6]}")
+
+        # ---- one menu for the player: the same options everywhere, opening exactly their pages,
+        #      All Time first when there are two or more seasons, player/<name>.html the first
+        #      season ----
+        lists_seen = {tuple(options) for _scope, options in menus.values()}
+        options = next(iter(lists_seen)) if len(lists_seen) == 1 else ()
+        seasons = [target for target, text in options if text != "All Time"]
+        all_time = [target for target, text in options if text == "All Time"]
+        if len(lists_seen) != 1 or {target for target, _text in options} != set(group) \
+                or (len(seasons) > 1) != bool(all_time) \
+                or all_time and options[0][1] != "All Time" \
+                or not seasons or seasons[0] != f"player/{player}.html" \
+                or len({re.search(r"<h1[^>]*>(.*?)</h1>", p).group(1) for p in group.values()}) != 1:
+            unlike.append(player)
+            continue
+
+        # ---- All Time adds up the seasons in the menu ----
+        if all_time:
+            top = all_time[0]
+            total = collections.Counter()
+            for target in seasons:
+                for label, (w, l) in records_of.get(target, {}).items():
+                    total[label] += w
+                    total[label + " lost"] += l
+            mine = collections.Counter()
+            for label, (w, l) in records_of.get(top, {}).items():
+                mine[label] += w
+                mine[label + " lost"] += l
+            if mine != total \
+                    or points_of.get(top) != sum(points_of.get(t) or 0 for t in seasons) \
+                    or hits_of.get(top) != sum(hits_of.get(t) or 0 for t in seasons):
+                unsummed.append(f"{top}: record, points or hits differ from its seasons'")
+            for label in DARTS_LABELS:
+                values = [figures_of[t].get(label) for t in seasons]
                 values = [v for v in values if v is not None]
-                mine = figure(career[i][0]) if career else None
+                value = figures_of.get(top, {}).get(label)
                 compared += 1
-                if (mine is None) != (not values) \
-                        or values and not min(values) <= mine <= max(values):
-                    outside.append(f"{name}: {label} {mine} vs seasons {values}")
+                if (value is None) != (not values) \
+                        or values and not min(values) <= value <= max(values):
+                    outside.append(f"{top}: {label} {value} vs seasons {values}")
 
-        # ---- every hit list: the top three, the rest in one fold that counts them right ----
-        for total, body in re.findall(r'<h2 class="section">THE (\d+) HITS?</h2>.*?</div>\n'
-                                      r'(.*?)(?=<div class="headline"|<nav aria-label="Sections")',
-                                      page, re.S):
-            lists += 1
-            total = int(total)
-            shown, fold, rest = body.partition('<details class="more-hits">')
-            more = re.fullmatch(r'\s*<summary>(\d+) MORE HIT(S?)<svg[^>]*>.*?</svg></summary>\n'
-                                r'(.*)</details>\s*', rest, re.S)
-            inside = more.group(3).count('<div class="hit">') if more else 0
-            folds += bool(fold)
-            if shown.count('<div class="hit">') != min(total, TOP_HITS) \
-                    or bool(fold) != (total > TOP_HITS) \
-                    or fold and not (more and int(more.group(1)) == inside == total - TOP_HITS
-                                     and (more.group(2) == "S") == (inside != 1)):
-                bad_fold.append(f"{name}: THE {total} HITS")
-            values = [int(v) for v in re.findall(r'<span class="hit-val num">(\d+)</span>', body)]
-            if len(values) != total or values != sorted(values, reverse=True):
-                unsorted.append(f"{name}: {values[:6]}")
-
-    check("every player page is All Time (two or more seasons) then each season, and each part "
-          "has its averages, its points and its hits", not misshapen, str(misshapen[:3]))
+    check(f"all {pages_seen} player pages have one SEASON menu, its current option the page itself",
+          pages_seen and not bad_menu, str(bad_menu[:3]))
+    check(f"each of the {len(groups)} players' menus is the same on every page, opens exactly their "
+          "pages, starts with All Time when there are two or more seasons, and opens "
+          "player/<name>.html on the first season", not unlike, str(unlike[:3]))
+    check("every page is darts, record and points -- a season with hits ends with them, a season "
+          "without says so -- and a season's points are its hits", not misshapen and not unsummed,
+          str((misshapen + unsummed)[:3]))
     check("no player page keeps the retired THIS SEASON card (MATCHES, LEGS, DARTS)", not stale,
           str(stale[:3]))
-    check(f"all {cards} darts cards show the six singles figures in order, or say there are no "
-          "singles legs", cards and not bad_darts, str(bad_darts[:3]))
-    check("the averages are explained once per page, on its first darts card with figures",
+    check(f"all {cards} darts cards show the six figures in order, LEG WINS always counted",
+          cards and not bad_darts, str(bad_darts[:3]))
+    check("every page says once, on its darts card, what the averages count",
           not bad_caption, str(bad_caption[:3]))
-    check(f"all {compared} All Time figures lie between the lowest and highest of the seasons "
-          "the page shows", compared and not outside, str(outside[:3]))
+    check("every record card lists only formats with a leg, in match order, as won-lost",
+          not bad_record, str(bad_record[:3]))
+    check("every record adds up to its page's LEG WINS", not uneven, str(uneven[:3]))
+    check(f"all {compared} All Time figures lie between the lowest and highest of the player's "
+          "seasons", compared and not outside, str(outside[:3]))
     check(f"all {lists} hit lists show their top {TOP_HITS}, and the {folds} with more fold the "
           "rest into one <details> whose count is right", lists and folds and not bad_fold,
           str(bad_fold[:3]))

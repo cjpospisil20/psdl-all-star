@@ -157,6 +157,9 @@ a:hover {{ color: var(--white); }}
 .picker nav a:first-child {{ border-top: 0; }}
 .picker nav a[aria-current] {{ color: var(--gold); font-weight: 700; }}
 .picker + .headline {{ margin-top: 14px; }}
+/* A player page's first card follows the SEASON menu. The gap is the menu's, not the card's: on a
+   desktop that card sits beside the record card, and the two must share a top edge. */
+.picker:has(+ .card) {{ margin-bottom: 14px; }}
 
 /* ---------- division switcher ---------- */
 .divnav {{ display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
@@ -439,10 +442,11 @@ a:hover {{ color: var(--white); }}
   .tabs a span {{ font-size: 12px; letter-spacing: 0.08em; }}
   .hdr-txt, .back {{ max-width: calc(100% - 650px); }}
 
-  /* A player's darts card and points card, side by side. Only the player page puts two cards
-     together; a card on its own (the team card) keeps the full width. */
-  .card:has(+ .card) {{ grid-column: main-start / mid; margin-right: 7px; }}
-  .card + .card {{ grid-column: mid / main-end; margin-left: 7px; }}
+  /* A player's darts and record cards, side by side: both are about how they throw, and three
+     across, each runs two rows of figures. The points card beneath, like every other card,
+     keeps the full width. */
+  .card.darts {{ grid-column: main-start / mid; margin-right: 7px; }}
+  .card.record {{ grid-column: mid / main-end; margin-left: 7px; }}
 
   /* The schedule: the division filter beside the team search, and two fixtures across under
      each night's heading. */

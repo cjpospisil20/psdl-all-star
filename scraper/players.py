@@ -1,9 +1,12 @@
-"""Player-level data: team membership, form stats, division ranks.
+"""Player-level data: team membership, form stats and records, division ranks.
 
 Everything here is computed from the archived DartConnect recaps. DartConnect's own player-card
 endpoint (3-dart average, first 9, checkout %) returns 403 without a login, so we recompute the
-same figures from turn data instead. That was validated against DartConnect's per-leg averages
-across 84 singles legs: mean delta 0.000, max 0.01 (rounding).
+same figures from turn data instead -- over every leg a player threw in, singles, doubles and
+triples, each turn credited to whoever threw it (turns_thrown). Two checks against DartConnect's
+own numbers back that up: a team's players, added up, give the '01 and CRK averages DartConnect
+shows on Standings (which count every leg too); and the cricket marks counted turn by turn match
+DartConnect's per-turn `notable` flags and its per-leg `mpr`.
 
 Recomputing has a second benefit beyond avoiding a login -- these numbers inherit the same
 traceability as the all-star points, because they come from the same archived turns.
@@ -186,7 +189,8 @@ def legs_played(props):
     format counts -- singles, doubles and triples, '01 and cricket -- because an all star can be
     hit in any of them. And every turn counts, not each leg's opening one, for the reason
     throwers() gives: a doubles partner who threw second played that leg too. Counting openers
-    alone, as form_sums does for LEG WINS, gave 226 of Fall 2026's 244 scorers the wrong count.
+    alone gave 226 of Fall 2026's 244 scorers the wrong count. form_sums counts a player's record
+    from these same legs, so W-L and PPL can never disagree about how many legs someone played.
 
     A leg is counted by its place in the match, never by DartConnect's set and game numbers:
     those are not unique. Two archived matches number two different legs alike -- a 501 singles
@@ -253,133 +257,243 @@ def _darts_thrown(g, side, turns):
     """Darts a side threw in a leg.
 
     DartConnect only records `darts_thrown` for the player who CHECKED OUT. The loser never
-    finishes mid-turn, so their count is exactly 3 per turn taken.
+    finishes mid-turn, so their count is exactly 3 per turn taken. turns_thrown splits the same
+    count between the side's players, turn by turn.
     """
     recorded = g[side].get("darts_thrown")
     if recorded:
         return int(recorded)
-    return 3 * sum(1 for t in turns
-                   if t[side].get("turn_score") is not None or t[side].get("color"))
+    return 3 * sum(1 for t in turns if _taken(t[side]))
 
 
-def form_stats(recaps):
-    """Per-player form, computed from turn data. Season to date, SINGLES only.
+# ---------------------------------------------------------------- form: every leg, turn by turn
 
-    Singles only is deliberate, and matches the card DartConnect itself shows ("SINGLES 501
-    SIDO"). In doubles and triples a leg's darts and points belong to the whole side, so there
-    is no honest way to split them between partners -- crediting the side's figures to each
-    player would inflate everyone's numbers.
+# The formats a leg can be, as (size, game), in the order a PSDL match plays them (Rulebook
+# section D): singles 501, singles cricket, doubles 501, doubles cricket, then 701 triples. A
+# player page's RECORD card lists them in this order. Monday plays no triples and nobody plays
+# cricket triples yet; a format nobody has a leg in is simply left out.
+FORMATS = [("singles", "01"), ("singles", "cricket"), ("doubles", "01"),
+           ("doubles", "cricket"), ("triples", "01"), ("triples", "cricket")]
+SIZES = ("singles", "doubles", "triples")
 
-    Validated against DartConnect's own per-leg averages: 84 singles legs, mean delta 0.000.
+
+def leg_format(g):
+    """(size, game) for one leg: ("doubles", "01") for a 501 Doubles leg.
+
+    The size comes from the segment label ("501 Singles", "Cricket Doubles", "701 Triples"), the
+    game from `score_type`, which is what the rules engine scores by. A label naming no size, or
+    two, raises: a format nobody has seen must stop the build until someone looks.
     """
-    return {name: form_figures(sums) for name, sums in form_sums(recaps).items()}
+    label = g["league_segment"]["label"]
+    sizes = [size for size in SIZES if size in label.lower()]
+    if len(sizes) != 1:
+        raise ValueError(f"cannot tell singles, doubles or triples from the segment {label!r}")
+    return sizes[0], "01" if g["score_type"] == "P" else "cricket"
 
 
-def combined_form(parts):
-    """Form over several seasons at once: a player page's All Time singles averages.
+_DART = re.compile(r"([SDT])(\d+|B)(?:x(\d+))?")
 
-    `parts` are one player's form_sums() entries, one per season. They are added together and
-    divided once -- exactly as if form_stats() had read all of those seasons' legs in one pass,
-    which verify.py checks. Season averages are never averaged: a season of 300 darts must not
-    weigh as much as a season of 3,000.
+
+def cricket_marks(turn_score):
+    """{target: marks} for one cricket turn as DartConnect writes it: 'T20, S20', 'S19x2', 'SB'.
+
+    A single is one mark, a double two, a triple three, and 'x2' is the same dart twice.
+    DartConnect lists only the darts that landed on 15-20 or the bull. A token it has never used
+    raises -- skipping it would quietly undercount somebody's marks.
     """
-    total = collections.Counter()
-    for part in parts:
-        total.update(part)
-    return form_figures(total)
+    marks = collections.Counter()
+    for token in str(turn_score or "").split(","):
+        token = token.strip()
+        if not token:
+            continue
+        found = _DART.fullmatch(token)
+        if not found:
+            raise ValueError(f"unrecognised cricket dart {token!r} in {turn_score!r}")
+        marks[found.group(2)] += ("SDT".index(found.group(1)) + 1) * int(found.group(3) or 1)
+    return marks
 
 
-def form_figures(sums):
-    """One player's form from their raw sums -- form_sums() for a season, or several seasons'
-    added together by combined_form(). Each average is divided here, once, from the sums."""
-    a = collections.Counter(sums)
-    return {
-        "three_dart_avg": round(a["points"] / a["darts"] * 3, 2) if a["darts"] else None,
-        "first_nine":     round(a["first9"] / a["first9_legs"] / 3, 2) if a["first9_legs"] else None,
-        "mpr":            round(a["mpr_weighted"] / a["mpr_darts"], 2) if a["mpr_darts"] else None,
-        "leg_win_pct":    round(a["leg_wins"] / a["legs"] * 100, 1) if a["legs"] else None,
-        "checkout_pct":   round(a["co_hits"] / a["co_attempts"] * 100, 1) if a["co_attempts"] else None,
-        "opp_three_dart": round(a["opp_points"] / a["opp_darts"] * 3, 2) if a["opp_darts"] else None,
-        "singles_legs":   int(a["legs_01"] + a["legs_crk"]),
-    }
+def _taken(p):
+    """Whether a side took this turn: a score, or a colour such as MISS, BUST or SKIP. The rows
+    after a leg ends carry neither."""
+    return p.get("turn_score") is not None or bool(p.get("color"))
+
+
+def turns_thrown(g):
+    """Every turn taken in one leg, in the order thrown, each credited to whoever threw it.
+
+    In doubles and triples the partners take turns about, and every turn record names its
+    thrower. So a side's darts, points and marks split exactly between its players: nothing is
+    shared out and nothing counts twice, and a side's turns add up to the side's own figures
+    (verify.py checks every leg). That is what lets the averages count every leg rather than
+    singles only (owner, 2026-11-16) -- crediting each partner with the side's figures would have
+    inflated everyone.
+
+    Yields one dict per turn:
+      side, name  the side and the thrower (clean_name). The -SHORT- marker keeps its own name:
+                  DartConnect counts its SKIP turns as three darts in a team's averages.
+      turn        which of the thrower's own turns in this leg it is, from 1
+      darts       3, except the side's last turn. DartConnect records `darts_thrown` only for
+                  the side that checked out, so that turn gets whatever the total leaves --
+                  exactly as _darts_thrown counts the side.
+      points      '01: the turn's score; 0 for a bust, or a miss before doubling in
+      before      '01: what the side needed before this turn
+      out         '01: the turn checked out
+      marks       cricket: the marks that counted
+      notable     cricket: DartConnect's own flag for the turn ("5M", "3B"), or None
+
+    A cricket mark counts the way DartConnect counts it: always, unless the thrower's side has
+    already closed that number and the other side has too, leaving nothing to score. The order of
+    throwing matters for that, and the side `starting_opponent_index` names throws first in every
+    round. This reproduces DartConnect's `notable` flag ("5M") on every flagged turn in the
+    archive, and its `mpr` for every side of every leg but one, which it records as 0.00.
+    """
+    turns = g["turns"]
+    first = "away" if g.get("starting_opponent_index") == 1 else "home"
+    order = (first, "home" if first == "away" else "away")
+    o1 = g["score_type"] == "P"
+    start = 701 if "701" in g["game_name"] else 501
+    taken = {side: sum(1 for t in turns if _taken(t[side])) for side in order}
+    marked = {side: collections.Counter() for side in order}     # cricket marks per target
+    seen, own = collections.Counter(), collections.Counter()
+    for i, t in enumerate(turns):
+        for side in order:
+            p = t[side]
+            if not _taken(p):
+                continue
+            other = "away" if side == "home" else "home"
+            name = clean_name(p.get("name"))
+            seen[side] += 1
+            own[(side, name)] += 1
+            darts = 3
+            recorded = g[side].get("darts_thrown")
+            if seen[side] == taken[side] and recorded:
+                darts = int(recorded) - 3 * (taken[side] - 1)
+            turn = {"side": side, "name": name, "turn": own[(side, name)], "darts": darts}
+            if o1:
+                score = p.get("turn_score")
+                turn["points"] = score if isinstance(score, int) and p.get("color") != "BUST" else 0
+                turn["before"] = turns[i - 1][side]["current_score"] if i > 0 else start
+                turn["out"] = p.get("current_score") == 0
+            else:
+                counted = 0
+                for target, marks in cricket_marks(p.get("turn_score")).items():
+                    left = max(0, 3 - marked[side][target])
+                    counted += min(marks, left) if marked[other][target] >= 3 else marks
+                    marked[side][target] += marks
+                turn["marks"] = counted
+                turn["notable"] = p.get("notable")
+            yield turn
 
 
 def form_sums(recaps):
-    """The raw per-player sums behind form_stats(): {name: Counter}, every value a plain total
-    -- points, darts, legs, checkout attempts -- so that two seasons' sums can be added together
-    (combined_form). Keep it that way: a figure that does not add up across seasons, such as a
-    count of distinct opponents, does not belong here.
-    """
-    acc = collections.defaultdict(collections.Counter)
+    """The raw sums behind every average and every record: {player: {format: Counter}}.
 
+    Every value is a plain total, so two seasons' sums add up (combine) and each figure is
+    divided once, at the end (form_figures). Keep it that way: a figure that does not add up
+    across seasons, such as a count of distinct opponents, does not belong here.
+
+    Every leg counts, in every format, for every player who threw a turn in it -- not only its
+    opener, since partners take turns about:
+      legs, wins          the leg, and whether their side won it (DartConnect's winner_index).
+                          The players are the ones legs_played counts, so the record and PPL
+                          count the same legs.
+    '01 legs, from the player's own turns (turns_thrown):
+      points, darts       every turn they took; a bust, or a miss before doubling in, scores 0
+      first9_points, first9_darts   their first three turns of the leg
+      co_attempts         turns they took with 170 or less left -- our definition, not
+                          DartConnect's, and the page says so
+      co_hits             their checkouts
+      opp_points, opp_darts   the other side's whole leg
+    Cricket legs:
+      marks, marks_darts  the marks that counted, over the darts they threw
+    """
+    acc = collections.defaultdict(lambda: collections.defaultdict(collections.Counter))
     for props in recaps:
         for g in allstar.games(props):
-            turns = g["turns"]
-            if not turns:
+            if not g["turns"]:
                 continue
-            singles = "Singles" in g["league_segment"]["label"]
-
-            for side in ("home", "away"):
-                other = "away" if side == "home" else "home"
-                name  = clean_name(turns[0][side].get("name"))
-                if not name:
+            fmt = leg_format(g)
+            o1 = fmt[1] == "01"
+            side_total = {"home": collections.Counter(), "away": collections.Counter()}
+            for t in turns_thrown(g):
+                side_total[t["side"]].update(points=t.get("points", 0), darts=t["darts"])
+                if not t["name"] or t["name"] in SENTINEL_PLAYERS:
                     continue
-
-                darts = _darts_thrown(g, side, turns)
-                won   = (g.get("winner_index") == (0 if side == "home" else 1))
-
-                # LEG WINS counts every format the player appeared in -- but only for the leg's
-                # opener, so a doubles partner who threw second is missing from it (summary.md,
-                # follow-ups). Nights played come from throwers(), which reads every turn.
-                a = acc[name]
-                a["legs"] += 1
-                a["leg_wins"] += 1 if won else 0
-
-                if not singles:
-                    continue
-
-                if g["score_type"] == "P":
-                    scored = sum(t[side]["turn_score"] for t in turns
-                                 if isinstance(t[side].get("turn_score"), int)
-                                 and t[side].get("color") != "BUST")
-                    a["points"] += scored
-                    a["darts"]  += darts
-
-                    # First 9 darts, expressed as a 3-dart average like every other figure.
-                    first9 = sum(t[side]["turn_score"] for t in turns[:3]
-                                 if isinstance(t[side].get("turn_score"), int)
-                                 and t[side].get("color") != "BUST")
-                    a["first9"] += first9
-                    a["first9_legs"] += 1
-
-                    # A checkout attempt is a turn taken with 170 or less remaining -- the
-                    # highest score that can be checked out in three darts. This is our own
-                    # definition, not DartConnect's, so the page labels it as ours.
-                    start = 701 if "701" in g["game_name"] else 501
-                    for i, t in enumerate(turns):
-                        before = turns[i - 1][side]["current_score"] if i > 0 else start
-                        took = t[side].get("turn_score") is not None or t[side].get("color")
-                        if took and isinstance(before, int) and before <= 170:
-                            a["co_attempts"] += 1
-                    if won:
+                a = acc[t["name"]][fmt]
+                if o1:
+                    a["points"] += t["points"]
+                    a["darts"] += t["darts"]
+                    if t["turn"] <= 3:
+                        a["first9_points"] += t["points"]
+                        a["first9_darts"] += t["darts"]
+                    if isinstance(t["before"], int) and t["before"] <= 170:
+                        a["co_attempts"] += 1
+                    if t["out"]:
                         a["co_hits"] += 1
-
-                    opp_scored = sum(t[other]["turn_score"] for t in turns
-                                     if isinstance(t[other].get("turn_score"), int)
-                                     and t[other].get("color") != "BUST")
-                    a["opp_points"] += opp_scored
-                    a["opp_darts"]  += _darts_thrown(g, other, turns)
-                    a["legs_01"] += 1
                 else:
-                    # DartConnect reports marks-per-round per side. `ending_marks` is the
-                    # POINTS total, not marks -- do not compute MPR from it.
-                    mpr = g[side].get("mpr")
-                    if mpr:
-                        a["mpr_weighted"] += float(mpr) * darts
-                        a["mpr_darts"]    += darts
-                    a["legs_crk"] += 1
+                    a["marks"] += t["marks"]
+                    a["marks_darts"] += t["darts"]
 
-    return dict(acc)
+            for side, name in dict.fromkeys(_leg_names(g)):
+                a = acc[name][fmt]
+                a["legs"] += 1
+                a["wins"] += int(g.get("winner_index") == (0 if side == "home" else 1))
+                if o1:
+                    other = side_total["away" if side == "home" else "home"]
+                    a["opp_points"] += other["points"]
+                    a["opp_darts"] += other["darts"]
+    return {name: dict(by_format) for name, by_format in acc.items()}
+
+
+def form_figures(by_format, formats=None):
+    """One player's figures from their form_sums -- one season's, or several seasons' added up by
+    combine(). `formats` keeps only those formats; None is every leg. Each figure is divided here,
+    once, from the sums."""
+    a = collections.Counter()
+    for fmt, sums in (by_format or {}).items():
+        if formats is None or fmt in formats:
+            a.update(sums)
+    return {
+        "three_dart_avg": round(a["points"] / a["darts"] * 3, 2) if a["darts"] else None,
+        "first_nine":     (round(a["first9_points"] / a["first9_darts"] * 3, 2)
+                           if a["first9_darts"] else None),
+        "mpr":            round(a["marks"] / a["marks_darts"] * 3, 2) if a["marks_darts"] else None,
+        "leg_win_pct":    round(a["wins"] / a["legs"] * 100, 1) if a["legs"] else None,
+        "checkout_pct":   round(a["co_hits"] / a["co_attempts"] * 100, 1) if a["co_attempts"] else None,
+        "opp_three_dart": round(a["opp_points"] / a["opp_darts"] * 3, 2) if a["opp_darts"] else None,
+        "legs":           int(a["legs"]),
+    }
+
+
+def record(by_format):
+    """[(format, won, lost)] in match order, for every format the player has a leg in. Every leg
+    is a point -- the two legs of a Division 1 or 2 singles 501 set are two (Rulebook section D)
+    -- so the record adds up to LEG WINS."""
+    out = []
+    for fmt in FORMATS:
+        sums = (by_format or {}).get(fmt)
+        if sums and sums["legs"]:
+            out.append((fmt, int(sums["wins"]), int(sums["legs"] - sums["wins"])))
+    return out
+
+
+def combine(parts):
+    """Several seasons' form_sums for one player, added up format by format: a player page's All
+    Time. form_figures then divides once, exactly as if form_sums had read every one of those
+    seasons' legs in one pass, which verify.py checks. Season averages are never averaged: a
+    season of 300 darts must not weigh as much as a season of 3,000."""
+    total = collections.defaultdict(collections.Counter)
+    for part in parts:
+        for fmt, sums in (part or {}).items():
+            total[fmt].update(sums)
+    return dict(total)
+
+
+def form_stats(recaps):
+    """{player: form_figures} over every leg of these recaps -- what a team page shows beside each
+    name."""
+    return {name: form_figures(by_format) for name, by_format in form_sums(recaps).items()}
 
 
 def division_table(hits, legs_by_player=None):
@@ -436,46 +550,45 @@ def league_table(table):
     return [{**row, "league_rank": i} for i, row in enumerate(rows, 1)]
 
 
-def career_table(seasons, tables):
+def career_table(seasons):
     """All Time: one row per player across every season of both nights, highest points first.
 
-    `seasons` in display order (events.load_all) and `tables` their division tables, keyed by
-    season key. The owner asked for it (2026-11-12) as the first option of the All-Stars season
-    picker; like the ALL board it ranks across divisions, so the page crowns nobody and names each
-    player's division.
+    `seasons` in display order (events.load_all). The owner asked for it (2026-11-12) as the first
+    option of the All-Stars season picker; like the ALL board it ranks across divisions, so the
+    page crowns nobody and names each player's division.
 
     Totals come from allstar.aggregate() over every hit -- never by adding up the season rows -- so
     a career total cannot drift from the hits behind it (CLAUDE.md data rule 3). A player is an
     identity(): Monday and Tuesday points add up when the two names differ only in spacing,
     punctuation or capitals, and a name that differs in any letter is another player (data rule 5).
-    The name shown is the one from the player's first season in display order -- the current
-    Tuesday season when they are in it -- and so are the division and team.
+    The name shown is the one from the first season, in display order, the player threw a dart in
+    -- the current Tuesday season when they are in it -- and so are the division and team. That is
+    the season their page opens on.
 
-    PPL divides by the legs of exactly the seasons the player has a row in -- the seasons their
-    page lists below its ALL TIME card, whose averages pool those same seasons -- on both nights.
-    Legs are not hits, so adding up the season rows' legs is the right total here: a season with
-    no all star hit has no row, and its legs stay out, as its darts do.
+    PPL divides by every leg the player has thrown, in every season of both nights, hit or not --
+    the seasons their page covers, whose All Time averages and record count those same legs
+    (owner, 2026-11-16). `seasons` lists them all.
     """
     stats = allstar.aggregate([{**h, "player": identity(h["player"])}
                                for s in seasons for h in s["hits"]])
     first, legs, played = {}, collections.Counter(), collections.defaultdict(list)
     for s in seasons:
-        rows = {r["player"]: r for rs in tables[s["key"]].values() for r in rs}
-        for player, row in rows.items():
+        for player, n in s["legs_by_player"].items():
             who = identity(player)
-            first.setdefault(who, (s, row))
+            team = s["teams"].get(player)
+            first.setdefault(who, (s, player, team, s["division_of"].get(team)))
             if s["key"] not in played[who]:
                 played[who].append(s["key"])
-            legs[who] += row["legs"]
+            legs[who] += n
 
     out = []
     for who, counter in stats.items():
-        s, row = first[who]
+        s, player, team, division = first[who]
         out.append({
-            "player":   row["player"],
+            "player":   player,
             "identity": who,
-            "team":     row["team"],
-            "division": row["division"],
+            "team":     team,
+            "division": division,
             "night":    s["night"],
             "points":   counter["PTS"],
             "hits":     counter["AS"],
