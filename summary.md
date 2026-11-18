@@ -98,6 +98,9 @@ This discovery removed what had been the single largest piece of remaining build
   match stays `A` until it is finalised (three from 11-10 were still `A` the next afternoon). `A` is
   not "live". DartConnect's real live list is `POST .../matches/live/{season}` (empty off match night);
   unused, because the site never rebuilds on a Tuesday night.
+  **DartConnect's standings already count an `A` match** — its `league_points` and `matches` — though
+  `fetch.py` will not archive it and the Feed's standings leave it out until it is `C`. `verify.py`
+  §14 takes open matches back out of DartConnect's numbers before comparing (2026-11-18).
 - **On the Schedule, HOME = `left`, by owner decision (2026-11-11).** DartConnect's own live view maps
   `home: left, away: right`. But the side recorded as home *on the night* matched `left` in only
   64 of 127 played matches, and some teams are `left` in 2 of 12 fixtures — so `left` is a scheduling
@@ -1349,3 +1352,50 @@ pair keeps a shared top edge.
     hit;
   - with scripts blocked (a sandboxed iframe), the menu opened and navigated;
   - no console errors.
+
+### 2026-11-18 — Three unclosed matches blocked the publish
+
+**What happened.** Wednesday's scheduled run fired at 16:30 UTC, nine hours late. It fetched 11 of
+the 14 Tuesday matches. The other three were still at status `A` on DartConnect:
+- Division 2: UB Darts Squad v Dart Day Afternoon;
+- Division 5: Bullseye Babes Double Trouble v Bullseye Babes Triple Threat;
+- Division 5: Commish 2 v Those Divas.
+
+DartConnect's standings already counted those three; the Feed's do not. So `verify.py` §14 failed
+for the six teams in them (its `[:3]` detail named only three), and nothing deployed. The 11 recaps
+were committed before the gate, so nothing was lost, but the site stayed on Week 9.
+
+**`A` is routine.** 12 matches on 6 of Fall 2026's first 10 Tuesdays: 09-22, 10-20 ×2, 10-27, 11-03 ×2,
+11-10 ×3, 11-17 ×3. Each cleared within hours to a week. Every committed snapshot of `matches.json`
+and `standings.json` that held one had it in DartConnect's `league_points` and `matches` already,
+for every team in it.
+
+Before §14 (added 2026-11-12, #20), the build published around an open match and archived it on a
+later run. That was ROADMAP Step 2's rule: a non-`C` match never fails the gate. §14 broke the rule
+the first time it met one.
+
+**Fix.** §14 now takes each open match's points and matches back out of DartConnect's numbers before
+comparing (`verify._open_matches`), so the comparison is still exact. It prints a NOTE naming the
+open matches. Nothing else changed:
+- the Feed still counts closed matches only, so its standings cards take an open match in once
+  DartConnect closes it;
+- `fetch.py` still archives `C` only;
+- the build is byte-identical.
+
+**Deliberate breakages.** These all fail §14:
+- a closed match's points +1;
+- the home/away swap §14 was written for;
+- DartConnect not counting an open match;
+- an open match's points disagreeing.
+
+These pass: a fourth open match, and all three closed.
+
+**Worth knowing.**
+- An open match's all star hits reach the site on the first run after DartConnect closes it: the
+  Thursday catch-up, the next Tuesday-morning run, or a manual run from the Actions tab.
+- DartConnect's standings can briefly disagree with its schedule on their own. At 11-11 15:20 UTC,
+  Smith's P.S. showed 75 against 77 from its matches, with nothing open; the next snapshot agreed.
+  §14 would still fail on a blip like that, and a rerun once it clears would pass.
+
+**Verified.** `verify.py`, `build.py` (1,169 pages, byte-identical to before) and `check.py` pass on
+the archive through 11-17.
