@@ -73,10 +73,14 @@ python3 scraper/standings.py --division "Division 1" --csv /tmp/div1.csv
 
 `.github/workflows/build.yml` does the whole job on its own. It runs:
 
-- **on a schedule** — 07:00 UTC Wednesday, which is 02:00–03:00 Wednesday morning in
-  Brooklyn, a few hours after the last Tuesday-night board finishes. A second, identical
-  pass runs Thursday at the same hour to cover the case where GitHub delays or drops the
-  Wednesday run.
+- **at 2 AM New York time, every Tuesday and Wednesday** — started by a free scheduler,
+  cron-job.org, so Monday night's results are up on Tuesday morning and Tuesday night's on
+  Wednesday morning. See **The 2 AM trigger** below.
+- **on GitHub's own schedule**, as the backup — 07:17 UTC on Tuesday, Wednesday and Thursday.
+  GitHub starts these hours late (every one so far began between 8 AM and noon New York
+  time), so they act as a second pass that picks up any match DartConnect closes after 2 AM.
+  If the 2 AM trigger ever stops, they still publish the same day, only later. Thursday's
+  covers a run GitHub drops.
 - **on demand** — the "Run workflow" button on the repository's Actions tab.
 - **on push** to the default branch, so a code change republishes immediately.
 
@@ -89,10 +93,47 @@ Each run, in order:
 4. `build.py` — generates `public/`.
 5. Uploads `public/` and deploys it to GitHub Pages.
 
-GitHub's cron is always in UTC and does not follow US daylight saving, so the run time
-drifts by an hour against New York twice a year. The 07:00 UTC slot has hours of slack on
-both sides, so the drift never matters. The reasoning is written out in comments at the
-top of the workflow file.
+cron-job.org runs on New York time, so the 2 AM run follows daylight saving. GitHub's cron
+is always in UTC, so the backup drifts by an hour against New York twice a year (02:17 in
+winter, 03:17 in summer), which does not matter for a backup. The reasoning is written out
+in comments at the top of the workflow file.
+
+### The 2 AM trigger
+
+GitHub delays scheduled runs when it is busy, and it has started every one for this
+repository 5 to 9½ hours late. So the punctual run comes from outside GitHub: a job on the
+owner's [cron-job.org](https://cron-job.org) account that does what the "Run workflow"
+button does, through GitHub's API. Its settings:
+
+| Setting | Value |
+|---|---|
+| URL | `https://api.github.com/repos/cjpospisil20/psdl-all-star/actions/workflows/build.yml/dispatches` |
+| Schedule | Tuesday and Wednesday at 02:00, time zone America/New_York |
+| Request method | POST |
+| Headers | `Accept: application/vnd.github+json`<br>`Authorization: Bearer <token>`<br>`X-GitHub-Api-Version: 2022-11-28`<br>`Content-Type: application/json` |
+| Request body | `{"ref":"main"}` |
+| Notifications | email the owner when a run fails |
+
+A good call returns HTTP 204, and a run labelled `workflow_dispatch` appears on the Actions
+tab within a minute. The job editor's **Test run** button makes one: a real build and
+deploy, the same as pressing "Run workflow".
+
+**The token** is a fine-grained personal access token on the owner's GitHub account
+(Settings → Developer settings → Personal access tokens → Fine-grained tokens). It covers
+only this repository and has one permission, **Actions: Read and write**, so it can start a
+build and nothing else. It lives only in the cron-job.org job: never commit it or paste it
+anywhere else. It expires on the date chosen when it was made. Before then, generate a new
+one with the same settings and paste it into the job's `Authorization` header.
+
+**If cron-job.org emails a failure**, the site still updates from GitHub's own schedule,
+only later in the day. The cause is usually one of these:
+
+- **401** — the token has expired or been revoked. Make a new one.
+- **403 or 404** — the token cannot start builds here (it lacks Actions: Read and write, or
+  was not given this repository), or the URL is wrong.
+- **The Actions tab shows the workflow as disabled** — GitHub disables a public repository's
+  scheduled workflows after 60 days with no activity, which a summer break could reach.
+  Re-enable it there.
 
 ### Repository settings this depends on
 

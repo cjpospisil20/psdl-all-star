@@ -1,33 +1,35 @@
 name: Build and deploy
 
 # Three ways in:
-#   schedule          - the morning after each league's match night (Monday and Tuesday)
-#   workflow_dispatch - a volunteer can force a rebuild from the Actions tab
+#   workflow_dispatch - the run the site relies on. cron-job.org starts it through GitHub's API
+#                       at 2 AM New York time every Tuesday and Wednesday, so Monday night's and
+#                       Tuesday night's results are up by morning (README.md, "The 2 AM trigger").
+#                       A volunteer can also start it from the Actions tab ("Run workflow").
+#   schedule          - GitHub's own cron below: the backup, and a later second pass
 #   push              - republish straight away when code or archived data changes
 on:
   schedule:
     # ---------------------------------------------------------------------------
-    # GitHub cron is ALWAYS UTC. It does not follow US daylight saving, so any
-    # fixed UTC time slides an hour against New York twice a year (mid-March and
-    # early November). So pick a slot with hours of slack on both sides, where a
-    # one-hour drift cannot possibly matter.
+    # GitHub starts these hours late. All 18 scheduled runs from September to November 2026
+    # began 5 to 9.5 hours after their slot: between 8:19 AM and 11:54 AM New York time, never
+    # in the small hours. GitHub delays scheduled runs when it is busy, and can drop them, and no
+    # setting changes that. So the 2 AM run comes from outside (workflow_dispatch, above), and
+    # these lines are the backup: if the 2 AM trigger ever stops, the site still updates the same
+    # day, only later. They are also a second pass that archives any match DartConnect closes
+    # after 2 AM. fetch.py skips every match already archived, so a pass with nothing new costs
+    # nothing.
     #
-    # The league plays Tuesday nights in Brooklyn and the last boards finish late
-    # evening America/New_York. 07:00 UTC on Wednesday is:
-    #     03:00 EDT  (UTC-4, mid-March to early November)
-    #     02:00 EST  (UTC-5, the rest of the year)
-    # Either way: the small hours of Wednesday morning in Brooklyn. Hours after
-    # the last dart, and finished long before anyone opens the site over coffee.
+    # GitHub cron is ALWAYS UTC and does not follow US daylight saving. 07:17 UTC is 02:17 EST
+    # (early November to mid-March) and 03:17 EDT (the rest of the year): hours after the last
+    # dart either way, and the hour's drift does not matter for a backup. The :17 keeps off the
+    # top of the hour, GitHub's busiest minute.
+    #
+    # Wednesday morning, after Tuesday night's league.
     - cron: "17 7 * * 3"
-    # The Monday league (2026-11-12): the same hour on Tuesday morning publishes Monday night's
-    # results the next day instead of waiting for Wednesday. Monday's last boards finish late
-    # evening New York time too, so 07:17 UTC is hours after the last dart.
+    # Tuesday morning, after Monday night's league (2026-11-12).
     - cron: "17 7 * * 2"
-    # Catch-up pass, Thursday at the same hour. GitHub delays and sometimes
-    # silently drops scheduled runs when its queues are busy, and fetch.py skips
-    # every match it has already archived - so this second pass normally does
-    # nothing, costs nothing, and turns a missed Wednesday into a one-day delay
-    # rather than a week-long gap in the archive.
+    # Catch-up pass, Thursday at the same hour, in case GitHub drops a run: it turns a missed
+    # Wednesday into a one-day delay rather than a week-long gap in the archive.
     - cron: "17 7 * * 4"
   workflow_dispatch:
   push:

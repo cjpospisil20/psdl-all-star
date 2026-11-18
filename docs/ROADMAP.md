@@ -106,7 +106,7 @@ existing `check.py` assertion. **Extend the checks; never loosen them.**
 | 6 | Before season end | Post-fetch score corrections (`score_edits`) are never re-fetched. | Phase 2 drift check |
 | 7 | Should | `load_season` iterates `matches.json` (overwritten each run), not the archive. | **Guarded 2026-11-12:** `verify.py` §12 fails if any archived recap is missing from its season's schedule, and an archived season's `matches.json` is no longer refetched. |
 | 8 | Should | Schedule `left` is the recap's home team in only 6 of 15 matches; `events.py` labels `left` as "home". | Step 3 (use recap `opponents[0]`) |
-| 9 | Should | Cron at `:00` (GitHub's high-load minute). Public-repo scheduled workflows are disabled after 60 days of no repo activity. | Step 2 / runbook |
+| 9 | Should | Cron at `:00` (GitHub's high-load minute). Public-repo scheduled workflows are disabled after 60 days of no repo activity. | Step 2 / runbook. **2026-11-18:** even at `:17`, GitHub started all 18 scheduled runs 5–9½ h late. A cron-job.org `workflow_dispatch` at 02:00 New York, Tue + Wed, is now the main trigger; the GitHub crons are the backup (README, "The 2 AM trigger"). |
 | 10 | Should | Player identity is name-only; slugs strip non-`a-z0-9` ("José"/"Jos" collide). | Step 2 (verify check) |
 | 11 | Should | Docs drifted (README baseline warning, CLAUDE.md "not done" list, summary.md). | Step 16 |
 | 12 | Minor | `build.py` fails on raw substring `"None"`; `check.py` correctly uses word boundaries. | Step 2 |

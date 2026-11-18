@@ -193,7 +193,9 @@ scope on 2026-11-12 — as far back as DartConnect goes (Fall 2025), and no furt
 ## Where things stand
 
 The site is **live** at <https://psdartleague.com/>, rebuilt the morning after each match night by
-`.github/workflows/build.yml`. `site/build.py` generates **1,169 pages** from 519 archived matches
+`.github/workflows/build.yml`, which cron-job.org starts at 2 AM New York time every Tuesday and
+Wednesday (2026-11-18). GitHub's own cron is only the backup, because GitHub starts it 5–9½ hours
+late; see README.md, "The 2 AM trigger". `site/build.py` generates **1,169 pages** from 519 archived matches
 across six seasons of both nights — 1,083 player pages (347 players with an all star hit: a page
 for every season they threw a dart in, and All Time for the 253 with two or more), 38 team pages (31 Tuesday, 7 Monday), the current Tuesday season's 5 division
 leaderboards + the ALL board, 17 boards for the other five seasons and All Time, 6 standings pages
