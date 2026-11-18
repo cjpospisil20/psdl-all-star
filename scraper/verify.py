@@ -529,8 +529,41 @@ def check_both_nights(seasons):
         check("no leader card repeats the one before it for the same division", True)
 
 
+def _open_matches(season):
+    """Matches on the schedule DartConnect has not closed yet, and what they add to its standings.
+
+    Returns ([label], {team_id: league points}, {team_id: matches}). A side counts exactly as in
+    feed.standings_by_night: it has a team id and a `points` field.
+    """
+    labels, pts, played = [], collections.Counter(), collections.Counter()
+    for division, by_date in season["schedule"].get("reg", {}).items():
+        for date, matches in by_date.items():
+            for m in matches:
+                if m.get("status") == "C":
+                    continue
+                left, right = m.get("left") or {}, m.get("right") or {}
+                labels.append(f"{division} {date} {players.clean_team(left.get('team_name'))} v "
+                              f"{players.clean_team(right.get('team_name'))} "
+                              f"(status={m.get('status')!r})")
+                for side in (left, right):
+                    if side.get("id") and side.get("points") is not None:
+                        pts[side["id"]] += int(side["points"])
+                        played[side["id"]] += 1
+    return labels, pts, played
+
+
 def check_feed_accuracy(seasons):
-    """Section 14: the Feed's standings agree with DartConnect."""
+    """Section 14: the Feed's standings agree with DartConnect.
+
+    The Feed's standings count only the matches DartConnect has closed (status 'C'), the same
+    ones fetch.py archives. DartConnect's own standings also count a match it has not closed yet
+    (status 'A'), and most weeks a match or two sits at 'A' for a day or more after the night.
+    All 12 such matches seen on Fall 2026's first ten Tuesdays were already in DartConnect's
+    league points and matches played. So their points come back out of DartConnect's numbers
+    before comparing: the two must still agree exactly, and a match that is only waiting to be
+    closed never fails the gate (ROADMAP Step 2). Counting them in full blocked the 2026-11-18
+    deploy over three such matches.
+    """
     print("\n14. The Feed agrees with DartConnect")
     import feed as feed_mod
     for season in seasons:
@@ -539,21 +572,27 @@ def check_feed_accuracy(seasons):
         if not cumulative:
             continue
         _date, final_pts, final_played = cumulative[-1]
+        open_labels, open_pts, open_mp = _open_matches(season)
+        if open_labels:
+            print(f"  NOTE  {night}: {len(open_labels)} match(es) DartConnect has not closed, "
+                  f"in its standings but not yet the Feed's: {'; '.join(open_labels)}")
         dc = {c["id"]: c for c in season["standings"]["competitors"]}
         wrong_pts, wrong_mp = [], []
         for c in dc.values():
             tid = c["id"]
             div = c["division"]
-            expect_pts = int(c["league_points"])
-            expect_mp = int(c["matches"])
+            expect_pts = int(c["league_points"]) - open_pts[tid]
+            expect_mp = int(c["matches"]) - open_mp[tid]
             got_pts = final_pts.get(div, {}).get(tid, 0)
             got_mp = final_played.get(tid, 0)
             if got_pts != expect_pts:
                 wrong_pts.append(f"{players.clean_team(c['team_name'])}: "
-                                 f"computed {got_pts}, DC {expect_pts}")
+                                 f"computed {got_pts}, DC {c['league_points']}"
+                                 + (f" less {open_pts[tid]} not closed" if open_pts[tid] else ""))
             if got_mp != expect_mp:
                 wrong_mp.append(f"{players.clean_team(c['team_name'])}: "
-                                f"computed {got_mp}, DC {expect_mp}")
+                                f"computed {got_mp}, DC {c['matches']}"
+                                + (f" less {open_mp[tid]} not closed" if open_mp[tid] else ""))
         check(f"{night}: league points match DartConnect for all "
               f"{len(dc)} teams", not wrong_pts, str(wrong_pts[:3]))
         check(f"{night}: matches played match DartConnect for all "
