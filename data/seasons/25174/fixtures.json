@@ -181,24 +181,6 @@
    }
   },
   {
-   "id": 10533223,
-   "division": "Division 1",
-   "sched_date": "2026-11-17",
-   "sched_time": "19:30",
-   "round_seq": 10,
-   "is_bye": false,
-   "status": "P",
-   "dc_match_id": null,
-   "left": {
-    "id": 395311,
-    "team_name": "The Craic"
-   },
-   "right": {
-    "id": 395236,
-    "team_name": "Paddy's Daddies"
-   }
-  },
-  {
    "id": 10533226,
    "division": "Division 1",
    "sched_date": "2026-11-17",
@@ -217,86 +199,14 @@
    }
   },
   {
-   "id": 10533229,
-   "division": "Division 1",
-   "sched_date": "2026-11-17",
-   "sched_time": "19:30",
-   "round_seq": 10,
-   "is_bye": false,
-   "status": "P",
-   "dc_match_id": null,
-   "left": {
-    "id": 395239,
-    "team_name": "Bucktown Darts"
-   },
-   "right": {
-    "id": 395224,
-    "team_name": "The Tickle Tickles"
-   }
-  },
-  {
-   "id": 10533232,
-   "division": "Division 1",
-   "sched_date": "2026-11-17",
-   "sched_time": "19:30",
-   "round_seq": 10,
-   "is_bye": false,
-   "status": "P",
-   "dc_match_id": null,
-   "left": {
-    "id": 395248,
-    "team_name": "Brazen Head"
-   },
-   "right": {
-    "id": 395242,
-    "team_name": "Westbury Inn"
-   }
-  },
-  {
-   "id": 10533364,
-   "division": "Division 2",
-   "sched_date": "2026-11-17",
-   "sched_time": "19:30",
-   "round_seq": 10,
-   "is_bye": false,
-   "status": "P",
-   "dc_match_id": null,
-   "left": {
-    "id": 395233,
-    "team_name": "Moonliters (Okeefes)"
-   },
-   "right": {
-    "id": 395221,
-    "team_name": "Prospect Darts and Chill "
-   }
-  },
-  {
-   "id": 10533367,
-   "division": "Division 2",
-   "sched_date": "2026-11-17",
-   "sched_time": "19:30",
-   "round_seq": 10,
-   "is_bye": false,
-   "status": "P",
-   "dc_match_id": null,
-   "left": {
-    "id": 395254,
-    "team_name": "Rullo's DC"
-   },
-   "right": {
-    "id": 395314,
-    "team_name": "Chairmen of the Board"
-   }
-  },
-  {
    "id": 10533370,
    "division": "Division 2",
    "sched_date": "2026-11-17",
    "sched_time": "19:30",
    "round_seq": 10,
    "is_bye": false,
-   "status": "P",
-   "dc_match_id": null,
+   "status": "A",
+   "dc_match_id": "6afcf5628e2f00636dcaaa93",
    "left": {
     "id": 395257,
     "team_name": "UB Darts Squad"
@@ -307,129 +217,21 @@
    }
   },
   {
-   "id": 10533499,
-   "division": "Division 3",
-   "sched_date": "2026-11-17",
-   "sched_time": "19:30",
-   "round_seq": 10,
-   "is_bye": false,
-   "status": "P",
-   "dc_match_id": null,
-   "left": {
-    "id": 395263,
-    "team_name": "The Prospectors (Pints & Points)"
-   },
-   "right": {
-    "id": 395269,
-    "team_name": "DuckDown Darts"
-   }
-  },
-  {
-   "id": 10533502,
-   "division": "Division 3",
-   "sched_date": "2026-11-17",
-   "sched_time": "19:30",
-   "round_seq": 10,
-   "is_bye": false,
-   "status": "P",
-   "dc_match_id": null,
-   "left": {
-    "id": 395260,
-    "team_name": "The Icelandic National Darts Team"
-   },
-   "right": {
-    "id": 395299,
-    "team_name": "Marty's Darty Party"
-   }
-  },
-  {
-   "id": 10533505,
-   "division": "Division 3",
-   "sched_date": "2026-11-17",
-   "sched_time": "19:30",
-   "round_seq": 10,
-   "is_bye": false,
-   "status": "P",
-   "dc_match_id": null,
-   "left": {
-    "id": 395251,
-    "team_name": "Eagle Fang Darts"
-   },
-   "right": {
-    "id": 395275,
-    "team_name": "The Monro Pub"
-   }
-  },
-  {
-   "id": 10533634,
-   "division": "Division 4",
-   "sched_date": "2026-11-17",
-   "sched_time": "19:30",
-   "round_seq": 10,
-   "is_bye": false,
-   "status": "P",
-   "dc_match_id": null,
-   "left": {
-    "id": 395284,
-    "team_name": "W2D (Westbury 2 Dangerous)"
-   },
-   "right": {
-    "id": 395287,
-    "team_name": "Dartbags (773)"
-   }
-  },
-  {
-   "id": 10533637,
-   "division": "Division 4",
-   "sched_date": "2026-11-17",
-   "sched_time": "19:30",
-   "round_seq": 10,
-   "is_bye": false,
-   "status": "P",
-   "dc_match_id": null,
-   "left": {
-    "id": 395278,
-    "team_name": "Shenanigans"
-   },
-   "right": {
-    "id": 395305,
-    "team_name": "That Team"
-   }
-  },
-  {
-   "id": 10533640,
-   "division": "Division 4",
-   "sched_date": "2026-11-17",
-   "sched_time": "19:30",
-   "round_seq": 10,
-   "is_bye": false,
-   "status": "P",
-   "dc_match_id": null,
-   "left": {
-    "id": 395308,
-    "team_name": "The Drunken Sailors"
-   },
-   "right": {
-    "id": 395272,
-    "team_name": "Farrell's"
-   }
-  },
-  {
    "id": 10533769,
    "division": "Division 5",
    "sched_date": "2026-11-17",
    "sched_time": "19:30",
    "round_seq": 10,
    "is_bye": false,
-   "status": "P",
-   "dc_match_id": null,
+   "status": "A",
+   "dc_match_id": "6afcf55d8e2f00636dcaaa69",
    "left": {
-    "id": 395281,
-    "team_name": "Bullseye Babes Triple Threat"
-   },
-   "right": {
     "id": 395293,
     "team_name": "Bullseye Babes Double Trouble"
+   },
+   "right": {
+    "id": 395281,
+    "team_name": "Bullseye Babes Triple Threat"
    }
   },
   {
@@ -457,15 +259,15 @@
    "sched_time": "19:30",
    "round_seq": 10,
    "is_bye": false,
-   "status": "P",
-   "dc_match_id": null,
+   "status": "A",
+   "dc_match_id": "6afcf53c8e2f00636dcaa9d7",
    "left": {
-    "id": 401530,
-    "team_name": "Those Divas"
-   },
-   "right": {
     "id": 395455,
     "team_name": "Commish 2"
+   },
+   "right": {
+    "id": 401530,
+    "team_name": "Those Divas"
    }
   },
   {
