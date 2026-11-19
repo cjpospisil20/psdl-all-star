@@ -169,15 +169,15 @@
    "sched_time": "19:30",
    "round_seq": 9,
    "is_bye": false,
-   "status": "P",
-   "dc_match_id": null,
+   "status": "A",
+   "dc_match_id": "6afe4e183ee4d2cd41d41e8a",
    "left": {
-    "id": 395452,
-    "team_name": "Boats & Hoes"
-   },
-   "right": {
     "id": 395281,
     "team_name": "Bullseye Babes Triple Threat"
+   },
+   "right": {
+    "id": 395452,
+    "team_name": "Boats & Hoes"
    }
   },
   {
