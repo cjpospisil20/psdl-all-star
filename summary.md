@@ -3,10 +3,10 @@
 > **Living document.** Update this at the end of any working session. It is the handoff file for
 > future agent sessions — read it first, before exploring the code.
 
-**Last updated:** 2026-11-16
+**Last updated:** 2026-11-18
 **Owner:** cjpospisil20@gmail.com
-**Status:** Live at <https://psdartleague.com/>, rebuilt by GitHub Actions the morning after each
-match night — 1,169 static pages from 519 archived matches across six seasons of both nights (Monday
+**Status:** Live at <https://psdartleague.com/>, rebuilt by GitHub Actions at 2 AM New York time
+the morning after each match night — 1,169 static pages from 519 archived matches across six seasons of both nights (Monday
 and Tuesday leagues, back to Fall 2025), plus each night's Schedule of match nights still to come.
 Built for a phone; from 768px it opens out into a desktop layout. Not yet reconciled with the
 commissioners. ROADMAP Steps 1–3 complete; Step 15's domain and HTTPS done early; part of Step 10
@@ -244,8 +244,8 @@ design/assets/         psdl-mark.png, psdl-wordmark-white.png — copied into pu
 DESIGN-SPEC.md         the design contract: palette, type, stat vocabulary, hard requirements
 CLAUDE.md              project conventions — read before touching site/ or scraper/
 README.md              outward-facing description and local run instructions
-.github/workflows/build.yml   weekly rebuild — Wed 07:00 UTC (small hours in Brooklyn,
-                       hours after the last dart), with a Thursday catch-up pass
+.github/workflows/build.yml   the rebuild — started at 2 AM New York time Tue + Wed by
+                       cron-job.org; GitHub's own 07:17 UTC Tue/Wed/Thu cron is the backup
 
 data/seasons.json      every season of both leagues (id, league, night, label, start date)
 data/seasons/<id>/     one DartConnect season: recaps/*.json (the permanent archive),
@@ -316,9 +316,10 @@ season, so it is a season-long landmark, not a weekly feature. Season to date: 2
    pages that were built for this were retired with the Match tab (2026-11-11); every hit on a
    player page still links to its DartConnect recap, naming set and game — and git history has
    `match_page()` if a commissioners-only per-match view is wanted back.
-3. **Scheduled runs** — **done**, in `.github/workflows/build.yml`: Wednesday 07:00 UTC with a
-   Thursday catch-up, since GitHub sometimes drops scheduled runs and `fetch.py` skips anything
-   already archived. The order is `fetch.py` → `verify.py` → `build.py` → `check.py`; run it in that
+3. **Scheduled runs** — **done**, in `.github/workflows/build.yml`. cron-job.org starts it at 2 AM
+   New York time every Tuesday and Wednesday (2026-11-18), because GitHub starts its own scheduled
+   runs hours late. GitHub's 07:17 UTC Tuesday, Wednesday and Thursday runs stay as the backup and a
+   second pass; `fetch.py` skips anything already archived. The order is `fetch.py` → `verify.py` → `build.py` → `check.py`; run it in that
    order by hand too, and never publish a build whose verify failed. The workflow runs
    `site/check.py` after the build; both gates fail the job and so block the deploy.
 4. **Forfeit handling** — flag forfeited matches as *awaiting commissioner credit* so they can't be
@@ -1399,3 +1400,38 @@ These pass: a fourth open match, and all three closed.
 
 **Verified.** `verify.py`, `build.py` (1,169 pages, byte-identical to before) and `check.py` pass on
 the archive through 11-17.
+
+### 2026-11-18 — A 2 AM trigger from outside GitHub
+
+The owner asked for a run at 2 AM on Tuesday, so Monday night's results are up by morning the way
+Tuesday night's are on Wednesday.
+- **The run already existed:** `"17 7 * * 2"` has been in the workflow since #18 (11-12), and on
+  11-17 it published Monday's three matches.
+- **It just never ran at 2 AM.** GitHub started all 18 scheduled runs 5 to 9½ hours late, between
+  8:19 AM and 11:54 AM New York time.
+- The delay is growing:
+
+| Period | Started (UTC) | New York |
+|---|---|---|
+| Sep–Oct, slot 07:00 | 12:19–14:19 | 8:19–10:19 AM |
+| Nov, slots 07:00 / 07:17 | 15:03–16:54 | 10:03–11:54 AM |
+
+GitHub delays scheduled runs under load and can drop them, and no setting changes that. Moving the
+cron earlier would only risk a run during play once its queue clears.
+
+**Decision (owner).** cron-job.org starts the workflow at **02:00 America/New_York every Tuesday
+and Wednesday**. It calls `POST /repos/cjpospisil20/psdl-all-star/actions/workflows/build.yml/
+dispatches` with `{"ref":"main"}`, which is exactly what the "Run workflow" button does.
+- **The token:** a fine-grained token, this repo only, **Actions: Read and write**. It lives only
+  in the cron-job.org job.
+- **GitHub's three crons are unchanged.** They are the backup if the trigger stops, and a later
+  second pass that archives any match DartConnect closes after 2 AM.
+- **Open matches:** 2 AM will often find some, which since #26 publish around rather than block.
+- The README has the job's settings, how to renew the token, and what each failure means.
+
+**Changed:** comments only in the workflow (no trigger, cron or step changed), README "How the
+weekly automation works" and its new "The 2 AM trigger", and the status lines here, in CLAUDE.md
+and in ROADMAP finding 9.
+
+**To confirm on Tue 11-24:** a `workflow_dispatch` run created at about 07:00 UTC, publishing
+Monday 11-23's matches; the GitHub `schedule` run follows later that day.
